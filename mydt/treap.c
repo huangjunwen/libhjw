@@ -1,4 +1,4 @@
-// vim:fdm=marker:nu:nowrap:encoding=gbk
+// vim:fdm=marker:nu:nowrap:encoding=utf-8
 
 #include <assert.h>
 #include <stdlib.h>

@@ -1,17 +1,17 @@
-// vim:fdm=marker:nu:nowrap:encoding=gbk
+// vim:fdm=marker:nu:nowrap:encoding=utf-8
 #ifndef _DT_H_
 #define _DT_H_
 
 #include "config.h"
 #include "types.h"
 
-// �ڵ�
+// 节点
 typedef struct {
 	real x;
 	real y;
 } node;
 
-// +y -x Ϊ��
+// +y -x 为先
 #define NODE_ORD_CMP(n1, n2) ((n1)->y > (n2)->y || ( (n1)->y == (n2)->y && (n1)->x < (n2)->x ))
 
 typedef void (*edgeHandler)(const node *, const node *);
@@ -23,23 +23,23 @@ typedef void* myDt;
 boolean dt_create(myDt * pdt);
 void dt_destroy(myDt * pdt);
 
-/* ��������api���ɻ���, ͬʱ�ڵ��õ���������, ���뱣֤���е�����겻�ܱ��ı�*/
+/* 以下两组api不可混用, 同时在调用的整个过程, 必须保证所有点的坐标不能被改变*/
 
 void dt_begin(myDt dt, edgeHandler handler);
-/* ��һ��api
- * dt_next/dt_end �÷�
- * dt_begin ��ʼ��dt�ṹ, ��ʾ׼����ʼһ���µ�һ�����У�֮ǰ�����ݽ��ᱻ���
- * dt_next �������㼯�е�ÿһ����
- * dt_end ���� dt_next ����ĵ㼯
+/* 第一组api
+ * dt_next/dt_end 用法
+ * dt_begin 初始化dt结构, 表示准备开始一个新的一次运行，之前的数据将会被清除
+ * dt_next 逐个输入点集中的每一个点
+ * dt_end 运行 dt_next 输入的点集
  */
 void dt_next(myDt dt, node * n);
 void dt_end(myDt dt);
 
-/* �ڶ���api
- * �÷������͵�һ��һ�£�Ψһ��֮ͬ������ʹ����һ��api���뱣֤
- * dt_next_sorted ����ĵ㼯���밴�� NODE_ORD_CMP ָ����˳������
- * ��ЩӦ�ó����µ㼯�����Ѿ���ĳ����ʽ�ź���, ʹ��
- * ��һ��api����ʡȴ�����ȵ�һ��Ҫ����ЧһЩ, ͬʱռ���ڴ�Ҳ����
+/* 第二组api
+ * 用法基本和第一组一致，唯一不同之处在于使用这一组api必须保证
+ * dt_next_sorted 输入的点集必须按照 NODE_ORD_CMP 指定的顺序输入
+ * 有些应用场景下点集可能已经以某种形式排好序, 使用
+ * 这一组api由于省却排序会比第一组要更高效一些, 同时占用内存也更少
  */
 void dt_next_sorted(myDt dt, node * pt);
 void dt_end_sorted(myDt dt);

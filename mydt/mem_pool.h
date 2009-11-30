@@ -1,4 +1,4 @@
-// vim:fdm=marker:nu:nowrap:encoding=gbk
+// vim:fdm=marker:nu:nowrap:encoding=utf-8
 
 #ifndef _MEM_POOL_H
 #define _MEM_POOL_H
@@ -12,12 +12,12 @@ typedef struct memSeg {
 } memSeg;
 
 typedef struct {
-    void * free_list;               // ¹é»¹µÄ¿ÕÏĞÁ´±í
-    byte * next_addr;               // Èô¿ÕÏĞÁ´±íÎª¿Õ£¬ÔòÕâ¸öÖ¸ÏòµÄÊÇÏÂÒ»¸ö¿É·ÖÅäµÄµØÖ· ( ÓĞ¿ÉÄÜ==addr_after_last )
-    memSeg * head_seg;              // memSeg ÊÇÒ»¸öÁ´±í£¬Á´±íÍ·
-    memSeg * curr_seg;              // µ±Ç°memSeg
-    uint32 item_sz;                 // ¹ËÃûË¼Òå ( ±ØĞëÂú×ã item_sz >= sizeof(void*) )
-    uint32 inc_sz;                  // Ã¿Ò»¸ösegÖĞ°üº¬µÄitem¸öÊı
+    void * free_list;               // å½’è¿˜çš„ç©ºé—²é“¾è¡¨
+    byte * next_addr;               // è‹¥ç©ºé—²é“¾è¡¨ä¸ºç©ºï¼Œåˆ™è¿™ä¸ªæŒ‡å‘çš„æ˜¯ä¸‹ä¸€ä¸ªå¯åˆ†é…çš„åœ°å€ ( æœ‰å¯èƒ½==addr_after_last )
+    memSeg * head_seg;              // memSeg æ˜¯ä¸€ä¸ªé“¾è¡¨ï¼Œé“¾è¡¨å¤´
+    memSeg * curr_seg;              // å½“å‰memSeg
+    uint32 item_sz;                 // é¡¾åæ€ä¹‰ ( å¿…é¡»æ»¡è¶³ item_sz >= sizeof(void*) )
+    uint32 inc_sz;                  // æ¯ä¸€ä¸ªsegä¸­åŒ…å«çš„itemä¸ªæ•°
 } memPool;
 
 boolean mem_pool_init(memPool * pool, uint32 item_sz, uint32 inc_sz);

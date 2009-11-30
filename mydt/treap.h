@@ -1,4 +1,4 @@
-// vim:fdm=marker:nu:nowrap:encoding=gbk
+// vim:fdm=marker:nu:nowrap:encoding=utf-8
 
 #include "config.h"
 #include "types.h"
@@ -9,16 +9,16 @@ typedef struct treapNode treapNode;
 struct treapNode {
 	void * val;
 	uint32 priority;				// the greater the closer to the root
-	treapNode * parent;				// Îª¿ÕÊ±±íÊ¾Îª root
+	treapNode * parent;				// ä¸ºç©ºæ—¶è¡¨ç¤ºä¸º root
 	treapNode * left;
 	treapNode * right;
 };
 
 typedef struct {
 	treapNode * node;
-	// µ± node Îª¿ÕÊ±, ±íÊ¾ÕâÊÇÒ»¸ö¿Õ½Úµã(²»´æÔÚµÄ), ´ËÊ± parent ÒÔ¼° pnode
-	// ÁªºÏÖ¸Ê¾Õâ¸ö¿Õ½ÚµãµÄÎ»ÖÃ
-	// Èô parent Ò²ÊÇ¿ÕµÄ, Ôò±íÊ¾ treap Ò²ÊÇ¿ÕµÄ
+	// å½“ node ä¸ºç©ºæ—¶, è¡¨ç¤ºè¿™æ˜¯ä¸€ä¸ªç©ºèŠ‚ç‚¹(ä¸å­˜åœ¨çš„), æ­¤æ—¶ parent ä»¥åŠ pnode
+	// è”åˆæŒ‡ç¤ºè¿™ä¸ªç©ºèŠ‚ç‚¹çš„ä½ç½®
+	// è‹¥ parent ä¹Ÿæ˜¯ç©ºçš„, åˆ™è¡¨ç¤º treap ä¹Ÿæ˜¯ç©ºçš„
 	treapNode * parent;
 	treapNode ** pnode;
 } treapIter;

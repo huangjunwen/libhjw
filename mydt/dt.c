@@ -1,4 +1,4 @@
-// vim:fdm=marker:nu:nowrap:encoding=gbk
+// vim:fdm=marker:nu:nowrap:encoding=utf-8
 
 #include <stdlib.h>
 #include <memory.h>
@@ -23,25 +23,25 @@
 
 typedef struct wave wave;
 
-// »ùµãÊÂ¼þ
+// åŸºç‚¹äº‹ä»¶
 typedef node siteEvent;
 
 
-// Ô²ÊÂ¼þ
+// åœ†äº‹ä»¶
 typedef struct {
     node coord;
-    wave * wv;                      // Ô²ÊÂ¼þ·¢ÉúÊ±£¬ÏûÊ§µÄÄÇ¶Îº£ÀËÏß
+    wave * wv;                      // åœ†äº‹ä»¶å‘ç”Ÿæ—¶ï¼Œæ¶ˆå¤±çš„é‚£æ®µæµ·æµªçº¿
 } cirlEvent;
 
 
-// Ò»¶Îº£ÀËÏß
+// ä¸€æ®µæµ·æµªçº¿
 struct wave {
-	node * focus;					// ½¹µã ( ÆäÊµ¾ÍÊÇÄ³»ùµã )
-	cirlEvent * cevent;			    // º£ÀËÏß¹ØÁªµÄÔ²ÊÂ¼þ
+	node * focus;					// ç„¦ç‚¹ ( å…¶å®žå°±æ˜¯æŸåŸºç‚¹ )
+	cirlEvent * cevent;			    // æµ·æµªçº¿å…³è”çš„åœ†äº‹ä»¶
 #ifndef NOT_USE_BST
-	void * bst_ptr;					// ÓÃÓÚ¼ÇÂ¼Õâ¶Îº£ÀËÏßÔÚ BST ½á¹¹ÖÐµÄÖ¸Õë, ²åÈëÊ±·µ»Ø, ¿ÉÓÃÓÚÉ¾³ý
+	void * bst_ptr;					// ç”¨äºŽè®°å½•è¿™æ®µæµ·æµªçº¿åœ¨ BST ç»“æž„ä¸­çš„æŒ‡é’ˆ, æ’å…¥æ—¶è¿”å›ž, å¯ç”¨äºŽåˆ é™¤
 #endif
-	wave * prev;					// Ë«ÏòÁ´±í
+	wave * prev;					// åŒå‘é“¾è¡¨
 	wave * next;		
 };
 
@@ -102,7 +102,7 @@ INTERNAL void se_array_sort(sevArray * a) {
  * Circle event heap
  *********************************/
 
-// Ô²ÊÂ¼þ¶Ñ
+// åœ†äº‹ä»¶å †
 typedef struct {
     cirlEvent ** elems;
     uint32 capacity;
@@ -184,7 +184,7 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
  * main structure 
  *********************************/
 
-// Ö÷½á¹¹
+// ä¸»ç»“æž„
 typedef struct {
     sevArray se_array;              // as a sorted array
     cevHeap ce_heap;                // as a heap
@@ -271,15 +271,15 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
 	 * |     \_/|   |
 	 * |     |   |r|
 	 * |    s|    -
-	 * |-----+--------- sweepline ÓÉyµÄÕýÎÞÇîÉ¨Ãèµ½yµÄ¸ºÎÞÇî
+	 * |-----+--------- sweepline ç”±yçš„æ­£æ— ç©·æ‰«æåˆ°yçš„è´Ÿæ— ç©·
 	 * |    new site                     
 	 * +----------------> x
 	 *
-	 * ÈçÍ¼ËùÊ¾, ½¹µãÎªl ÒÔ¼°½¹µãÎªr µÄÁ½¶ÎÅ×ÎïÏß, ÐÂÔöµÄs, after_break_pointÅÐ¶ÏÐÂÔöµÄsÊÇ·ñ
-	 * ÔÚÕâÁ½Ìõº£ÀËÏß¶ÏµãÖ®ºó£ºÈôÔÚ¶Ïµã×ó±ß(°üÀ¨¶Ïµã)£¬·µ»Øfalse£¬ÈôÔÚÓÒ±ß£¬·µ»Øtrue
+	 * å¦‚å›¾æ‰€ç¤º, ç„¦ç‚¹ä¸ºl ä»¥åŠç„¦ç‚¹ä¸ºr çš„ä¸¤æ®µæŠ›ç‰©çº¿, æ–°å¢žçš„s, after_break_pointåˆ¤æ–­æ–°å¢žçš„sæ˜¯å¦
+	 * åœ¨è¿™ä¸¤æ¡æµ·æµªçº¿æ–­ç‚¹ä¹‹åŽï¼šè‹¥åœ¨æ–­ç‚¹å·¦è¾¹(åŒ…æ‹¬æ–­ç‚¹)ï¼Œè¿”å›žfalseï¼Œè‹¥åœ¨å³è¾¹ï¼Œè¿”å›žtrue
 	 *
 	 */
-	// ÌØÊâÇéÐÎ1, l »òÕß r ÖÐÓÐÒ»¸ö¸ú s µÄy×ø±êÒ»ÖÂ
+	// ç‰¹æ®Šæƒ…å½¢1, l æˆ–è€… r ä¸­æœ‰ä¸€ä¸ªè·Ÿ s çš„yåæ ‡ä¸€è‡´
 	real sl_y;
 	if (!(sl_y = Y_DELTA(s, l))) {
 		return s->x > l->x;
@@ -289,14 +289,14 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
 		return s->x > r->x;
 	}
 
-	// ÌØÊâÇé¿ö2, Èôl r µÄy×ø±êÏàÍ¬, Òò´ËÁ½Å×ÎïÏß½öÓÐÒ»¸ö½»µã, ½»µãµÄx×ø±êÔÚÁ½ÕßÖÐ¼ä
+	// ç‰¹æ®Šæƒ…å†µ2, è‹¥l r çš„yåæ ‡ç›¸åŒ, å› æ­¤ä¸¤æŠ›ç‰©çº¿ä»…æœ‰ä¸€ä¸ªäº¤ç‚¹, äº¤ç‚¹çš„xåæ ‡åœ¨ä¸¤è€…ä¸­é—´
 	real lr_y;
 	if (!(lr_y = Y_DELTA(l, r))) {
 		return s->x > X_SUM(l, r)/2;
 	}
 
-	// Ò»°ãÇé¿ö
-	// Ö±Ïß x = s->x ÓëÁ½¸öÅ×ÎïÏßµÄ½»µãÎªCl, Cr, Ôòyl == 2*Cl.y, yr == 2*Cr.y
+	// ä¸€èˆ¬æƒ…å†µ
+	// ç›´çº¿ x = s->x ä¸Žä¸¤ä¸ªæŠ›ç‰©çº¿çš„äº¤ç‚¹ä¸ºCl, Cr, åˆ™yl == 2*Cl.y, yr == 2*Cr.y
 	// yl = sweepline + l->y - (s->x - l->x)*(s->x - l->x)/(sweepline - l->y);
 	// yr = sweepline + r->y - (s->x - r->x)*(s->x - r->x)/(sweepline - r->y);
 	// t = yl - yr
@@ -304,13 +304,13 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
 	real sr_x = X_DELTA(s, r);
 	real t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
 
-	// l ±È r Ô¶ÀëÉ¨ÃèÏß, Òò´Ë¶ÏµãÖ¸µÄÊÇÁ½¸ö½»µãµÄ×ó½»µã
+	// l æ¯” r è¿œç¦»æ‰«æçº¿, å› æ­¤æ–­ç‚¹æŒ‡çš„æ˜¯ä¸¤ä¸ªäº¤ç‚¹çš„å·¦äº¤ç‚¹
 	if (lr_y > 0) {
-		// ÈôÔÚÖÐ¼ä£¬Ôòtrue£¬ÈôÔÚÁ½²à£¬ÔòÅÐ¶Ï s->x - r->x > 0
+		// è‹¥åœ¨ä¸­é—´ï¼Œåˆ™trueï¼Œè‹¥åœ¨ä¸¤ä¾§ï¼Œåˆ™åˆ¤æ–­ s->x - r->x > 0
 		return t > 0 ? 1 : sr_x > 0;
 	}
-	// r ±È l Ô¶ÀëÉ¨ÃèÏß, Òò´Ë¶ÏµãÖ¸µÄÊÇÁ½¸ö½»µãµÄÓÒ½»µã
-	// ÈôÔÚÖÐ¼ä£¬Ôòfalse£¬ÈôÔÚÁ½²à£¬ÔòÅÐ¶Ï s->x - l->x <= 0
+	// r æ¯” l è¿œç¦»æ‰«æçº¿, å› æ­¤æ–­ç‚¹æŒ‡çš„æ˜¯ä¸¤ä¸ªäº¤ç‚¹çš„å³äº¤ç‚¹
+	// è‹¥åœ¨ä¸­é—´ï¼Œåˆ™falseï¼Œè‹¥åœ¨ä¸¤ä¾§ï¼Œåˆ™åˆ¤æ–­ s->x - l->x <= 0
 	return t < 0 ? 0 : sl_x > 0;
 }
 
@@ -320,7 +320,7 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 #endif
 	INIT_WV_SHORTCUT(dt);
 
-	// ¼ì²é²ÎÊý
+	// æ£€æŸ¥å‚æ•°
 	if (wv == HEAD_WV || wv == LAST_WV) {
 		return 0;
 	}
@@ -328,9 +328,9 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 	node * b = wv->focus;
 	node * c = wv->next->focus;
 
-	/* ÈôÐÐÁÐÊ½
+	/* è‹¥è¡Œåˆ—å¼
 	 * | abx cbx | 
-	 * |         | > 0 ±íÃ÷´ÓÏòÁ¿ b->a ×ªµ½ b->c µÄ½Ç¶ÈÐ¡ÓÚ 180
+	 * |         | > 0 è¡¨æ˜Žä»Žå‘é‡ b->a è½¬åˆ° b->c çš„è§’åº¦å°äºŽ 180
 	 * | aby cby | 
 	 */
 	real abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
@@ -340,12 +340,12 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 		return 0;
 	}
 
-	// ¿ÉÒÔÈ·¶¨ÓÐÐÂµÄ candidate circle event
+	// å¯ä»¥ç¡®å®šæœ‰æ–°çš„ candidate circle event
 	cirlEvent * res = (cirlEvent *)mem_pool_get(&dt->ce_pool);
     cevent_init(res);
     node * nd= &res->coord;
 
-	/* ½â·½³Ì×éÇóµÃÈýµãÍâ½ÓÔ²Ô²ÐÄ
+	/* è§£æ–¹ç¨‹ç»„æ±‚å¾—ä¸‰ç‚¹å¤–æŽ¥åœ†åœ†å¿ƒ
 	 * 2*abx*X + 2*aby*Y = abx * X_SUM(a, b) + aby * Y_SUM(a, b)
 	 * 2*cbx*X + 2*cby*Y = cbx * X_SUM(c, b) + cby * Y_SUM(c, b)
 	 */
@@ -355,7 +355,7 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 	nd->x = (cby * r1 - aby * r2)/det;
 	nd->y = (abx * r2 - cbx * r1)/det;
 	
-	/* yÖá¼õÈ¥°ë¾¶ÒÔ»ñµÃÔ°µÄ×îµ×¶Ë
+	/* yè½´å‡åŽ»åŠå¾„ä»¥èŽ·å¾—å›­çš„æœ€åº•ç«¯
 	 */
 	real xdelta = X_DELTA(nd, a);
 	real ydelta = Y_DELTA(nd, a);
@@ -425,9 +425,9 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
 			after_break_point(e, curr->focus, curr->next->focus)) {
 		curr = curr->next;
 	}
-	// curr ¼´ÐÂ»ùµãËù´¦µÄº£ÀËÏß
+	// curr å³æ–°åŸºç‚¹æ‰€å¤„çš„æµ·æµªçº¿
 	
-	// Éú³ÉÁ½¸ö wave 
+	// ç”Ÿæˆä¸¤ä¸ª wave 
 	wave * new_wv = (wave *)mem_pool_get(&dt->wv_pool);
     wave_init(new_wv);
 	new_wv->focus = e;
@@ -435,12 +435,12 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
     wave_init(dup_wv);
 	dup_wv->focus = curr->focus;
 
-	// ²åÈëÐèÒª±£Ö¤BSTÖÐµÄË³Ðò
-	// left_bound == right_bound ÓÐÁ½ÖÖÇé¿öÏÂ»á³öÏÖ
-	// 1. Ö»ÓÐÒ»¸ö wave µÄÊ±ºò(¼´Ö»ÓÐÍ·), ´ËÊ±±£Ö¤Ã»ÓÐ BST ½á¹¹, ¹ÊÎÞÐè±£Ö¤Ë³Ðò
-	// 2. iter µü´úµÄ×îºóÁ½²½ËùÖ¸ÏòµÄ wave Ç¡ºÃÏàÁÚ(ÆäÊµÕâÒ²ÊÇÓÐÁ½ÖÖÇé¿özig-zagºÍzag-zig), 
-	// 		¾­»­Í¼ÑéÖ¤, ÈÔÈ»Ó¦¸ÃÔÚÆäºó²åÈë
-	// µ± left_bound != right_bound Ê±, Ö»Òª±£Ö¤ÐÂ²åÈëµÄµãÎ»ÓÚÁ½ÕßÖ®¼ä¼´¿É
+	// æ’å…¥éœ€è¦ä¿è¯BSTä¸­çš„é¡ºåº
+	// left_bound == right_bound æœ‰ä¸¤ç§æƒ…å†µä¸‹ä¼šå‡ºçŽ°
+	// 1. åªæœ‰ä¸€ä¸ª wave çš„æ—¶å€™(å³åªæœ‰å¤´), æ­¤æ—¶ä¿è¯æ²¡æœ‰ BST ç»“æž„, æ•…æ— éœ€ä¿è¯é¡ºåº
+	// 2. iter è¿­ä»£çš„æœ€åŽä¸¤æ­¥æ‰€æŒ‡å‘çš„ wave æ°å¥½ç›¸é‚»(å…¶å®žè¿™ä¹Ÿæ˜¯æœ‰ä¸¤ç§æƒ…å†µzig-zagå’Œzag-zig), 
+	// 		ç»ç”»å›¾éªŒè¯, ä»ç„¶åº”è¯¥åœ¨å…¶åŽæ’å…¥
+	// å½“ left_bound != right_bound æ—¶, åªè¦ä¿è¯æ–°æ’å…¥çš„ç‚¹ä½äºŽä¸¤è€…ä¹‹é—´å³å¯
 	if (left_bound == right_bound || curr != right_bound) {
 		// insert after curr
 		wv = curr->next;
@@ -457,10 +457,10 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
 
 	}
 	
-	// Îª curr ÉèÖÃÎó¾¯
+	// ä¸º curr è®¾ç½®è¯¯è­¦
 	UNLINK_CEVENT(curr);
 
-	// Îª dup_wv ºÍ curr ÖØÐÂ¼ÆËã¿ÉÄÜµÄ candidate circle event
+	// ä¸º dup_wv å’Œ curr é‡æ–°è®¡ç®—å¯èƒ½çš„ candidate circle event
 	cirlEvent * new_cevent;
     memPool * pool = &dt->ce_pool;
     cevHeap * heap = &dt->ce_heap;
@@ -494,16 +494,16 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
 		return;
 	INIT_WV_SHORTCUT(dt);
 
-	// È¥µôÕâ¶Îº£ÀËÏß
+	// åŽ»æŽ‰è¿™æ®µæµ·æµªçº¿
 	wave * p;
 	wave * n;
 	p = wv->next->prev = wv->prev;
 	n = wv->prev->next = wv->next;
-	// Ê×ÏÈÎªËùÓÐÏà¹ØµÄwaveÉèÖÃÎó¾¯ 
+	// é¦–å…ˆä¸ºæ‰€æœ‰ç›¸å…³çš„waveè®¾ç½®è¯¯è­¦ 
 	UNLINK_CEVENT(p);
 	UNLINK_CEVENT(n);
 	
-	// Îªwv->prevºÍwv->next¼ÆËã¿ÉÄÜµÄcandidate circle event
+	// ä¸ºwv->prevå’Œwv->nextè®¡ç®—å¯èƒ½çš„candidate circle event
 	cirlEvent * new_cevent;
     memPool * pool = &dt->ce_pool;
     cevHeap * heap = &dt->ce_heap;

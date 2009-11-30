@@ -1,3 +1,4 @@
+// vim:fdm=marker:nu:nowrap:encoding=utf-8
 
 // switches
 #define OUTFILE 1
