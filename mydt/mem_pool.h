@@ -1,4 +1,4 @@
-// vim:fdm=marker:nu:nowrap:encoding=utf-8
+// vim:fdm=marker:nu:nowrap
 
 #ifndef _MEM_POOL_H
 #define _MEM_POOL_H
@@ -12,12 +12,12 @@ typedef struct memSeg {
 } memSeg;
 
 typedef struct {
-    void * free_list;               // 归还的空闲链表
-    byte * next_addr;               // 若空闲链表为空，则这个指向的是下一个可分配的地址 ( 有可能==addr_after_last )
-    memSeg * head_seg;              // memSeg 是一个链表，链表头
-    memSeg * curr_seg;              // 当前memSeg
-    uint32 item_sz;                 // 顾名思义 ( 必须满足 item_sz >= sizeof(void*) )
-    uint32 inc_sz;                  // 每一个seg中包含的item个数
+    void * free_list;               // free link list
+    byte * next_addr;               // if freelist is null, then point to the next avail addr ( maybe ==addr_after_last )
+    memSeg * head_seg;              // head of link list of memSeg
+    memSeg * curr_seg;              // current memSeg
+    uint32 item_sz;                 // the size of each item in pool ( must item_sz >= sizeof(void*) )
+    uint32 inc_sz;                  // how many item in a memSeg
 } memPool;
 
 boolean mem_pool_init(memPool * pool, uint32 item_sz, uint32 inc_sz);

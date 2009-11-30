@@ -1,4 +1,4 @@
-// vim:fdm=marker:nu:nowrap:encoding=utf-8
+// vim:fdm=marker:nu:nowrap
 #include <stdlib.h>
 #include "mem_pool.h"
 

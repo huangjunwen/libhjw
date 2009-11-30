@@ -1,4 +1,4 @@
-﻿// vim:fdm=marker:nu:nowrap:encoding=utf-8
+﻿// vim:fdm=marker:nu:nowrap
 
 #ifndef _TYPES_H
 #define _TYPES_H

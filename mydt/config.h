@@ -1,4 +1,4 @@
-// vim:fdm=marker:nu:nowrap:encoding=utf-8
+// vim:fdm=marker:nu:nowrap
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 

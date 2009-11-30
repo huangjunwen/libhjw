@@ -1,4 +1,4 @@
-// vim:fdm=marker:nu:nowrap:encoding=utf-8
+// vim:fdm=marker:nu:nowrap
 
 #include <stdlib.h>
 #include <memory.h>
@@ -23,25 +23,20 @@
 
 typedef struct wave wave;
 
-// 基点事件
 typedef node siteEvent;
 
-
-// 圆事件
 typedef struct {
     node coord;
-    wave * wv;                      // 圆事件发生时，消失的那段海浪线
+    wave * wv;                      // if not null that is the disappear wave when this event occur
 } cirlEvent;
 
-
-// 一段海浪线
 struct wave {
-	node * focus;					// 焦点 ( 其实就是某基点 )
-	cirlEvent * cevent;			    // 海浪线关联的圆事件
+	node * focus;					// the focus point ( the coord of site event )
+	cirlEvent * cevent;			    // the circle event 
 #ifndef NOT_USE_BST
-	void * bst_ptr;					// 用于记录这段海浪线在 BST 结构中的指针, 插入时返回, 可用于删除
+	void * bst_ptr;					
 #endif
-	wave * prev;					// 双向链表
+	wave * prev;					// double link list
 	wave * next;		
 };
 
@@ -102,7 +97,6 @@ INTERNAL void se_array_sort(sevArray * a) {
  * Circle event heap
  *********************************/
 
-// 圆事件堆
 typedef struct {
     cirlEvent ** elems;
     uint32 capacity;
@@ -184,7 +178,6 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
  * main structure 
  *********************************/
 
-// 主结构
 typedef struct {
     sevArray se_array;              // as a sorted array
     cevHeap ce_heap;                // as a heap
@@ -271,15 +264,13 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
 	 * |     \_/|   |
 	 * |     |   |r|
 	 * |    s|    -
-	 * |-----+--------- sweepline 由y的正无穷扫描到y的负无穷
+	 * |-----+--------- sweepline scan from +y to -y
 	 * |    new site                     
 	 * +----------------> x
 	 *
-	 * 如图所示, 焦点为l 以及焦点为r 的两段抛物线, 新增的s, after_break_point判断新增的s是否
-	 * 在这两条海浪线断点之后：若在断点左边(包括断点)，返回false，若在右边，返回true
-	 *
+     * return 1 if the site event is occur on the right side of the break point of the two waves
 	 */
-	// 特殊情形1, l 或者 r 中有一个跟 s 的y坐标一致
+	// case 1, either l or r 's y coord is the same as s
 	real sl_y;
 	if (!(sl_y = Y_DELTA(s, l))) {
 		return s->x > l->x;
@@ -289,14 +280,15 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
 		return s->x > r->x;
 	}
 
-	// 特殊情况2, 若l r 的y坐标相同, 因此两抛物线仅有一个交点, 交点的x坐标在两者中间
+	// case 2, l.y == r.y
 	real lr_y;
 	if (!(lr_y = Y_DELTA(l, r))) {
 		return s->x > X_SUM(l, r)/2;
 	}
 
-	// 一般情况
-	// 直线 x = s->x 与两个抛物线的交点为Cl, Cr, 则yl == 2*Cl.y, yr == 2*Cr.y
+    // case 3
+    // let Cl be the intersection of line x=s->x and wave l, and yl = 2*Cl.y
+    // let Cr be the intersection of line x=s->x and wave r, and yr = 2*Cr.y
 	// yl = sweepline + l->y - (s->x - l->x)*(s->x - l->x)/(sweepline - l->y);
 	// yr = sweepline + r->y - (s->x - r->x)*(s->x - r->x)/(sweepline - r->y);
 	// t = yl - yr
@@ -304,13 +296,12 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
 	real sr_x = X_DELTA(s, r);
 	real t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
 
-	// l 比 r 远离扫描线, 因此断点指的是两个交点的左交点
+    // two waves have two break points
+	// the left break point
 	if (lr_y > 0) {
-		// 若在中间，则true，若在两侧，则判断 s->x - r->x > 0
 		return t > 0 ? 1 : sr_x > 0;
 	}
-	// r 比 l 远离扫描线, 因此断点指的是两个交点的右交点
-	// 若在中间，则false，若在两侧，则判断 s->x - l->x <= 0
+    // the right break point
 	return t < 0 ? 0 : sl_x > 0;
 }
 
@@ -320,7 +311,6 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 #endif
 	INIT_WV_SHORTCUT(dt);
 
-	// 检查参数
 	if (wv == HEAD_WV || wv == LAST_WV) {
 		return 0;
 	}
@@ -328,9 +318,9 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 	node * b = wv->focus;
 	node * c = wv->next->focus;
 
-	/* 若行列式
+	/* if det
 	 * | abx cbx | 
-	 * |         | > 0 表明从向量 b->a 转到 b->c 的角度小于 180
+	 * |         | > 0, then the angle between vector b->a to b->c is less than 180 
 	 * | aby cby | 
 	 */
 	real abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
@@ -340,12 +330,11 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 		return 0;
 	}
 
-	// 可以确定有新的 candidate circle event
 	cirlEvent * res = (cirlEvent *)mem_pool_get(&dt->ce_pool);
     cevent_init(res);
     node * nd= &res->coord;
 
-	/* 解方程组求得三点外接圆圆心
+	/* get the center of circle of the three points
 	 * 2*abx*X + 2*aby*Y = abx * X_SUM(a, b) + aby * Y_SUM(a, b)
 	 * 2*cbx*X + 2*cby*Y = cbx * X_SUM(c, b) + cby * Y_SUM(c, b)
 	 */
@@ -355,7 +344,7 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 	nd->x = (cby * r1 - aby * r2)/det;
 	nd->y = (abx * r2 - cbx * r1)/det;
 	
-	/* y轴减去半径以获得园的最底端
+	/* get the bottom point of the circle
 	 */
 	real xdelta = X_DELTA(nd, a);
 	real ydelta = Y_DELTA(nd, a);
@@ -425,9 +414,8 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
 			after_break_point(e, curr->focus, curr->next->focus)) {
 		curr = curr->next;
 	}
-	// curr 即新基点所处的海浪线
+    // curr is the right wave
 	
-	// 生成两个 wave 
 	wave * new_wv = (wave *)mem_pool_get(&dt->wv_pool);
     wave_init(new_wv);
 	new_wv->focus = e;
@@ -435,12 +423,12 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
     wave_init(dup_wv);
 	dup_wv->focus = curr->focus;
 
-	// 插入需要保证BST中的顺序
-	// left_bound == right_bound 有两种情况下会出现
-	// 1. 只有一个 wave 的时候(即只有头), 此时保证没有 BST 结构, 故无需保证顺序
-	// 2. iter 迭代的最后两步所指向的 wave 恰好相邻(其实这也是有两种情况zig-zag和zag-zig), 
-	// 		经画图验证, 仍然应该在其后插入
-	// 当 left_bound != right_bound 时, 只要保证新插入的点位于两者之间即可
+    // insert in the right place
+    // !! must ensure that the order in BST is the same as in wave list
+    // left_bound == right_bound when:
+    // 1. there is only a head in wave list
+    // 2. the last two BST nodes in one iteration point to two adjacent waves
+    // in either case new waves should be inserted after curr
 	if (left_bound == right_bound || curr != right_bound) {
 		// insert after curr
 		wv = curr->next;
@@ -457,10 +445,10 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
 
 	}
 	
-	// 为 curr 设置误警
+    // set false alarm for curr
 	UNLINK_CEVENT(curr);
 
-	// 为 dup_wv 和 curr 重新计算可能的 candidate circle event
+    // recalculate candidate circle event for dup_wv and curr
 	cirlEvent * new_cevent;
     memPool * pool = &dt->ce_pool;
     cevHeap * heap = &dt->ce_heap;
@@ -494,16 +482,15 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
 		return;
 	INIT_WV_SHORTCUT(dt);
 
-	// 去掉这段海浪线
+	// remove this wave
 	wave * p;
 	wave * n;
 	p = wv->next->prev = wv->prev;
 	n = wv->prev->next = wv->next;
-	// 首先为所有相关的wave设置误警 
+    // set false alarms
 	UNLINK_CEVENT(p);
 	UNLINK_CEVENT(n);
 	
-	// 为wv->prev和wv->next计算可能的candidate circle event
 	cirlEvent * new_cevent;
     memPool * pool = &dt->ce_pool;
     cevHeap * heap = &dt->ce_heap;

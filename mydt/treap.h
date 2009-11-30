@@ -1,4 +1,4 @@
-// vim:fdm=marker:nu:nowrap:encoding=utf-8
+// vim:fdm=marker:nu:nowrap
 
 #include "config.h"
 #include "types.h"
@@ -9,16 +9,14 @@ typedef struct treapNode treapNode;
 struct treapNode {
 	void * val;
 	uint32 priority;				// the greater the closer to the root
-	treapNode * parent;				// 为空时表示为 root
+	treapNode * parent;				// if parent == 0, this node is root
 	treapNode * left;
 	treapNode * right;
 };
 
 typedef struct {
+    // if node == 0, this is an 'empty' node, we can insert new node in it
 	treapNode * node;
-	// 当 node 为空时, 表示这是一个空节点(不存在的), 此时 parent 以及 pnode
-	// 联合指示这个空节点的位置
-	// 若 parent 也是空的, 则表示 treap 也是空的
 	treapNode * parent;
 	treapNode ** pnode;
 } treapIter;
