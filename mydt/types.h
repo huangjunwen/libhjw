@@ -1,4 +1,4 @@
-﻿// vim:fdm=marker:nu:nowrap
+// vim:fdm=marker:nu:nowrap
 
 #ifndef _TYPES_H
 #define _TYPES_H
