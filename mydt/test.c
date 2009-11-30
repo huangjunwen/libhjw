@@ -62,7 +62,7 @@ int main() {
     real x, y;
     int32 r;
     uint32 i, j, num, c;
-    numNode buffer[100000];
+    numNode buffer[50000];
     num = 0;
     while (1) {
         r = fscanf(fp, "%d %f %f\n", &c, &x, &y);
