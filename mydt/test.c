@@ -21,10 +21,19 @@
 #include "dt.h"
 #include "mem_pool.h"
 
+typedef struct {
+    node coord;
+    uint32 num;
+} numNode;
+
 #if OUTFILE
 void pp_handler(const node * p1, const node * p2) {
-	printf("((%f, %f), (%f, %f))\n", p1->x, p1->y, p2->x, p2->y);
-//	outfile << "((" << p1->x << ", " << p1->y << "), (" << p2->x << ", " << p2->y << "))" << std::endl;
+    const numNode * nn1 = (const numNode*)p1;
+    const numNode * nn2 = (const numNode*)p2;
+    uint32 min = nn1->num > nn2->num ? nn2->num : nn1->num;
+    uint32 max = nn1->num > nn2->num ? nn1->num : nn2->num;
+	printf("%u %u\n", min, max);
+	//printf("((%f, %f), (%f, %f))\n", p1->x, p1->y, p2->x, p2->y);
 }
 #else
 void pp_handler(const node * p1, const node * p2) {
@@ -52,15 +61,16 @@ int main() {
     }
     real x, y;
     int32 r;
-    uint32 i, j, num;
-    node buffer[100000];
+    uint32 i, j, num, c;
+    numNode buffer[100000];
     num = 0;
     while (1) {
-        r = fscanf(fp, "%f %f\n", &x, &y);
+        r = fscanf(fp, "%d %f %f\n", &c, &x, &y);
         if (r == EOF)
             break;
-        buffer[num].x = x;
-        buffer[num].y = y;
+        buffer[num].coord.x = x;
+        buffer[num].coord.y = y;
+        buffer[num].num = num;
         ++num;
     }
 	fclose(fp);
@@ -93,9 +103,9 @@ int main() {
         dt_begin(dt, pp_handler);
         for (j = 0; j < num; ++j) {
 #if SORT_OUTSIDE
-			dt_next_sorted(dt, &buffer[j]);
+			dt_next_sorted(dt, (node*)&buffer[j]);
 #else
-            dt_next(dt, &buffer[j]);
+            dt_next(dt, (node*)&buffer[j]);
 #endif
         }
 #if SORT_OUTSIDE
