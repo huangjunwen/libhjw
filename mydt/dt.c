@@ -82,16 +82,35 @@ INTERNAL boolean se_array_push_back(sevArray * a, siteEvent * elem) {
     return 1;
 }
 
-INTERNAL int node_ord_cmp(const void * v1, const void * v2) {
-    const node * n1 = *(const node **)v1;
-    const node * n2 = *(const node **)v2;
-    return NODE_ORD_CMP(n1, n2) ? -1 : 1;
+INTERNAL uint32 _partition(siteEvent ** elems, uint32 left, uint32 right) {
+    siteEvent * tmp;
+#define SWAP(i1, i2) tmp = elems[i1]; elems[i1] = elems[i2]; elems[i2] = tmp
+    siteEvent * pivot = elems[left];
+    SWAP(left, right);
+    uint32 idx = left;
+    uint32 i;
+    for (i = left; i < right; ++i) {
+        if (NODE_ORD_CMP(elems[i], pivot)) {
+            SWAP(i, idx);
+            ++idx;
+        }   
+    }   
+    SWAP(idx, right);
+    return idx;
+}
+
+void _qsort(siteEvent ** elems, uint32 left, uint32 right) {
+    if (left >= right)
+        return;
+    uint32 i = _partition(elems, left, right);
+    if (i) 
+        _qsort(elems, left, i - 1); 
+    _qsort(elems, i + 1, right);
 }
 
 INTERNAL void se_array_sort(sevArray * a) {
-    qsort(a->elems, a->size, sizeof(siteEvent *), node_ord_cmp);
+    _qsort(a->elems, 0, a->size - 1); 
 }
-
 
 /*********************************
  * Circle event heap
