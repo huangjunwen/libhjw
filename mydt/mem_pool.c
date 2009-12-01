@@ -21,8 +21,8 @@ memSeg * _new_seg(memPool * pool) {
 
 void mem_pool_reset(memPool * pool) {
     pool->free_list = 0;
-    pool->next_addr = pool->head_seg->mem;
-    pool->curr_seg = pool->head_seg;
+    pool->next_addr = pool->head_seg.mem;
+    pool->curr_seg = &pool->head_seg;
 }
 
 boolean mem_pool_init(memPool * pool, uint32 item_sz, uint32 inc_sz) {
@@ -30,14 +30,17 @@ boolean mem_pool_init(memPool * pool, uint32 item_sz, uint32 inc_sz) {
     assert(inc_sz > 0);
     pool->item_sz = item_sz;
     pool->inc_sz = inc_sz;
-    if (!(pool->head_seg = _new_seg(pool)))
-        return 0;
+
+    // special init for head_seg
+    pool->head_seg.next = 0;
+    pool->head_seg.addr_after_last = pool->head_seg.mem;
+
     mem_pool_reset(pool);
     return 1;
 }
 
 void mem_pool_finalize(memPool * pool) {
-    memSeg * ms = pool->head_seg;
+    memSeg * ms = pool->head_seg.next;
     memSeg * n;
     while (ms) {
         n = ms->next;

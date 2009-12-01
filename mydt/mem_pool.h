@@ -14,10 +14,10 @@ typedef struct memSeg {
 typedef struct {
     void * free_list;               // free link list
     byte * next_addr;               // if freelist is null, then point to the next avail addr ( maybe ==addr_after_last )
-    memSeg * head_seg;              // head of link list of memSeg
     memSeg * curr_seg;              // current memSeg
     uint32 item_sz;                 // the size of each item in pool ( must item_sz >= sizeof(void*) )
     uint32 inc_sz;                  // how many item in a memSeg
+    memSeg head_seg;                // head of link list of memSeg
 } memPool;
 
 boolean mem_pool_init(memPool * pool, uint32 item_sz, uint32 inc_sz);
