@@ -2,7 +2,7 @@
 
 // switches
 #define OUTFILE 1
-#define SORT_OUTSIDE 0
+#define SORT_OUTSIDE 1
 
 #ifdef WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -24,10 +24,10 @@
 
 #if OUTFILE
 void pp_handler(const node * p1, const node * p2) {
-    uint32 n1 = (uint32)p1->attr;
-    uint32 n2 = (uint32)p2->attr;
-    uint32 min = n1>n2?n2:n1;
-    uint32 max = n1>n2?n1:n2;
+     uint32 n1 = (uint32)p1->attr;
+     uint32 n2 = (uint32)p2->attr;
+     uint32 min = n1>n2?n2:n1;
+     uint32 max = n1>n2?n1:n2;
     printf("%u %u\n", min, max);
     //printf("((%f, %f), (%f, %f))\n", p1->x, p1->y, p2->x, p2->y);
 }
@@ -40,10 +40,10 @@ void pp_handler(const node * p1, const node * p2) {
 #endif
 
 #if SORT_OUTSIDE
-int cmp_point_buffer(const void * v1, const void * v2) {
-    point * p1 = (point *)v1;
-    point * p2 = (point *)v2;
-    return POINT_ORD_CMP(p1, p2) ? -1 : 1;
+int cmp_node_buffer(const void * v1, const void * v2) {
+    node * n1 = (node *)v1;
+    node * n2 = (node *)v2;
+    return NODE_ORD_CMP(n1, n2) ? -1 : 1;
 }
 #endif
 
@@ -72,7 +72,7 @@ int main() {
     fclose(fp);
 
 #if SORT_OUTSIDE
-    qsort(buffer, num, sizeof(point), cmp_point_buffer);
+    qsort(buffer, num, sizeof(node), cmp_node_buffer);
 #endif
     if (!dt_create(&dt)) {
         printf("Bad\n");
