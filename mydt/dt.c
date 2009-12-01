@@ -27,17 +27,17 @@ typedef node siteEvent;
 
 typedef struct {
     node coord;
-    wave * wv;                      // if not null that is the disappear wave when this event occur
+    wave * wv;                       // if not null that is the disappear wave when this event occur
 } cirlEvent;
 
 struct wave {
-	node * focus;					// the focus point ( the coord of site event )
-	cirlEvent * cevent;			    // the circle event 
+    node * focus;                    // the focus point ( the coord of site event )
+    cirlEvent * cevent;              // the circle event 
 #ifndef NOT_USE_BST
-	void * bst_ptr;					
+    void * bst_ptr;                    
 #endif
-	wave * prev;					// double link list
-	wave * next;		
+    wave * prev;                     // double link list
+    wave * next;        
 };
 
 #define cevent_init(cev) (memset((cev), 0, sizeof(cirlEvent)))
@@ -83,13 +83,13 @@ INTERNAL boolean se_array_push_back(sevArray * a, siteEvent * elem) {
 }
 
 INTERNAL int node_ord_cmp(const void * v1, const void * v2) {
-	const node * n1 = *(const node **)v1;
-	const node * n2 = *(const node **)v2;
-	return NODE_ORD_CMP(n1, n2) ? -1 : 1;
+    const node * n1 = *(const node **)v1;
+    const node * n2 = *(const node **)v2;
+    return NODE_ORD_CMP(n1, n2) ? -1 : 1;
 }
 
 INTERNAL void se_array_sort(sevArray * a) {
-	qsort(a->elems, a->size, sizeof(siteEvent *), node_ord_cmp);
+    qsort(a->elems, a->size, sizeof(siteEvent *), node_ord_cmp);
 }
 
 
@@ -146,18 +146,18 @@ INTERNAL boolean ce_heap_push(cevHeap * h, cirlEvent * elem) {
 }
 
 INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
-	assert(h->size);
+    assert(h->size);
     cirlEvent * ret = h->elems[0];
-	if (h->size == 1) {
-		h->size = 0;
-		return ret;
-	}
-	// last one
-	cirlEvent * last = h->elems[--h->size];
+    if (h->size == 1) {
+        h->size = 0;
+        return ret;
+    }
+    // last one
+    cirlEvent * last = h->elems[--h->size];
 
     // find postion for last from top to bottom
     uint32 child;
-	uint32 curr = 0;
+    uint32 curr = 0;
     uint32 last_idx = h->size - 1;
     cirlEvent ** elems = h->elems;
     while ((child = (curr << 1) + 1) <= last_idx){
@@ -170,7 +170,7 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
         curr = child;
     } 
     elems[curr] = last;
-	
+    
     return ret;
 }
 
@@ -185,7 +185,7 @@ typedef struct {
     memPool wv_pool;
     wave wf_head;                   // the wave front list head
 #ifndef NOT_USE_BST
-	BST bst;
+    BST bst;
 #endif
     edgeHandler handler;            // edge handler
 } myDtImpl;
@@ -198,12 +198,12 @@ boolean dt_create(myDt * pdt) {
             mem_pool_init(&ret->ce_pool, sizeof(cirlEvent), 128) &&
             mem_pool_init(&ret->wv_pool, sizeof(wave), 128)
 #ifndef NOT_USE_BST
-			&& BST_INIT(&ret->bst)
+            && BST_INIT(&ret->bst)
 #endif
-			))
+            ))
         return 0;
     *pdt = (void *)ret;
-	//srand(clock());
+    //srand(clock());
     return 1;
 }
 
@@ -214,7 +214,7 @@ void dt_destroy(myDt * pdt) {
     mem_pool_finalize(&dt->ce_pool);
     mem_pool_finalize(&dt->wv_pool);
 #ifndef NOT_USE_BST
-	BST_FINALIZE(&dt->bst);
+    BST_FINALIZE(&dt->bst);
 #endif
     free(dt);
     *pdt = 0;
@@ -254,102 +254,102 @@ uint32 hce_cnt = 0;
 
 INTERNAL boolean after_break_point(const node * s, const node * l, const node * r) {
 #ifdef COUNT_CALL
-	++abp_cnt;
+    ++abp_cnt;
 #endif
-	/* after_break_point example graph
-	 *
-	 * y
-	 *     |  l  |
-	 * ^   \_   _/
-	 * |     \_/|   |
-	 * |     |   |r|
-	 * |    s|    -
-	 * |-----+--------- sweepline scan from +y to -y
-	 * |    new site                     
-	 * +----------------> x
-	 *
+    /* after_break_point example graph
+     *
+     * y
+     *     |  l  |
+     * ^   \_   _/
+     * |     \_/|   |
+     * |     |   |r|
+     * |    s|    -
+     * |-----+--------- sweepline scan from +y to -y
+     * |    new site                     
+     * +----------------> x
+     *
      * return 1 if the site event is occur on the right side of the break point of the two waves
-	 */
-	// case 1, either l or r 's y coord is the same as s
-	metric sl_y;
-	if (!(sl_y = Y_DELTA(s, l))) {
-		return s->x > l->x;
-	}
-	metric sr_y;
-	if (!(sr_y = Y_DELTA(s, r))) {
-		return s->x > r->x;
-	}
+     */
+    // case 1, either l or r 's y coord is the same as s
+    metric sl_y;
+    if (!(sl_y = Y_DELTA(s, l))) {
+        return s->x > l->x;
+    }
+    metric sr_y;
+    if (!(sr_y = Y_DELTA(s, r))) {
+        return s->x > r->x;
+    }
 
-	// case 2, l.y == r.y
-	metric lr_y;
-	if (!(lr_y = Y_DELTA(l, r))) {
-		return s->x > X_SUM(l, r)/2;
-	}
+    // case 2, l.y == r.y
+    metric lr_y;
+    if (!(lr_y = Y_DELTA(l, r))) {
+        return s->x > X_SUM(l, r)/2;
+    }
 
     // case 3
     // let Cl be the intersection of line x=s->x and wave l, and yl = 2*Cl.y
     // let Cr be the intersection of line x=s->x and wave r, and yr = 2*Cr.y
-	// yl = sweepline + l->y - (s->x - l->x)*(s->x - l->x)/(sweepline - l->y);
-	// yr = sweepline + r->y - (s->x - r->x)*(s->x - r->x)/(sweepline - r->y);
-	// t = yl - yr
-	metric sl_x = X_DELTA(s, l);
-	metric sr_x = X_DELTA(s, r);
-	metric t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
+    // yl = sweepline + l->y - (s->x - l->x)*(s->x - l->x)/(sweepline - l->y);
+    // yr = sweepline + r->y - (s->x - r->x)*(s->x - r->x)/(sweepline - r->y);
+    // t = yl - yr
+    metric sl_x = X_DELTA(s, l);
+    metric sr_x = X_DELTA(s, r);
+    metric t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
 
     // two waves have two break points
-	// the left break point
-	if (lr_y > 0) {
-		return t > 0 ? 1 : sr_x > 0;
-	}
+    // the left break point
+    if (lr_y > 0) {
+        return t > 0 ? 1 : sr_x > 0;
+    }
     // the right break point
-	return t < 0 ? 0 : sl_x > 0;
+    return t < 0 ? 0 : sl_x > 0;
 }
 
 INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 #ifdef COUNT_CALL
-	++cce_cnt;
+    ++cce_cnt;
 #endif
-	INIT_WV_SHORTCUT(dt);
+    INIT_WV_SHORTCUT(dt);
 
-	if (wv == HEAD_WV || wv == LAST_WV) {
-		return 0;
-	}
-	node * a = wv->prev->focus;
-	node * b = wv->focus;
-	node * c = wv->next->focus;
+    if (wv == HEAD_WV || wv == LAST_WV) {
+        return 0;
+    }
+    node * a = wv->prev->focus;
+    node * b = wv->focus;
+    node * c = wv->next->focus;
 
-	/* if det
-	 * | abx cbx | 
-	 * |         | > 0, then the angle between vector b->a to b->c is less than 180 
-	 * | aby cby | 
-	 */
-	metric abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
-	metric cbx = X_DELTA(c, b), cby = Y_DELTA(c, b);
-	metric det = abx * cby - aby * cbx;
-	if (det <= 0) {
-		return 0;
-	}
+    /* if det
+     * | abx cbx | 
+     * |         | > 0, then the angle between vector b->a to b->c is less than 180 
+     * | aby cby | 
+     */
+    metric abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
+    metric cbx = X_DELTA(c, b), cby = Y_DELTA(c, b);
+    metric det = abx * cby - aby * cbx;
+    if (det <= 0) {
+        return 0;
+    }
 
-	cirlEvent * res = (cirlEvent *)mem_pool_get(&dt->ce_pool);
+    cirlEvent * res = (cirlEvent *)mem_pool_get(&dt->ce_pool);
     cevent_init(res);
     node * nd= &res->coord;
 
-	/* get the center of circle of the three points
-	 * 2*abx*X + 2*aby*Y = abx * X_SUM(a, b) + aby * Y_SUM(a, b)
-	 * 2*cbx*X + 2*cby*Y = cbx * X_SUM(c, b) + cby * Y_SUM(c, b)
-	 */
-	det *= 2;
-	metric r1 = abx * X_SUM(a, b) + aby * Y_SUM(a, b);
-	metric r2 = cbx * X_SUM(c, b) + cby * Y_SUM(c, b);
-	nd->x = (cby * r1 - aby * r2)/det;
-	nd->y = (abx * r2 - cbx * r1)/det;
-	
-	/* get the bottom point of the circle
-	 */
-	metric xdelta = X_DELTA(nd, a);
-	metric ydelta = Y_DELTA(nd, a);
-	nd->y -= sqrt(xdelta * xdelta + ydelta * ydelta);
-	return res;
+    /* get the center of circle of the three points
+     * 2*abx*X + 2*aby*Y = abx * X_SUM(a, b) + aby * Y_SUM(a, b)
+     * 2*cbx*X + 2*cby*Y = cbx * X_SUM(c, b) + cby * Y_SUM(c, b)
+     */
+    det *= 2;
+    metric r1 = abx * X_SUM(a, b) + aby * Y_SUM(a, b);
+    metric r2 = cbx * X_SUM(c, b) + cby * Y_SUM(c, b);
+    nd->x = (cby * r1 - aby * r2)/det;
+    nd->y = (abx * r2 - cbx * r1)/det;
+    
+    /* get the bottom point of the circle
+     */
+    metric xdelta = X_DELTA(nd, a);
+    metric ydelta = Y_DELTA(nd, a);
+    nd->y -= sqrt(xdelta * xdelta + ydelta * ydelta);
+    return res;
 }
 
 /*
@@ -357,71 +357,71 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
  * | l | <--> | r |
  * +---+      +---+
  * if after_break_point(s, l, r) == 1
- * 		left_bound = r
+ *     left_bound = r
  * else
- * 		right_bound = l
- */		
+ *     right_bound = l
+ */        
 INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
 #ifdef COUNT_CALL
-	++hse_cnt;
+    ++hse_cnt;
 #endif
-	INIT_WV_SHORTCUT(dt);
+    INIT_WV_SHORTCUT(dt);
 
-	if (!HEAD_WV->focus) {						// the first one
-		HEAD_WV->focus = e;
-		HEAD_WV->next = LAST_WV = HEAD_WV;
+    if (!HEAD_WV->focus) {                        // the first one
+        HEAD_WV->focus = e;
+        HEAD_WV->next = LAST_WV = HEAD_WV;
 #ifndef NOT_USE_BST
-		HEAD_WV->bst_ptr = 0;
+        HEAD_WV->bst_ptr = 0;
 #endif
-		return;
-	}
-	if (e->y == HEAD_WV->focus->y) {			// the first several one
-		wave * w = (wave *)mem_pool_get(&dt->wv_pool);
-		wave_init(w);
-		w->focus = e;
-		CONNECT_WV(LAST_WV, w);
-		CONNECT_WV(w, HEAD_WV);
-		dt->handler(w->prev->focus, w->focus);
-		return;
-	}
+        return;
+    }
+    if (e->y == HEAD_WV->focus->y) {            // the first several one
+        wave * w = (wave *)mem_pool_get(&dt->wv_pool);
+        wave_init(w);
+        w->focus = e;
+        CONNECT_WV(LAST_WV, w);
+        CONNECT_WV(w, HEAD_WV);
+        dt->handler(w->prev->focus, w->focus);
+        return;
+    }
 
-	wave * left_bound = HEAD_WV;
-	wave * right_bound = LAST_WV;
-	wave * wv;
+    wave * left_bound = HEAD_WV;
+    wave * right_bound = LAST_WV;
+    wave * wv;
 
 #ifndef NOT_USE_BST
-	BSTIter iter;	
+    BSTIter iter;    
 
-	BST_ITER_INIT(&dt->bst, &iter);
-	while (BST_ITER_NOTNIL(&iter)) {
-		wv = (wave *)BST_ITER_DEREF(&iter);
-		assert(wv != HEAD_WV);
-		if (after_break_point(e, wv->prev->focus, wv->focus)) {
-			// search greater part
-			left_bound = wv;
-			BST_ITER_FORWARD(&iter);
-		}
-		else {
-			// search lesser part
-			right_bound = wv->prev;
-			BST_ITER_BACKWARD(&iter);
-		}
-	}
+    BST_ITER_INIT(&dt->bst, &iter);
+    while (BST_ITER_NOTNIL(&iter)) {
+        wv = (wave *)BST_ITER_DEREF(&iter);
+        assert(wv != HEAD_WV);
+        if (after_break_point(e, wv->prev->focus, wv->focus)) {
+            // search greater part
+            left_bound = wv;
+            BST_ITER_FORWARD(&iter);
+        }
+        else {
+            // search lesser part
+            right_bound = wv->prev;
+            BST_ITER_BACKWARD(&iter);
+        }
+    }
 #endif
 
-	wave * curr = left_bound;
-	while (curr != right_bound && 
-			after_break_point(e, curr->focus, curr->next->focus)) {
-		curr = curr->next;
-	}
+    wave * curr = left_bound;
+    while (curr != right_bound && 
+            after_break_point(e, curr->focus, curr->next->focus)) {
+        curr = curr->next;
+    }
     // curr is the right wave
-	
-	wave * new_wv = (wave *)mem_pool_get(&dt->wv_pool);
+    
+    wave * new_wv = (wave *)mem_pool_get(&dt->wv_pool);
     wave_init(new_wv);
-	new_wv->focus = e;
-	wave * dup_wv = (wave *)mem_pool_get(&dt->wv_pool);
+    new_wv->focus = e;
+    wave * dup_wv = (wave *)mem_pool_get(&dt->wv_pool);
     wave_init(dup_wv);
-	dup_wv->focus = curr->focus;
+    dup_wv->focus = curr->focus;
 
     // insert in the right place
     // !! must ensure that the order in BST is the same as in wave list
@@ -429,90 +429,90 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
     // 1. there is only a head in wave list
     // 2. the last two BST nodes in one iteration point to two adjacent waves
     // in either case new waves should be inserted after curr
-	if (left_bound == right_bound || curr != right_bound) {
-		// insert after curr
-		wv = curr->next;
-		CONNECT_WV(curr, new_wv);
-		CONNECT_WV(new_wv, dup_wv);
-		CONNECT_WV(dup_wv, wv);
+    if (left_bound == right_bound || curr != right_bound) {
+        // insert after curr
+        wv = curr->next;
+        CONNECT_WV(curr, new_wv);
+        CONNECT_WV(new_wv, dup_wv);
+        CONNECT_WV(dup_wv, wv);
 
-	} else {
-		// insert before curr
-		wv = curr->prev;
-		CONNECT_WV(wv, dup_wv);
-		CONNECT_WV(dup_wv, new_wv);
-		CONNECT_WV(new_wv, curr);
+    } else {
+        // insert before curr
+        wv = curr->prev;
+        CONNECT_WV(wv, dup_wv);
+        CONNECT_WV(dup_wv, new_wv);
+        CONNECT_WV(new_wv, curr);
 
-	}
-	
+    }
+    
     // set false alarm for curr
-	UNLINK_CEVENT(curr);
+    UNLINK_CEVENT(curr);
 
     // recalculate candidate circle event for dup_wv and curr
-	cirlEvent * new_cevent;
+    cirlEvent * new_cevent;
     memPool * pool = &dt->ce_pool;
     cevHeap * heap = &dt->ce_heap;
 
-	if (new_cevent = candidate_circle_event(dt, curr)) {
-		LINK_CEVENT(curr, new_cevent);
+    if (new_cevent = candidate_circle_event(dt, curr)) {
+        LINK_CEVENT(curr, new_cevent);
         ce_heap_push(heap, new_cevent);
-	}
-	
-	if (new_cevent = candidate_circle_event(dt, dup_wv)) {
-		LINK_CEVENT(dup_wv, new_cevent);
+    }
+    
+    if (new_cevent = candidate_circle_event(dt, dup_wv)) {
+        LINK_CEVENT(dup_wv, new_cevent);
         ce_heap_push(heap, new_cevent);
-	}
+    }
 
 #ifndef NOT_USE_BST
-	if ((rand() & 2) == 0)
-		new_wv->bst_ptr = BST_INSERT_AT(&dt->bst, &iter, new_wv);
-	else
-		new_wv->bst_ptr = 0;
+    if ((rand() & 2) == 0)
+        new_wv->bst_ptr = BST_INSERT_AT(&dt->bst, &iter, new_wv);
+    else
+        new_wv->bst_ptr = 0;
 #endif
-	// handler 
-	dt->handler(e, curr->focus);
+    // handler 
+    dt->handler(e, curr->focus);
 }
 
 INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
 #ifdef COUNT_CALL
-	++hce_cnt;
+    ++hce_cnt;
 #endif
-	wave * wv = e->wv;
-	if (!wv)
-		return;
-	INIT_WV_SHORTCUT(dt);
+    wave * wv = e->wv;
+    if (!wv)
+        return;
+    INIT_WV_SHORTCUT(dt);
 
-	// remove this wave
-	wave * p;
-	wave * n;
-	p = wv->next->prev = wv->prev;
-	n = wv->prev->next = wv->next;
+    // remove this wave
+    wave * p;
+    wave * n;
+    p = wv->next->prev = wv->prev;
+    n = wv->prev->next = wv->next;
     // set false alarms
-	UNLINK_CEVENT(p);
-	UNLINK_CEVENT(n);
-	
-	cirlEvent * new_cevent;
+    UNLINK_CEVENT(p);
+    UNLINK_CEVENT(n);
+    
+    cirlEvent * new_cevent;
     memPool * pool = &dt->ce_pool;
     cevHeap * heap = &dt->ce_heap;
 
-	if (new_cevent = candidate_circle_event(dt, p)) {
-		LINK_CEVENT(p, new_cevent);
+    if (new_cevent = candidate_circle_event(dt, p)) {
+        LINK_CEVENT(p, new_cevent);
         ce_heap_push(heap, new_cevent);
-	}
-	
-	if (new_cevent = candidate_circle_event(dt, n)) {
-		LINK_CEVENT(n, new_cevent);
+    }
+    
+    if (new_cevent = candidate_circle_event(dt, n)) {
+        LINK_CEVENT(n, new_cevent);
         ce_heap_push(heap, new_cevent);
-	}
+    }
 
 #ifndef NOT_USE_BST
-	BST_DELETE(&dt->bst, wv->bst_ptr);
+    BST_DELETE(&dt->bst, wv->bst_ptr);
 #endif
 
-	mem_pool_release(&dt->wv_pool, wv);
-	
-	// handler
-	dt->handler(p->focus, n->focus);
+    mem_pool_release(&dt->wv_pool, wv);
+    
+    // handler
+    dt->handler(p->focus, n->focus);
 }
 
 void dt_begin(myDt dt, edgeHandler handler) {
@@ -524,7 +524,7 @@ void dt_begin(myDt dt, edgeHandler handler) {
     mem_pool_reset(&d->ce_pool);
     mem_pool_reset(&d->wv_pool);
 #ifndef NOT_USE_BST
-	BST_RESET(&d->bst);
+    BST_RESET(&d->bst);
 #endif
 }
 

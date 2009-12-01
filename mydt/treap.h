@@ -7,23 +7,23 @@
 typedef struct treapNode treapNode;
 
 struct treapNode {
-	void * val;
-	uint32 priority;				// the greater the closer to the root
-	treapNode * parent;				// if parent == 0, this node is root
-	treapNode * left;
-	treapNode * right;
+    void * val;
+    uint32 priority;                // the greater the closer to the root
+    treapNode * parent;             // if parent == 0, this node is root
+    treapNode * left;
+    treapNode * right;
 };
 
 typedef struct {
     // if node == 0, this is an 'empty' node, we can insert new node in it
-	treapNode * node;
-	treapNode * parent;
-	treapNode ** pnode;
+    treapNode * node;
+    treapNode * parent;
+    treapNode ** pnode;
 } treapIter;
 
 typedef struct {
-	treapNode * root;
-	memPool pool;
+    treapNode * root;
+    memPool pool;
 } treap;
 
 void treap_reset(treap * t);
@@ -46,16 +46,16 @@ typedef treapIter BSTIter;
 #define BST_DELETE treap_delete
 
 #define BST_ITER_INIT(bst, piter) (piter)->node = (bst)->root; \
-								 (piter)->parent = 0; \
-								 (piter)->pnode = &((bst)->root)
+                                 (piter)->parent = 0; \
+                                 (piter)->pnode = &((bst)->root)
 
 #define BST_ITER_NOTNIL(piter) ((piter)->node != 0)
 #define BST_ITER_DEREF(piter) ((piter)->node->val)
 #define BST_ITER_FORWARD(piter) (piter)->parent = (piter)->node; \
-								(piter)->pnode = &((piter)->node->right); \
-								(piter)->node = *((piter)->pnode)
+                                (piter)->pnode = &((piter)->node->right); \
+                                (piter)->node = *((piter)->pnode)
 
 #define BST_ITER_BACKWARD(piter) (piter)->parent = (piter)->node; \
-								(piter)->pnode = &((piter)->node->left); \
-								(piter)->node = *((piter)->pnode)
+                                (piter)->pnode = &((piter)->node->left); \
+                                (piter)->node = *((piter)->pnode)
 

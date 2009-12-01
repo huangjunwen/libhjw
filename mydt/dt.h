@@ -12,9 +12,9 @@ typedef real metric;
 #endif
 
 typedef struct {
-	metric x;
-	metric y;
-	void * attr;
+    metric x;
+    metric y;
+    void * attr;
 } node;
 
 // node order: from +y -x to -y +x

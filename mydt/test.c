@@ -28,29 +28,29 @@ void pp_handler(const node * p1, const node * p2) {
     uint32 n2 = (uint32)p2->attr;
     uint32 min = n1>n2?n2:n1;
     uint32 max = n1>n2?n1:n2;
-	printf("%u %u\n", min, max);
-	//printf("((%f, %f), (%f, %f))\n", p1->x, p1->y, p2->x, p2->y);
+    printf("%u %u\n", min, max);
+    //printf("((%f, %f), (%f, %f))\n", p1->x, p1->y, p2->x, p2->y);
 }
 #else
 void pp_handler(const node * p1, const node * p2) {
-	real x_delta = p1->x - p2->x;
-	real y_delta = p1->y - p2->y;
-	real distance = sqrt(x_delta * x_delta + y_delta * y_delta);
+    real x_delta = p1->x - p2->x;
+    real y_delta = p1->y - p2->y;
+    real distance = sqrt(x_delta * x_delta + y_delta * y_delta);
 }
 #endif
 
 #if SORT_OUTSIDE
 int cmp_point_buffer(const void * v1, const void * v2) {
-	point * p1 = (point *)v1;
-	point * p2 = (point *)v2;
-	return POINT_ORD_CMP(p1, p2) ? -1 : 1;
+    point * p1 = (point *)v1;
+    point * p2 = (point *)v2;
+    return POINT_ORD_CMP(p1, p2) ? -1 : 1;
 }
 #endif
 
 myDt dt;
 
 int main() {
-	FILE * fp = fopen("in.txt", "r");
+    FILE * fp = fopen("in.txt", "r");
     if (!fp) {
         printf("cant open in.txt\n");
         return 1;
@@ -69,10 +69,10 @@ int main() {
         *(uint32 *)(&buffer[num].attr) = num;
         ++num;
     }
-	fclose(fp);
+    fclose(fp);
 
 #if SORT_OUTSIDE
-	qsort(buffer, num, sizeof(point), cmp_point_buffer);
+    qsort(buffer, num, sizeof(point), cmp_point_buffer);
 #endif
     if (!dt_create(&dt)) {
         printf("Bad\n");
@@ -84,12 +84,12 @@ int main() {
 #else
 #define LOOP_NUM 10
 #endif
-	clock_t c1, c2;
-	c1 = clock();
+    clock_t c1, c2;
+    c1 = clock();
 
 #ifdef WIN32
-	DWORD d1, d2;
-	d1 = timeGetTime();
+    DWORD d1, d2;
+    d1 = timeGetTime();
 #else
     struct timeval tv0, tv1;
     struct timezone tz;
@@ -99,20 +99,20 @@ int main() {
         dt_begin(dt, pp_handler);
         for (j = 0; j < num; ++j) {
 #if SORT_OUTSIDE
-			dt_next_sorted(dt, &buffer[j]);
+            dt_next_sorted(dt, &buffer[j]);
 #else
             dt_next(dt, &buffer[j]);
 #endif
         }
 #if SORT_OUTSIDE
-		dt_end_sorted(dt);
+        dt_end_sorted(dt);
 #else
         dt_end(dt);
 #endif
     }
-	c2 = clock();
+    c2 = clock();
 #ifdef WIN32
-	d2 = timeGetTime();
+    d2 = timeGetTime();
 #else
     gettimeofday(&tv1, &tz);
 #endif
@@ -120,14 +120,14 @@ int main() {
     fprintf(stderr, "%d CLOCKS_PER_SEC %d\n", c2 - c1, CLOCKS_PER_SEC);
 
 #ifdef WIN32
-	fprintf(stderr, "%d ms\n", d2 - d1);
+    fprintf(stderr, "%d ms\n", d2 - d1);
 #else
     fprintf(stderr, "%ld ms\n", 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l);
 
 #endif
 
 #ifdef COUNT_CALL
-	fprintf(stderr, "abp_cnt: %u, cce_cnt: %u\n", abp_cnt, cce_cnt);
+    fprintf(stderr, "abp_cnt: %u, cce_cnt: %u\n", abp_cnt, cce_cnt);
 #endif
     dt_destroy(&dt);
     return 0;
