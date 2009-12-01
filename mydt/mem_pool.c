@@ -1,4 +1,5 @@
 // vim:fdm=marker:nu:nowrap
+#include <assert.h>
 #include <stdlib.h>
 #include "mem_pool.h"
 
@@ -23,8 +24,8 @@ void mem_pool_reset(memPool * pool) {
 }
 
 boolean mem_pool_init(memPool * pool, uint32 item_sz, uint32 inc_sz) {
-    if (item_sz < sizeof(void *))   // for free list
-        return 0;
+    assert(item_sz >= sizeof(void *));
+    assert(inc_sz > 0);
     pool->item_sz = item_sz;
     pool->inc_sz = inc_sz;
     if (!(pool->head_seg = _new_seg(pool)))

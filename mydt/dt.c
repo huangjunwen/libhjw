@@ -183,7 +183,7 @@ typedef struct {
     cevHeap ce_heap;                // as a heap
     memPool ce_pool;                // memory pools
     memPool wv_pool;
-    wave wf_head;                   // the wave front skip list head
+    wave wf_head;                   // the wave front list head
 #ifndef NOT_USE_BST
 	BST bst;
 #endif
