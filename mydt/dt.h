@@ -2,12 +2,19 @@
 #ifndef _DT_H_
 #define _DT_H_
 
-#include "config.h"
 #include "types.h"
+#include "config.h"
+
+#ifdef INT_METRIC
+#error "int metric not support yet"
+#else
+typedef real metric;
+#endif
 
 typedef struct {
-	real x;
-	real y;
+	metric x;
+	metric y;
+	void * attr;
 } node;
 
 // node order: from +y -x to -y +x

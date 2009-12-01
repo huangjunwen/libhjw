@@ -271,17 +271,17 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
      * return 1 if the site event is occur on the right side of the break point of the two waves
 	 */
 	// case 1, either l or r 's y coord is the same as s
-	real sl_y;
+	metric sl_y;
 	if (!(sl_y = Y_DELTA(s, l))) {
 		return s->x > l->x;
 	}
-	real sr_y;
+	metric sr_y;
 	if (!(sr_y = Y_DELTA(s, r))) {
 		return s->x > r->x;
 	}
 
 	// case 2, l.y == r.y
-	real lr_y;
+	metric lr_y;
 	if (!(lr_y = Y_DELTA(l, r))) {
 		return s->x > X_SUM(l, r)/2;
 	}
@@ -292,9 +292,9 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
 	// yl = sweepline + l->y - (s->x - l->x)*(s->x - l->x)/(sweepline - l->y);
 	// yr = sweepline + r->y - (s->x - r->x)*(s->x - r->x)/(sweepline - r->y);
 	// t = yl - yr
-	real sl_x = X_DELTA(s, l);
-	real sr_x = X_DELTA(s, r);
-	real t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
+	metric sl_x = X_DELTA(s, l);
+	metric sr_x = X_DELTA(s, r);
+	metric t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
 
     // two waves have two break points
 	// the left break point
@@ -323,9 +323,9 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 	 * |         | > 0, then the angle between vector b->a to b->c is less than 180 
 	 * | aby cby | 
 	 */
-	real abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
-	real cbx = X_DELTA(c, b), cby = Y_DELTA(c, b);
-	real det = abx * cby - aby * cbx;
+	metric abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
+	metric cbx = X_DELTA(c, b), cby = Y_DELTA(c, b);
+	metric det = abx * cby - aby * cbx;
 	if (det <= 0) {
 		return 0;
 	}
@@ -339,15 +339,15 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 	 * 2*cbx*X + 2*cby*Y = cbx * X_SUM(c, b) + cby * Y_SUM(c, b)
 	 */
 	det *= 2;
-	real r1 = abx * X_SUM(a, b) + aby * Y_SUM(a, b);
-	real r2 = cbx * X_SUM(c, b) + cby * Y_SUM(c, b);
+	metric r1 = abx * X_SUM(a, b) + aby * Y_SUM(a, b);
+	metric r2 = cbx * X_SUM(c, b) + cby * Y_SUM(c, b);
 	nd->x = (cby * r1 - aby * r2)/det;
 	nd->y = (abx * r2 - cbx * r1)/det;
 	
 	/* get the bottom point of the circle
 	 */
-	real xdelta = X_DELTA(nd, a);
-	real ydelta = Y_DELTA(nd, a);
+	metric xdelta = X_DELTA(nd, a);
+	metric ydelta = Y_DELTA(nd, a);
 	nd->y -= sqrt(xdelta * xdelta + ydelta * ydelta);
 	return res;
 }

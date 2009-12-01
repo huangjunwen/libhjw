@@ -2,12 +2,23 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-// use binary search tree struture (e.g. splay-tree/treap and skip-list?)
-#define USE_TREAP
+// compile configs
 
-// counting function calls;
-//#define COUNT_CALL
+/*****************
+ * Debug config
+ ****************/
+//#define COUNT_CALL    // couting function call number
 
-#define INTERNAL static inline
+
+/*****************
+ * BST
+ ****************/
+#define USE_TREAP       // use treap as BST
+
+
+/*****************
+ * Metric
+ ****************/
+//#define INT_METRIC    // use int type other than real type as metric
 
 #endif

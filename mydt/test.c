@@ -21,18 +21,14 @@
 #include "dt.h"
 #include "mem_pool.h"
 
-typedef struct {
-    node coord;
-    uint32 num;
-} numNode;
 
 #if OUTFILE
 void pp_handler(const node * p1, const node * p2) {
-    // const numNode * nn1 = (const numNode*)p1;
-    // const numNode * nn2 = (const numNode*)p2;
-    // uint32 min = nn1->num > nn2->num ? nn2->num : nn1->num;
-    // uint32 max = nn1->num > nn2->num ? nn1->num : nn2->num;
-	// printf("%u %u\n", min, max);
+    uint32 n1 = (uint32)p1->attr;
+    uint32 n2 = (uint32)p2->attr;
+    uint32 min = n1>n2?n2:n1;
+    uint32 max = n1>n2?n1:n2;
+	printf("%u %u\n", min, max);
 	//printf("((%f, %f), (%f, %f))\n", p1->x, p1->y, p2->x, p2->y);
 }
 #else
@@ -62,15 +58,15 @@ int main() {
     real x, y;
     int32 r;
     uint32 i, j, num, c;
-    numNode buffer[50000];
+    node buffer[50000];
     num = 0;
     while (1) {
         r = fscanf(fp, "%d %f %f\n", &c, &x, &y);
         if (r == EOF)
             break;
-        buffer[num].coord.x = x;
-        buffer[num].coord.y = y;
-        buffer[num].num = num;
+        buffer[num].x = x;
+        buffer[num].y = y;
+        *(uint32 *)(&buffer[num].attr) = num;
         ++num;
     }
 	fclose(fp);
@@ -103,9 +99,9 @@ int main() {
         dt_begin(dt, pp_handler);
         for (j = 0; j < num; ++j) {
 #if SORT_OUTSIDE
-			dt_next_sorted(dt, (node*)&buffer[j]);
+			dt_next_sorted(dt, &buffer[j]);
 #else
-            dt_next(dt, (node*)&buffer[j]);
+            dt_next(dt, &buffer[j]);
 #endif
         }
 #if SORT_OUTSIDE

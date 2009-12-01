@@ -3,14 +3,16 @@
 #ifndef _TYPES_H
 #define _TYPES_H
 
-#define uint8 unsigned char
-#define int8 char
-#define boolean unsigned char 
-#define byte unsigned char
-#define uint16 unsigned short
-#define int16 short
-#define uint32 unsigned int
-#define int32 int
-#define real float 
+typedef unsigned char uint8;
+typedef char int8;
+typedef unsigned char boolean;
+typedef unsigned char byte;
+typedef unsigned short uint16;
+typedef short int16;
+typedef unsigned int uint32;
+typedef int int32;
+typedef float real;
+
+#define INTERNAL static inline
 
 #endif
