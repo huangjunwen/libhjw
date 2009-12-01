@@ -28,11 +28,11 @@ typedef struct {
 
 #if OUTFILE
 void pp_handler(const node * p1, const node * p2) {
-    const numNode * nn1 = (const numNode*)p1;
-    const numNode * nn2 = (const numNode*)p2;
-    uint32 min = nn1->num > nn2->num ? nn2->num : nn1->num;
-    uint32 max = nn1->num > nn2->num ? nn1->num : nn2->num;
-	printf("%u %u\n", min, max);
+    // const numNode * nn1 = (const numNode*)p1;
+    // const numNode * nn2 = (const numNode*)p2;
+    // uint32 min = nn1->num > nn2->num ? nn2->num : nn1->num;
+    // uint32 max = nn1->num > nn2->num ? nn1->num : nn2->num;
+	// printf("%u %u\n", min, max);
 	//printf("((%f, %f), (%f, %f))\n", p1->x, p1->y, p2->x, p2->y);
 }
 #else

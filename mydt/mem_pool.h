@@ -8,7 +8,7 @@
 typedef struct memSeg {
     struct memSeg * next;
     byte * addr_after_last;
-    byte mem[0];
+    byte mem[1];
 } memSeg;
 
 typedef struct {

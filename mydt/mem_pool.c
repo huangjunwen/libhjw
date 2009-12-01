@@ -6,9 +6,11 @@
 /*********************************
  * Mem pool
  *********************************/
+static const memSeg _dummy_seg;
+static const uint32 memSegSz = (uint32)((byte *)(_dummy_seg.mem) - (byte *)&_dummy_seg);
 
 memSeg * _new_seg(memPool * pool) {
-    uint32 sz = sizeof(memSeg) + pool->item_sz * pool->inc_sz;
+    uint32 sz = memSegSz + pool->item_sz * pool->inc_sz;
     memSeg * ms = (memSeg *)malloc(sz);
     if (!ms)
         return 0;
