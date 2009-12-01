@@ -203,7 +203,7 @@ boolean dt_create(myDt * pdt) {
 			))
         return 0;
     *pdt = (void *)ret;
-	srand(clock());
+	//srand(clock());
     return 1;
 }
 
