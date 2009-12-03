@@ -198,10 +198,11 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
  *********************************/
 
 typedef struct {
-    sevArray se_array;              // as a sorted array
-    cevHeap ce_heap;                // as a heap
     memPool ce_pool;                // memory pools
     memPool wv_pool;
+    memPool nd_pool;
+    sevArray se_array;              // as a sorted array
+    cevHeap ce_heap;                // as a heap
     wave wf_head;                   // the wave front list head
 #ifndef NOT_USE_BST
     BST bst;
@@ -215,7 +216,8 @@ boolean dt_create(myDt * pdt) {
         return 0;
     if (! (se_array_init(&ret->se_array) && ce_heap_init(&ret->ce_heap) &&
             mem_pool_init(&ret->ce_pool, sizeof(cirlEvent), 128) &&
-            mem_pool_init(&ret->wv_pool, sizeof(wave), 128)
+            mem_pool_init(&ret->wv_pool, sizeof(wave), 128) &&
+            mem_pool_init(&ret->nd_pool, sizeof(node), 256)
 #ifndef NOT_USE_BST
             && BST_INIT(&ret->bst)
 #endif
@@ -232,6 +234,7 @@ void dt_destroy(myDt * pdt) {
     ce_heap_finalize(&dt->ce_heap);
     mem_pool_finalize(&dt->ce_pool);
     mem_pool_finalize(&dt->wv_pool);
+    mem_pool_finalize(&dt->nd_pool);
 #ifndef NOT_USE_BST
     BST_FINALIZE(&dt->bst);
 #endif
@@ -542,6 +545,7 @@ void dt_begin(myDt dt, edgeHandler handler) {
     ce_heap_reset(&d->ce_heap);
     mem_pool_reset(&d->ce_pool);
     mem_pool_reset(&d->wv_pool);
+    mem_pool_reset(&d->nd_pool);
 #ifndef NOT_USE_BST
     BST_RESET(&d->bst);
 #endif
@@ -570,16 +574,29 @@ void dt_end_sorted(myDt dt) {
     }
 }
 
-void dt_next(myDt dt, node * nd) {
+void dt_next_node(myDt dt, node * nd) {
     myDtImpl * d = (myDtImpl *)dt;
     se_array_push_back(&d->se_array, nd);
 }
 
-void dt_end(myDt dt) {
+void dt_end_node(myDt dt) {
     myDtImpl * d = (myDtImpl *)dt;
     se_array_sort(&d->se_array);
     uint32 i;
     for (i = 0; i < d->se_array.size; ++i)
         dt_next_sorted(dt, d->se_array.elems[i]);
     dt_end_sorted(dt);
+}
+
+void dt_next(myDt dt, metric x, metric y, void * attr) {
+    myDtImpl * d = (myDtImpl *)dt;
+    node * n = (node *)mem_pool_get(&d->nd_pool);
+    n->x = x;
+    n->y = y;
+    n->attr = attr;
+    dt_next_node(dt, n);
+}
+
+void dt_end(myDt dt) {
+    dt_end_node(dt);
 }

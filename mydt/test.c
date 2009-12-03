@@ -101,13 +101,13 @@ int main() {
 #if SORT_OUTSIDE
             dt_next_sorted(dt, &buffer[j]);
 #else
-            dt_next(dt, &buffer[j]);
+            dt_next_node(dt, &buffer[j]);
 #endif
         }
 #if SORT_OUTSIDE
         dt_end_sorted(dt);
 #else
-        dt_end(dt);
+        dt_end_node(dt);
 #endif
     }
     c2 = clock();

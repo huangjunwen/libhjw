@@ -29,24 +29,28 @@ typedef void* myDt;
 boolean dt_create(myDt * pdt);
 void dt_destroy(myDt * pdt);
 
-/* two sets of api */
+/* three sets of api */
+/* 1:
+ *      dt_begin/dt_next_sorted/dt_end_sorted
+ *      nodes' memory management is outside and nodes' input order is sorted
+ *      fastest
+ * 2:
+ *      dt_begin/dt_next_node/dt_end_node
+ *      nodes' memory management is outside
+ * 3:
+ *      dt_begin/dt_next/dt_end
+ *      all managed by dt
+ * each run must use only one set of api
+ * but different run can use different sets
+ */
 
 void dt_begin(myDt dt, edgeHandler handler);
-/* first set
- * dt_begin init a new run
- * dt_next input each node
- * dt_end run all
- */
-void dt_next(myDt dt, node * n);
-void dt_end(myDt dt);
-
-/* secod set
- * almost the same as the first set
- * but dt_next_sorted must be called under the order specified by NODE_ORD_CMP
- * this set of api is more effecient
- */
 void dt_next_sorted(myDt dt, node * pt);
 void dt_end_sorted(myDt dt);
+void dt_next_node(myDt dt, node * n);
+void dt_end_node(myDt dt);
+void dt_next(myDt dt, metric x, metric y, void * attr);
+void dt_end(myDt dt);
 
 #ifdef COUNT_CALL
 // after_break_point count
