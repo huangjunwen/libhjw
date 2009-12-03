@@ -5,8 +5,10 @@ using namespace std;
 using namespace BWAPI;
 
 void drawEdge(const node * n1, const node * n2) {
-    Unit * u1 = (Unit *)n1->attr;
-    Unit * u2 = (Unit *)n2->attr;
+    UnitData * d1 = (UnitData *)n1->attr;
+    UnitData * d2 = (UnitData *)n2->attr;
+    Unit * u1 = d1->unit;
+    Unit * u2 = d2->unit;
     Color c;
     if (u1->getPlayer() == u2->getPlayer())
         c = Colors::Green;
@@ -18,8 +20,7 @@ void drawEdge(const node * n1, const node * n2) {
 }
 
 
-AI1::AI1():BWAPI::AIModule() {
-    self = Broodwar->self();
+AI1::AI1():BWAPI::AIModule(), self(Broodwar->self()) {
 	dt_create(&dt);
 }
 
@@ -44,6 +45,7 @@ void AI1::remove_unit(Unit *u) {
 void AI1::onStart()
 {
     Broodwar->enableFlag(Flag::UserInput);
+    //Broodwar->setLocalSpeed(20);
     set<Unit *> & all_units = Broodwar->getAllUnits();
     set<Unit *>::iterator iter;
     for (iter = all_units.begin(); iter != all_units.end(); ++iter)
@@ -61,12 +63,12 @@ void AI1::onFrame()
     dt_begin(dt, drawEdge);
     for (iter = self_units.begin(); iter != self_units.end(); ++iter) {
         u = iter->first;
-        dt_next(dt, u->getPosition().x(), u->getPosition().y(), u);
+        dt_next(dt, u->getPosition().x(), u->getPosition().y(), iter->second);
     }
 
     for (iter = enemy_units.begin(); iter != enemy_units.end(); ++iter) {
         u = iter->first;
-        dt_next(dt, u->getPosition().x(), u->getPosition().y(), u);
+        dt_next(dt, u->getPosition().x(), u->getPosition().y(), iter->second);
     }
 
 	dt_end(dt);

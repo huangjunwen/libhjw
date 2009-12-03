@@ -23,7 +23,7 @@ public:
   AI1();
   virtual ~AI1();
 private:
-    const BWAPI::Player * self;
+    BWAPI::Player * const self;
     bool is_self(BWAPI::Unit * u) { return u->getPlayer() == self; }
     void add_unit(BWAPI::Unit * u);
     void remove_unit(BWAPI::Unit *u);

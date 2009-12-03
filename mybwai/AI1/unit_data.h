@@ -8,8 +8,7 @@
 class UnitData {
 public:
 	UnitData(BWAPI::Unit * u): unit(u) {}
-private:
-    BWAPI::Unit * unit;
+    BWAPI::Unit * const unit;
 };
 
 class UnitGrp {
