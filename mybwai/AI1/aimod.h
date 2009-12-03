@@ -3,15 +3,7 @@
 #include <BWTA.h>
 #include <windows.h>
 #include "dt.h"
-#include "mem_pool.h"
-
-class UnitNode: public node {
-public:
-	UnitNode(BWAPI::Unit * u);
-    BWAPI::Unit * unit();
-    int X();
-    int Y();
-};
+#include "unit_data.h"
 
 class AI1: public BWAPI::AIModule
 {
@@ -31,6 +23,11 @@ public:
   AI1();
   virtual ~AI1();
 private:
-	memPool un_pool;
+    const BWAPI::Player * self;
+    bool is_self(BWAPI::Unit * u) { return u->getPlayer() == self; }
+    void add_unit(BWAPI::Unit * u);
+    void remove_unit(BWAPI::Unit *u);
+    UnitGrp self_units;
+    UnitGrp enemy_units;
 	myDt dt;
 };

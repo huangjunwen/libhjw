@@ -5,49 +5,49 @@ using namespace std;
 using namespace BWAPI;
 
 void drawEdge(const node * n1, const node * n2) {
-    UnitNode * un1 = (UnitNode *)n1;
-    UnitNode * un2 = (UnitNode *)n2;
+    Unit * u1 = (Unit *)n1->attr;
+    Unit * u2 = (Unit *)n2->attr;
     Color c;
-    if (un1->unit()->getPlayer() == un2->unit()->getPlayer())
+    if (u1->getPlayer() == u2->getPlayer())
         c = Colors::Green;
     else
         c = Colors::Red;
-    Broodwar->drawLineMap(un1->X(), un1->Y(), un2->X(), un2->Y(), c);
-}
-
-
-UnitNode::UnitNode(Unit * u) {
-    attr = u;
-	x = X();
-	y = Y();
-}
-
-Unit * UnitNode::unit() {
-    return (Unit *)attr;
-}
-
-int UnitNode::X() {
-    return unit()->getPosition().x();
-}
-
-int UnitNode::Y() {
-    return unit()->getPosition().y();
+    Position p1 = u1->getPosition();
+    Position p2 = u2->getPosition();
+    Broodwar->drawLineMap(p1.x(), p1.y(), p2.x(), p2.y(), c);
 }
 
 
 AI1::AI1():BWAPI::AIModule() {
-	mem_pool_init(&un_pool, sizeof(UnitNode), 256);
+    self = Broodwar->self();
 	dt_create(&dt);
 }
 
 AI1::~AI1() {
-	mem_pool_finalize(&un_pool);
 	dt_destroy(&dt);
+}
+
+void AI1::add_unit(Unit * u) {
+    if (is_self(u))
+        self_units.add_unit(u);
+    else
+        enemy_units.add_unit(u);  
+}
+
+void AI1::remove_unit(Unit *u) {
+    if (is_self(u))
+        self_units.remove_unit(u);
+    else
+        enemy_units.remove_unit(u);
 }
 
 void AI1::onStart()
 {
     Broodwar->enableFlag(Flag::UserInput);
+    set<Unit *> & all_units = Broodwar->getAllUnits();
+    set<Unit *>::iterator iter;
+    for (iter = all_units.begin(); iter != all_units.end(); ++iter)
+        add_unit(*iter);
 }
 
 void AI1::onEnd(bool isWinner)
@@ -56,35 +56,44 @@ void AI1::onEnd(bool isWinner)
 
 void AI1::onFrame()
 {
-	set<Unit *> & all_units = Broodwar->getAllUnits();
-	set<Unit *>::iterator iter;
-    mem_pool_reset(&un_pool);
+    UnitGrp::const_iterator iter;
+    Unit * u;
     dt_begin(dt, drawEdge);
-	for (iter = all_units.begin(); iter != all_units.end(); ++iter) {
-		UnitNode * un = new(mem_pool_get(&un_pool)) UnitNode(*iter);
-        dt_next(dt, (node *)un);
-	}
+    for (iter = self_units.begin(); iter != self_units.end(); ++iter) {
+        u = iter->first;
+        dt_next(dt, u->getPosition().x(), u->getPosition().y(), u);
+    }
+
+    for (iter = enemy_units.begin(); iter != enemy_units.end(); ++iter) {
+        u = iter->first;
+        dt_next(dt, u->getPosition().x(), u->getPosition().y(), u);
+    }
+
 	dt_end(dt);
 }
 
-void AI1::onUnitCreate(BWAPI::Unit* unit)
+void AI1::onUnitCreate(BWAPI::Unit* u)
+{
+    add_unit(u);
+}
+
+void AI1::onUnitDestroy(BWAPI::Unit* u)
+{
+    remove_unit(u);
+}
+
+void AI1::onUnitMorph(BWAPI::Unit* u)
 {
 }
 
-void AI1::onUnitDestroy(BWAPI::Unit* unit)
+void AI1::onUnitShow(BWAPI::Unit* u)
 {
+    add_unit(u);
 }
 
-void AI1::onUnitMorph(BWAPI::Unit* unit)
+void AI1::onUnitHide(BWAPI::Unit* u)
 {
-}
-
-void AI1::onUnitShow(BWAPI::Unit* unit)
-{
-}
-
-void AI1::onUnitHide(BWAPI::Unit* unit)
-{
+    remove_unit(u);
 }
 
 void AI1::onUnitRenegade(BWAPI::Unit* unit)
