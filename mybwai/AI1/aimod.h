@@ -8,6 +8,7 @@
 class UnitNode: public node {
 public:
 	UnitNode(BWAPI::Unit * u);
+    BWAPI::Unit * unit();
     int X();
     int Y();
 };

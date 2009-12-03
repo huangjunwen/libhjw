@@ -7,8 +7,12 @@ using namespace BWAPI;
 void drawEdge(const node * n1, const node * n2) {
     UnitNode * un1 = (UnitNode *)n1;
     UnitNode * un2 = (UnitNode *)n2;
-    
-    Broodwar->drawLineMap(un1->X(), un1->Y(), un2->X(), un2->Y(), Colors::Green);
+    Color c;
+    if (un1->unit()->getPlayer() == un2->unit()->getPlayer())
+        c = Colors::Green;
+    else
+        c = Colors::Red;
+    Broodwar->drawLineMap(un1->X(), un1->Y(), un2->X(), un2->Y(), c);
 }
 
 
@@ -18,12 +22,16 @@ UnitNode::UnitNode(Unit * u) {
 	y = Y();
 }
 
+Unit * UnitNode::unit() {
+    return (Unit *)attr;
+}
+
 int UnitNode::X() {
-    return ((Unit *)attr)->getPosition().x();
+    return unit()->getPosition().x();
 }
 
 int UnitNode::Y() {
-    return ((Unit *)attr)->getPosition().y();
+    return unit()->getPosition().y();
 }
 
 
