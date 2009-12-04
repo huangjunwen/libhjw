@@ -20,7 +20,7 @@ typedef struct {
 // node order: from +y -x to -y +x
 #define NODE_ORD_CMP(n1, n2) ((n1)->y > (n2)->y || ( (n1)->y == (n2)->y && (n1)->x < (n2)->x ))
 
-typedef void (*edgeHandler)(const node *, const node *);
+typedef void (*edgeHandler)(void *, const node *, const node *);
 
 // main struct
 typedef void* myDt;
@@ -44,7 +44,7 @@ void dt_destroy(myDt * pdt);
  * but different run can use different sets
  */
 
-void dt_begin(myDt dt, edgeHandler handler);
+void dt_begin(myDt dt, edgeHandler handler, void * extra);
 void dt_next_sorted(myDt dt, node * pt);
 void dt_end_sorted(myDt dt);
 void dt_next_node(myDt dt, node * n);

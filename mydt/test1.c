@@ -23,7 +23,7 @@
 
 
 #if OUTFILE
-void pp_handler(const node * p1, const node * p2) {
+void pp_handler(void * extra, const node * p1, const node * p2) {
      uint32 n1 = (uint32)p1->attr;
      uint32 n2 = (uint32)p2->attr;
      uint32 min = n1>n2?n2:n1;
@@ -32,7 +32,7 @@ void pp_handler(const node * p1, const node * p2) {
     //printf("((%f, %f), (%f, %f))\n", p1->x, p1->y, p2->x, p2->y);
 }
 #else
-void pp_handler(const node * p1, const node * p2) {
+void pp_handler(void * extra, const node * p1, const node * p2) {
     real x_delta = p1->x - p2->x;
     real y_delta = p1->y - p2->y;
     real distance = sqrt(x_delta * x_delta + y_delta * y_delta);
@@ -96,7 +96,7 @@ int main() {
     gettimeofday(&tv0, &tz);
 #endif
     for (i = 0; i < LOOP_NUM; ++i) {
-        dt_begin(dt, pp_handler);
+        dt_begin(dt, pp_handler, 0);
         for (j = 0; j < num; ++j) {
 #if SORT_OUTSIDE
             dt_next_sorted(dt, &buffer[j]);

@@ -208,6 +208,7 @@ typedef struct {
     BST bst;
 #endif
     edgeHandler handler;            // edge handler
+    void * extra;                   // extra para for edge handler
 } myDtImpl;
 
 boolean dt_create(myDt * pdt) {
@@ -403,7 +404,7 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
         w->focus = e;
         CONNECT_WV(LAST_WV, w);
         CONNECT_WV(w, HEAD_WV);
-        dt->handler(w->prev->focus, w->focus);
+        dt->handler(dt->extra, w->prev->focus, w->focus);
         return;
     }
 
@@ -492,7 +493,7 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
         new_wv->bst_ptr = 0;
 #endif
     // handler 
-    dt->handler(e, curr->focus);
+    dt->handler(dt->extra, e, curr->focus);
 }
 
 INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
@@ -534,12 +535,13 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
     mem_pool_release(&dt->wv_pool, wv);
     
     // handler
-    dt->handler(p->focus, n->focus);
+    dt->handler(dt->extra, p->focus, n->focus);
 }
 
-void dt_begin(myDt dt, edgeHandler handler) {
+void dt_begin(myDt dt, edgeHandler handler, void * extra) {
     myDtImpl * d = (myDtImpl *)dt;
     d->handler = handler;
+    d->extra = extra;
     wave_init(&d->wf_head);
     se_array_reset(&d->se_array);
     ce_heap_reset(&d->ce_heap);
