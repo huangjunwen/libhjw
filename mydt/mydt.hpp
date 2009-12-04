@@ -2,7 +2,6 @@
 
 #include "dt.h"
 
-template<typename T, typename F>
 class MyDT {
 public:
     MyDT() {
@@ -11,20 +10,15 @@ public:
     virtual ~MyDT() {
         dt_destroy(&_dt);
     }
-    void begin(F & cb) {
-        _cb = &cb;
-        dt_begin(_dt, MyDT<T, F>::_edge_handler, this);
+    void begin(edgeHandler handler, void * extra = 0) {
+        dt_begin(_dt, handler, extra);
     }
-    void next(metric x, metric y, T * v) {
+    void next(metric x, metric y, void * v) {
         dt_next(_dt, x, y, v);
     }
     void end() {
         dt_end(_dt);
     }
 private:
-    static void _edge_handler(void * extra, const node * n1, const node * n2) {
-        (*((MyDT<T, F> *)extra)->_cb)((T *)n1->attr, (T *)n2->attr);
-    }
     myDt _dt;
-    F * _cb;
 };
