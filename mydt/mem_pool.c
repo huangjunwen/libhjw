@@ -6,8 +6,7 @@
 /*********************************
  * Mem pool
  *********************************/
-static const memSeg _dummy_seg;
-static const uint32 memSegSz = (uint32)((byte *)(_dummy_seg.mem) - (byte *)&_dummy_seg);
+static const uint32 memSegSz = sizeof(memSeg *) + sizeof(byte *);
 
 memSeg * _new_seg(memPool * pool) {
     uint32 sz = memSegSz + pool->item_sz * pool->inc_sz;
