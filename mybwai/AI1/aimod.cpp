@@ -72,6 +72,18 @@ void AI1::onFrame()
     }
 
 	dt_end(dt);
+
+    set<Unit *> & selected = Broodwar->getSelectedUnits();
+    set<Unit *>::iterator uiter = selected.begin();
+    if (selected.size() == 1) {
+        u = *uiter;
+        Broodwar->drawTextScreen(5, 0, "%s at x: %d, y: %d\n", u->getType().getName().c_str(), u->getPosition().x(), u->getPosition().y());
+    } else if (selected.size() == 2) {
+        u = *uiter;
+        Broodwar->drawTextScreen(5, 0, "distance between two units %f\n", u->getDistance(*(++uiter)));
+    } else {
+        Broodwar->drawTextScreen(5, 0, "select one unit or two\n");
+    }
 }
 
 void AI1::onUnitCreate(BWAPI::Unit* u)
