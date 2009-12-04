@@ -4,7 +4,25 @@
 using namespace std;
 using namespace BWAPI;
 
-void UnitPairHandler::operator() (Unit * u1, Unit * u2) {
+
+void _unit_pair_handler(void * self, const node * n1, const node * n2) {
+    ((BattleMgr *)self)->handle((Unit *)n1->attr, (Unit *)n2->attr);
+
+}
+
+void BattleMgr::run(set<Unit *> & units) {
+   set<Unit *>::iterator iter;
+   Unit * u;
+   dt.begin(_unit_pair_handler, this);
+   for (iter = units.begin(); iter != units.end(); ++iter) {
+       u = (*iter);
+       Position pos = u->getPosition();
+       dt.next(pos.x(), pos.y(), u);
+   }
+   dt.end();
+}
+
+void BattleMgr::handle(Unit * u1, Unit * u2) {
     Color c;
     if (u1->getPlayer() == u2->getPlayer())
         c = Colors::Green;
@@ -14,7 +32,6 @@ void UnitPairHandler::operator() (Unit * u1, Unit * u2) {
     Position p2 = u2->getPosition();
     Broodwar->drawLineMap(p1.x(), p1.y(), p2.x(), p2.y(), c);
 }
-
 
 void AI1::onStart()
 {
@@ -28,20 +45,9 @@ void AI1::onEnd(bool isWinner)
 
 void AI1::onFrame()
 {
-    set<Unit *> & all_units = Broodwar->getAllUnits();
-    set<Unit *>::iterator iter;
+    bm.run(Broodwar->getAllUnits());
+
     Unit * u;
-    Broodwar->drawTextScreen(5, 10, "total units: %d\n", all_units.size());
-
-    UnitPairHandler handler;
-    dt.begin(handler);
-    for (iter = all_units.begin(); iter != all_units.end(); ++iter) {
-        u = (*iter);
-        Position pos = u->getPosition();
-        dt.next(pos.x(), pos.y(), u);
-    }
-    dt.end();
-
     set<Unit *> & selected = Broodwar->getSelectedUnits();
     set<Unit *>::iterator uiter = selected.begin();
     if (selected.size() == 1) {

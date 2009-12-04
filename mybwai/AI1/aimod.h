@@ -1,11 +1,15 @@
 #pragma once
 #include <BWAPI.h>
 #include <windows.h>
+#include <set>
 #include "mydt.hpp"
 
-class UnitPairHandler {
+class BattleMgr { 
 public:
-    void operator() (BWAPI::Unit *, BWAPI::Unit *);
+    void run(std::set<BWAPI::Unit *> &);
+    virtual void handle(BWAPI::Unit *, BWAPI::Unit *);
+private:
+    MyDT dt;
 };
 
 class AI1: public BWAPI::AIModule
@@ -24,5 +28,5 @@ public:
     virtual void onUnitHide(BWAPI::Unit* unit);
     virtual void onUnitRenegade(BWAPI::Unit* unit);
 private:
-    MyDT<BWAPI::Unit, UnitPairHandler> dt;
+    BattleMgr bm;
 };
