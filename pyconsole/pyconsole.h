@@ -2,7 +2,7 @@
 #define _PYCONSOLE_H_
 
 #include <string>
-#include <python.h>
+#include <Python.h>
 
 namespace pyconsole {
 
