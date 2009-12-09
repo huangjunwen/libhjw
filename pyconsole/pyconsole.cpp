@@ -62,7 +62,7 @@ bool PyConsoleImpl::start() {
     if (_alive)
         return true;
 
-    Py_Initialize();
+    Py_InitializeEx(0);
     globals = PyDict_New();
 
     if (!globals)
