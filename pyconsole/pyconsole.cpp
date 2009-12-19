@@ -24,8 +24,8 @@ class PyConsoleImpl: public PyConsole {
 public:
     PyConsoleImpl();
     virtual ~PyConsoleImpl();
-    virtual bool start();
-    virtual void stop();
+    bool start();
+    void stop();
     virtual bool restart();
     virtual void loop_once(const string & in, string & out, string & err);
     virtual bool alive() { return _alive; }

@@ -8,8 +8,6 @@ namespace pyconsole {
 
 class PyConsole {
 public:
-    virtual bool start() = 0;
-    virtual void stop() = 0;
     virtual bool restart() = 0;
     virtual bool alive() = 0;
     virtual void loop_once(const std::string & in, std::string & out, std::string & err) = 0;
