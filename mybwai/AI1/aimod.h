@@ -2,6 +2,7 @@
 #include <BWAPI.h>
 #include <windows.h>
 #include <set>
+#include <map>
 #include "../../mydt/mydt.hpp"
 
 class BattleMgr { 
@@ -10,6 +11,12 @@ public:
     virtual void handle(BWAPI::Unit *, BWAPI::Unit *);
 private:
     MyDT dt;
+	bool better_target(BWAPI::Unit *, BWAPI::Unit *, BWAPI::Unit *);
+	BWAPI::Unit * get_target(BWAPI::Unit *);
+	void set_target(BWAPI::Unit *, BWAPI::Unit *);
+	void apply_target();
+	bool exists(BWAPI::Unit * u) { return u ? u->exists() : false; } 
+	std::map<BWAPI::Unit*, BWAPI::Unit*> _targets;	// remember the target for each our unit 
 };
 
 class AI1: public BWAPI::AIModule
