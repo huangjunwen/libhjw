@@ -1,0 +1,17 @@
+randin.py [num]
+    生成 num 个(默认 50000)随机点到文件 in.node
+
+    in.node 可用 test 也可用于 trinagle 库 (http://www.cs.cmu.edu/~quake/triangle.html)
+    例如: 
+        ./triangle -F in.node
+    作为比较
+
+test
+    test.c 编译而成
+
+extract_edge.py
+    triangle 运行之后产生的文件其中一个叫 ***.1.ele 从中可以提取出边信息, 运行之后得到 edge 文件
+    可以用于同 test 产生的结果作比较
+    
+bad.node
+    这一个点集在本实现中结果有误, 应该是算法中的误差引致, 暂时还没找到问题所, 现在只能暂时将精度调低(例如保证两点之间坐标之差至少为1等等)

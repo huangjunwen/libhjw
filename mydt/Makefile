@@ -1,7 +1,13 @@
+# vim:fdm=marker:nu:nowrap:noexpandtab
+
 common_src=dt.c mem_pool.c treap.c
 
-test1: ${common_src} test1.c
-	gcc -o test1 -lm ${common_src} test1.c
+libmydt.a: ${common_src}
+	gcc -c -lm ${common_src} && ar rcs libmydt.a ${common_src:.c=.o} && mkdir -p build && mv libmydt.a build && cp *.h build
 
-test2: ${common_src} test2.cpp
-	g++ -o test2 -lm ${common_src} test2.cpp
+clean:
+	rm -rf *.o
+
+veryclean: clean
+	rm -rf build
+	

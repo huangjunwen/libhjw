@@ -268,17 +268,7 @@ void dt_destroy(myDt * pdt) {
 #define LAST_WV (head->prev)
 #define CONNECT_WV(p, n) (p)->next = n; (n)->prev = p
 
-#ifdef COUNT_CALL
-uint32 abp_cnt = 0;
-uint32 cce_cnt = 0;
-uint32 hse_cnt = 0;
-uint32 hce_cnt = 0;
-#endif
-
 INTERNAL boolean after_break_point(const node * s, const node * l, const node * r) {
-#ifdef COUNT_CALL
-    ++abp_cnt;
-#endif
     /* after_break_point example graph
      *
      * y
@@ -329,9 +319,6 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
 }
 
 INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
-#ifdef COUNT_CALL
-    ++cce_cnt;
-#endif
     INIT_WV_SHORTCUT(dt);
 
     if (wv == HEAD_WV || wv == LAST_WV) {
@@ -385,9 +372,6 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
  *     right_bound = l
  */        
 INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
-#ifdef COUNT_CALL
-    ++hse_cnt;
-#endif
     INIT_WV_SHORTCUT(dt);
 
     if (!HEAD_WV->focus) {                        // the first one
@@ -497,9 +481,6 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
 }
 
 INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
-#ifdef COUNT_CALL
-    ++hce_cnt;
-#endif
     wave * wv = e->wv;
     if (!wv)
         return;

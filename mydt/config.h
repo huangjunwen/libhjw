@@ -5,12 +5,6 @@
 // compile configs
 
 /*****************
- * Debug config
- ****************/
-//#define COUNT_CALL    // couting function call number
-
-
-/*****************
  * BST
  ****************/
 #define USE_TREAP       // use treap as BST
