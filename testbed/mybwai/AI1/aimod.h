@@ -3,7 +3,7 @@
 #include <windows.h>
 #include <set>
 #include <map>
-#include "../../mydt/mydt.hpp"
+#include "../../../mydt/mydt.hpp"
 
 class BattleMgr { 
 public:
