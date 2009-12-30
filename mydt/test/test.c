@@ -43,7 +43,11 @@ int main() {
     // get total number of point
     int32 total;
     fscanf(fp, "%d 2 0 0\n", &total);
-    node buffer[total + 1];
+    node * buffer = (node *)malloc(sizeof(node) * total);
+    if (!buffer) {
+        printf("can't malloc\n");
+        return 1;
+    }
     // get points
     node * np = buffer;
     int32 r, n;
@@ -61,6 +65,7 @@ int main() {
     myDt dt;
     if (!dt_create(&dt)) {
         printf("Bad\n");
+        free(buffer);
         fclose(fp);
         return 1;
     }
@@ -98,5 +103,6 @@ int main() {
 #endif
 
     dt_destroy(&dt);
+    free(buffer);
     return 0;
 }
