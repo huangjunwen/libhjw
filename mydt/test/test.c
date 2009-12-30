@@ -19,8 +19,8 @@
 #include "../mem_pool.h"
 
 // options
-#define OUTPUT 0
-#define LOOP_NUM (100)
+#define OUTPUT 1
+#define LOOP_NUM (1)
 
 void pp_handler(void * extra, const node * p1, const node * p2) {
 #if OUTPUT
