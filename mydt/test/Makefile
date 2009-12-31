@@ -1,10 +1,8 @@
-# vim:fdm=marker:nu:nowrap:noexpandtab
+curr_dir=`pwd`
+lib=${curr_dir}/../build/libmydt.a
 
-lib_dir=../
-common_src=${lib_dir}dt.c ${lib_dir}mem_pool.c ${lib_dir}treap.c
-
-test: ${common_src} test.c
-	gcc -o test -lm ${common_src} test.c
+test: test.c
+	gcc -o test -lm test.c ${lib}
 
 clean:
 	rm -rf test

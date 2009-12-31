@@ -4,8 +4,8 @@
 #define _TREAP_H_
 
 #include "config.h"
-#include "types.h"
-#include "mem_pool.h"
+#include "codebase/types.h"
+#include "codebase/mem_pool.h"
 
 typedef struct treapNode treapNode;
 
