@@ -1,7 +1,7 @@
 // vim:fdm=marker:nu:nowrap
 
-#ifndef _MEM_POOL_H
-#define _MEM_POOL_H
+#ifndef _MEM_POOL_H_
+#define _MEM_POOL_H_
 
 #include "types.h"
 

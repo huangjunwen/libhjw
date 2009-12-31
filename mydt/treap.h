@@ -1,5 +1,8 @@
 // vim:fdm=marker:nu:nowrap
 
+#ifndef _TREAP_H_
+#define _TREAP_H_
+
 #include "config.h"
 #include "types.h"
 #include "mem_pool.h"
@@ -59,3 +62,5 @@ typedef treapIter BSTIter;
                                 (piter)->pnode = &((piter)->node->left); \
                                 (piter)->node = *((piter)->pnode)
 
+
+#endif

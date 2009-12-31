@@ -3,7 +3,7 @@
 common_src=dt.c mem_pool.c treap.c
 
 libmydt.a: ${common_src}
-	gcc -c -lm ${common_src} && ar rcs libmydt.a ${common_src:.c=.o} && mkdir -p build && mv libmydt.a build && cp *.h build
+	gcc -c -lm ${common_src} && ar rcs libmydt.a ${common_src:.c=.o} && mkdir -p build && mv libmydt.a build && cp *.h *.hpp build
 
 clean:
 	rm -rf *.o

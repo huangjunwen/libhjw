@@ -16,7 +16,6 @@
 #include <time.h>
 #include <math.h>
 #include "../dt.h"
-#include "../mem_pool.h"
 
 // options
 #define OUTPUT 1

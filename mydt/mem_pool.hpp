@@ -1,4 +1,6 @@
-#pragma once
+#ifndef _MEM_POOL_HPP_
+#define _MEM_POOL_HPP_
+
 #include "mem_pool.h"
 
 // mem_pool's c++ wrapper
@@ -24,3 +26,5 @@ public:
 private:
     memPool _pool;
 };
+
+#endif
