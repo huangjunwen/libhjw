@@ -2,20 +2,16 @@
 
 #include <Python.h>
 #include <string.h>
-#include <stdio.h>
-#include "codebase/mem_pool.h"
 
 typedef enum {
     UNKNOWN = 0,
     HEAD,                       // head seg
     PLAIN,                      // plain text
 
-    VAR_TYPE_BEGIN = 10,        // ----
     RAW_VAR,                    // raw variable ( `raw` means directly render in the result sql )
     SQL_VAR,                    // variable use in sql ( just a/a list of place holder)
     INVIS_VAR,                  // invisalbe var
 
-    SEG_TYPE_BEGIN = 20,        // ----
     OPT_SEG,                    // optional segment
     OR_SEG                      // or segment
 } sqlSegType;
@@ -58,15 +54,15 @@ static inline sqlSeg * init_seg(sqlSeg * seg, sqlSegType type,
     return seg;
 }
 
-static inline sqlSeg * new_seg(memPool * pool, sqlSegType type, 
-        sqlSeg * parent, sqlSeg * prev) {
-    sqlSeg * ret = (sqlSeg *)mem_pool_get(pool);
+static inline sqlSeg * new_seg(sqlSegType type, sqlSeg * parent, 
+        sqlSeg * prev) {
+    sqlSeg * ret = PyMem_New(sqlSeg, 1);
     if (!ret)
         return 0;
     return init_seg(ret, type, parent, prev);
 }
 
-int dynsql_parse(memPool * pool, const char * tmpl, sqlSeg * head_seg, 
+int parse_seg(const char * tmpl, sqlSeg * head_seg, 
         parseErrCode * err_code, int * err_pos) {
 
     const char *p, *base;
@@ -79,7 +75,7 @@ int dynsql_parse(memPool * pool, const char * tmpl, sqlSeg * head_seg,
 #define ERR_RET(code) { *err_pos = base - tmpl; *err_code = code; return 0; }
 #define BEGIN_PLAIN() { base = p; len = 0; all_whitespace = 1; }
 #define STORE_PLAIN() if (len && !all_whitespace) { \
-    if (!(last = new_seg(pool, PLAIN, parent, last))) ERR_RET(MEM_ERR); \
+    if (!(last = new_seg(PLAIN, parent, last))) ERR_RET(MEM_ERR); \
     last->start = base - tmpl; last->len = len; \
     if (!(last->plain = PyString_FromStringAndSize(base, len))) ERR_RET(PY_ERR); }
 
@@ -91,7 +87,7 @@ int dynsql_parse(memPool * pool, const char * tmpl, sqlSeg * head_seg,
     // `p` always point to the next char's address
     // `parent` point to last's parent
     // `last` point to the last segment in this level
-    while (c = *p++) {
+    while ((c = *p++)) {
         switch (c) {
         case '?': type = RAW_VAR; goto STORE_VAR;
         case '#': type = INVIS_VAR; goto STORE_VAR;
@@ -120,7 +116,7 @@ STORE_VAR:
         enclosed = *base == '(';
         paren_cnt = enclosed ? -1 : 0;
 
-        while (c = *p++) {
+        while ((c = *p++)) {
             if (!isprint(c)) {
                 ERR_RET(SYNTAX_ERR);
             }
@@ -151,7 +147,7 @@ STORE_VAR:
         if (paren_cnt > 0)
             is_complex = 1;
         
-        if (!(last = new_seg(pool, type, parent, last)))
+        if (!(last = new_seg(type, parent, last)))
             ERR_RET(MEM_ERR);
 
         last->start = base - tmpl;
@@ -180,12 +176,12 @@ STORE_VAR:
 DOWN_TREE:
         STORE_PLAIN();
 
-        if (!(last = new_seg(pool, type, parent, last)))
+        if (!(last = new_seg(type, parent, last)))
             ERR_RET(MEM_ERR);
         last->start = p - tmpl;
 
         parent = last;                  // down one level
-        if (!(last->first_child = new_seg(pool, HEAD, parent, 0)))
+        if (!(last->first_child = new_seg(HEAD, parent, 0)))
             ERR_RET(MEM_ERR);
         last = last->first_child;
 
@@ -214,87 +210,127 @@ UP_TREE:
     return 1;   
 }
 
-
-void print_seg(sqlSeg * seg, int indent) {
-    while (indent--) printf("\t");
-    PyObject * repr = 0;
-    const char * type;
-    switch (seg->type) {
-    case HEAD: type = "HEAD"; break;
-    case PLAIN: type = "PLAIN"; repr = PyObject_Repr(seg->plain); break;
-    case RAW_VAR: 
-        type = "RAW_VAR"; 
-        repr = seg->var.is_complex ? seg->var.code : seg->var.name;
-        break;
-    case SQL_VAR: 
-        type = "SQL_VAR"; 
-        repr = seg->var.is_complex ? seg->var.code : seg->var.name;
-        break;
-    case INVIS_VAR: 
-        type = "INVIS_VAR"; 
-        repr = seg->var.is_complex ? seg->var.code : seg->var.name;
-        break;
-    case OPT_SEG: type = "OPT_SEG"; break;
-    case OR_SEG: type = "OR_SEG"; break;
-    }
-    printf("%s %d %d |%s|\n", type, seg->start, seg->len, repr ? PyString_AS_STRING(repr) : "");
-    Py_XDECREF(repr);
-}
-
-void print_segs(sqlSeg * head, int indent) {
-    sqlSeg * s = head;
-    while (s) {
-        print_seg(s, indent);
-        if (s->first_child) {
-            print_segs(s->first_child, indent+1);
+// depth first traverse
+void free_seg(sqlSeg * seg) {
+    sqlSeg * curr = seg, * next = 0;
+    while (curr) {
+        switch (curr->type) {
+        case PLAIN:
+            Py_XDECREF(curr->plain);
+        case UNKNOWN:
+        case HEAD:
+            next = curr->sibling ? curr->sibling : curr->parent;
+            break;
+        case RAW_VAR:
+        case SQL_VAR:
+        case INVIS_VAR:
+            next = curr->sibling ? curr->sibling : curr->parent;
+            if (curr->var.is_complex)
+                Py_XDECREF(curr->var.code);
+            else
+                Py_XDECREF(curr->var.name);
+            break;
+        case OPT_SEG:
+        case OR_SEG:
+            next = curr->first_child;
+            curr->type = UNKNOWN;
+            break;
         }
-        s = s->sibling;
+        PyMem_Del(curr);
+        curr = next;
     }
 }
 
-void print_err(const char * tmpl, parseErrCode code, int pos) {
-    int len, b;
-    char err_buff[21];
-    switch (code) {
-    case MEM_ERR:
-        fprintf(stderr, "not enough memory\n");
-        break;
-    case SYNTAX_ERR:
-        len = strlen(tmpl);
-        b = pos <= 10 ? 0 : pos - 10;
-        strncpy(err_buff, tmpl + b, sizeof(err_buff) - 1);
-        fprintf(stderr, "syntax error near pos %d, \"%s\"\n", pos, err_buff);       
-        break;
-    case EMPTY_CHILD:
-        fprintf(stderr, "empty child\n");
-        break;
-    }
-}
+typedef struct {
+    PyObject_VAR_HEAD
+    PyObject * tmpl;        // tmpl string
+    int parsed;             // does the tmpl already parsed
+    sqlSeg head;            // head seg   
+} PyDynSqlObject;
 
-static memPool seg_pool;
 
-int main() {
-    Py_Initialize();
-    if (!mem_pool_init(&seg_pool, sizeof(sqlSeg), 256))
-        return 1;
-    
-    size_t len = 1024;
-    char * tmpl = (char *)malloc(len);
-    sqlSeg head;
-    int r = getline(&tmpl, &len, stdin);
-    tmpl[r - 1] = '\0';
-    parseErrCode err_code;
-    int err_pos;
+static int dynsql_init(PyDynSqlObject * ds, PyObject * args, PyObject * kw) {
+    ds->tmpl = 0;
+    if (!PyArg_ParseTuple(args, "|S:__init__", &ds->tmpl))
+        return -1;
 
-    if (!dynsql_parse(&seg_pool, tmpl, &head, &err_code, &err_pos)) {
-        print_err(tmpl, err_code, err_pos);
-    }
-    else {
-        print_segs(&head, 0);
-    }
-
-    free(tmpl);
-    mem_pool_finalize(&seg_pool);
-    Py_Finalize();
+    if (ds->tmpl != 0)
+        Py_INCREF(ds->tmpl);
+    else
+        ds->tmpl = PyString_FromString("");
+    ds->parsed = 0;
     return 0;
+}
+
+static void dynsql_dealloc(PyDynSqlObject * ds) {
+    if (ds->parsed) {
+        free_seg(ds->head.sibling);
+    }
+    ds->ob_type->tp_free((PyObject *)ds);
+}
+
+static PyObject * dynsql_str(PyDynSqlObject * ds) {
+    Py_INCREF(ds->tmpl);
+    return ds->tmpl;
+}
+
+PyTypeObject PyDynSql_Type = {
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,
+    "dynsql",
+    sizeof(PyDynSqlObject),
+    0,
+    (destructor)dynsql_dealloc,     /* tp_dealloc */
+    0,                              /* tp_print */
+    0,                              /* tp_getattr */
+    0,                              /* tp_setattr */
+    0,                              /* tp_compare */
+    0,                              /* tp_repr */
+    0,                              /* tp_as_number */
+    0,                              /* tp_as_sequence */
+    0,                              /* tp_as_mapping */
+    0,                              /* tp_hash */
+    0,                              /* tp_call */
+    (reprfunc)dynsql_str,           /* tp_str */
+    0,                              /* tp_getattro */
+    0,                              /* tp_setattro */
+    0,                              /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,             /* tp_flags */
+    "dynsql",                       /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                 /* tp_methods */
+    0,                 /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    (initproc)dynsql_init,          /* tp_init */
+    PyType_GenericAlloc,            /* tp_alloc */
+    PyType_GenericNew,              /* tp_new */
+    0,                              /* tp_free */
+};
+
+
+void initdynsql(void) {
+    PyObject * mod;
+
+    // Create the module
+    mod = Py_InitModule3("dynsql", NULL, "dynsql c module");
+    if (mod == NULL) {
+        return;
+    }
+
+    if (PyType_Ready(&PyDynSql_Type) < 0) {
+        return;
+    }
+
+    Py_INCREF(&PyDynSql_Type);
+    PyModule_AddObject(mod, "dynsql", (PyObject *)&PyDynSql_Type);
 }
