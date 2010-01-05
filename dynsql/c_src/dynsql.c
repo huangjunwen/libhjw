@@ -33,14 +33,16 @@ typedef struct sqlSeg {
     struct sqlSeg * first_child;
     struct sqlSeg * sibling;
     sqlSegType type;
-    const char * base;
+    int start;
     int len;
     union {
         PyObject * plain;               // plain string
         struct {
             int is_complex;             // it's a complex expression, not a simple identify
-            PyObject * name;            // simple identify (string object)
-            PyObject * code;            // code object (code object)
+            union {
+                PyObject * name;        // simple identify (string object)
+                PyObject * code;        // code object (code object)
+            };
         } var;
     };
 } sqlSeg;
@@ -69,7 +71,7 @@ int dynsql_parse(memPool * pool, const char * tmpl, sqlSeg * head_seg,
 
     const char *p, *base;
     int len;
-    sqlSeg *parent, *last, *curr;
+    sqlSeg *parent, *last;
     sqlSegType type;
     char c;
     int all_whitespace;
@@ -77,10 +79,9 @@ int dynsql_parse(memPool * pool, const char * tmpl, sqlSeg * head_seg,
 #define ERR_RET(code) { *err_pos = base - tmpl; *err_code = code; return 0; }
 #define BEGIN_PLAIN() { base = p; len = 0; all_whitespace = 1; }
 #define STORE_PLAIN() if (len && !all_whitespace) { \
-    if (!(curr = new_seg(pool, PLAIN, parent, last))) ERR_RET(MEM_ERR); \
-    curr->base = base; curr->len = len; \
-    if (!(curr->plain = PyString_FromStringAndSize(base, len))) ERR_RET(PY_ERR); \
-    last = curr; }
+    if (!(last = new_seg(pool, PLAIN, parent, last))) ERR_RET(MEM_ERR); \
+    last->start = base - tmpl; last->len = len; \
+    if (!(last->plain = PyString_FromStringAndSize(base, len))) ERR_RET(PY_ERR); }
 
     parent = 0;
     last = init_seg(head_seg, HEAD, parent, 0);
@@ -150,29 +151,28 @@ STORE_VAR:
         if (paren_cnt > 0)
             is_complex = 1;
         
-        if (!(curr = new_seg(pool, type, parent, last)))
+        if (!(last = new_seg(pool, type, parent, last)))
             ERR_RET(MEM_ERR);
 
-        curr->base = base;
-        curr->len = len;
-        curr->var.is_complex = is_complex;
+        last->start = base - tmpl;
+        last->len = len;
+        last->var.is_complex = is_complex;
         if (is_complex) {
             char tmp[len + 1];
             strncpy(tmp, base, len);
             tmp[len] = '\0';
-            curr->var.code = Py_CompileString(tmp, "dynsql", Py_eval_input);
-            if (!curr->var.code)
+            last->var.code = Py_CompileString(tmp, "dynsql", Py_eval_input);
+            if (!last->var.code)
                 ERR_RET(PY_ERR);
         }
         else {
             if (enclosed)
-                curr->var.name = PyString_FromStringAndSize(base + 1, len - 2);
+                last->var.name = PyString_FromStringAndSize(base + 1, len - 2);
             else
-                curr->var.name = PyString_FromStringAndSize(base, len);
-            if (!curr->var.name)
+                last->var.name = PyString_FromStringAndSize(base, len);
+            if (!last->var.name)
                 ERR_RET(PY_ERR);
         }
-        last = curr;
 
         BEGIN_PLAIN();
         continue;
@@ -180,13 +180,14 @@ STORE_VAR:
 DOWN_TREE:
         STORE_PLAIN();
 
-        if (!(curr = new_seg(pool, type, parent, last)))
+        if (!(last = new_seg(pool, type, parent, last)))
             ERR_RET(MEM_ERR);
+        last->start = p - 1 - tmpl;
 
-        parent = curr;                  // down one level
-        if (!(curr->first_child = new_seg(pool, HEAD, parent, 0)))
+        parent = last;                  // down one level
+        if (!(last->first_child = new_seg(pool, HEAD, parent, 0)))
             ERR_RET(MEM_ERR);
-        last = curr->first_child;
+        last = last->first_child;
 
         BEGIN_PLAIN();
         continue;
@@ -200,12 +201,15 @@ UP_TREE:
         if (!last->first_child->sibling)
             ERR_RET(EMPTY_CHILD);
         parent = last->parent;
+        last->len = p - tmpl - last->start;
 
         BEGIN_PLAIN();
         continue;
     }
 
     STORE_PLAIN();
+    if (parent != 0)
+        ERR_RET(SYNTAX_ERR);
     *err_code = NO_ERR;
     return 1;   
 }
@@ -233,7 +237,7 @@ void print_seg(sqlSeg * seg, int indent) {
     case OPT_SEG: type = "OPT_SEG"; break;
     case OR_SEG: type = "OR_SEG"; break;
     }
-    printf("%s |%s|\n", type, repr ? PyString_AS_STRING(repr) : "");
+    printf("%s %d %d |%s|\n", type, seg->start, seg->len, repr ? PyString_AS_STRING(repr) : "");
     Py_XDECREF(repr);
 }
 
@@ -286,7 +290,6 @@ int main() {
         print_err(tmpl, err_code, err_pos);
     }
     else {
-    printf("hahhaha\n");
         print_segs(&head, 0);
     }
 
