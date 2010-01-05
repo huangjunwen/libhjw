@@ -182,7 +182,7 @@ DOWN_TREE:
 
         if (!(last = new_seg(pool, type, parent, last)))
             ERR_RET(MEM_ERR);
-        last->start = p - 1 - tmpl;
+        last->start = p - tmpl;
 
         parent = last;                  // down one level
         if (!(last->first_child = new_seg(pool, HEAD, parent, 0)))
@@ -201,7 +201,7 @@ UP_TREE:
         if (!last->first_child->sibling)
             ERR_RET(EMPTY_CHILD);
         parent = last->parent;
-        last->len = p - tmpl - last->start;
+        last->len = p - 1 - tmpl - last->start;
 
         BEGIN_PLAIN();
         continue;
