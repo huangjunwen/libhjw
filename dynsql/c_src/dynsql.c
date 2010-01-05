@@ -1,5 +1,6 @@
 // vim:fdm=marker:nu:nowrap
 
+#include <Python.h>
 #include <string.h>
 #include <stdio.h>
 #include "codebase/mem_pool.h"
@@ -17,15 +18,14 @@ typedef enum {
     SEG_TYPE_BEGIN = 20,        // ----
     OPT_SEG,                    // optional segment
     OR_SEG                      // or segment
-
 } sqlSegType;
 
 typedef enum {
     NO_ERR = 0,
     MEM_ERR,
+    PY_ERR,
     SYNTAX_ERR,
     EMPTY_CHILD
-
 } parseErrCode;
 
 typedef struct sqlSeg {
@@ -33,15 +33,14 @@ typedef struct sqlSeg {
     struct sqlSeg * first_child;
     struct sqlSeg * sibling;
     sqlSegType type;
+    const char * base;
+    int len;
     union {
+        PyObject * plain;               // plain string
         struct {
-            const char * base;
-            int len;
-        } plain;                        // plain string
-        struct {
-            const char * base;          // if "$(abc)" 
-            int len;
             int is_complex;             // it's a complex expression, not a simple identify
+            PyObject * name;            // simple identify (string object)
+            PyObject * code;            // code object (code object)
         } var;
     };
 } sqlSeg;
@@ -76,10 +75,11 @@ int dynsql_parse(memPool * pool, const char * tmpl, sqlSeg * head_seg,
     int all_whitespace;
 
 #define ERR_RET(code) { *err_pos = base - tmpl; *err_code = code; return 0; }
-#define BEGIN_PLAIN() base = p; len = 0; all_whitespace = 1
+#define BEGIN_PLAIN() { base = p; len = 0; all_whitespace = 1; }
 #define STORE_PLAIN() if (len && !all_whitespace) { \
     if (!(curr = new_seg(pool, PLAIN, parent, last))) ERR_RET(MEM_ERR); \
-    curr->plain.base = base; curr->plain.len = len; \
+    curr->base = base; curr->len = len; \
+    if (!(curr->plain = PyString_FromStringAndSize(base, len))) ERR_RET(PY_ERR); \
     last = curr; }
 
     parent = 0;
@@ -88,6 +88,8 @@ int dynsql_parse(memPool * pool, const char * tmpl, sqlSeg * head_seg,
     BEGIN_PLAIN();
 
     // `p` always point to the next char's address
+    // `parent` point to last's parent
+    // `last` point to the last segment in this level
     while (c = *p++) {
         switch (c) {
         case '?': type = RAW_VAR; goto STORE_VAR;
@@ -108,46 +110,68 @@ int dynsql_parse(memPool * pool, const char * tmpl, sqlSeg * head_seg,
 STORE_VAR:
         STORE_PLAIN();
 
-        int is_complex, paren_cnt;
+        int is_complex, nest, enclosed, paren_cnt;
 
         is_complex = 0;
-        paren_cnt = 0;
+        nest = 0;
         base = p;
         len = 0;
+        enclosed = *base == '(';
+        paren_cnt = enclosed ? -1 : 0;
 
         while (c = *p++) {
-            if (c == '(') {
+            if (!isprint(c)) {
+                ERR_RET(SYNTAX_ERR);
+            }
+            else if (c == '(') {
+                ++nest;
                 ++paren_cnt;
-                is_complex = 1;
             }
             else if (c == ')') {
-                --paren_cnt;
-                if (paren_cnt == 0) {
+                if (--nest == 0) {
                     ++len;
                     break;
                 }
-                if (paren_cnt < 0)              // asymmetric decteced
+                if (nest < 0)                               // asymmetric decteced
                     ERR_RET(SYNTAX_ERR);
-                
             }
             else if (!isalnum(c) && c != '_') {
-                if (paren_cnt == 0) {
-                    --p;                        // backward one char
+                if (nest == 0) {
+                    --p;                                    // backward one char
                     break;
                 }
                 is_complex = 1;
             }
             ++len;
         }
-        if (paren_cnt != 0 || !len)                              // the end
+        if (nest != 0 || !len || (enclosed && len <= 2))    // must be complete and has length
             ERR_RET(SYNTAX_ERR);
+        
+        if (paren_cnt > 0)
+            is_complex = 1;
         
         if (!(curr = new_seg(pool, type, parent, last)))
             ERR_RET(MEM_ERR);
 
-        curr->var.base = base;
-        curr->var.len = len;
+        curr->base = base;
+        curr->len = len;
         curr->var.is_complex = is_complex;
+        if (is_complex) {
+            char tmp[len + 1];
+            strncpy(tmp, base, len);
+            tmp[len] = '\0';
+            curr->var.code = Py_CompileString(tmp, "dynsql", Py_eval_input);
+            if (!curr->var.code)
+                ERR_RET(PY_ERR);
+        }
+        else {
+            if (enclosed)
+                curr->var.name = PyString_FromStringAndSize(base + 1, len - 2);
+            else
+                curr->var.name = PyString_FromStringAndSize(base, len);
+            if (!curr->var.name)
+                ERR_RET(PY_ERR);
+        }
         last = curr;
 
         BEGIN_PLAIN();
@@ -186,46 +210,31 @@ UP_TREE:
     return 1;   
 }
 
-void repr(const char * s, int len) {
-    char c;
-    const char * p = s;
-    while (len--) {
-        c = *p;
-        if (isprint(c))
-            printf("%c", c);
-        else
-            printf("\\x%02x", c);
-        ++p;
-    }
-}
 
 void print_seg(sqlSeg * seg, int indent) {
     while (indent--) printf("\t");
+    PyObject * repr = 0;
+    const char * type;
     switch (seg->type) {
-    case HEAD: printf("HEAD\n"); break;
-    case PLAIN: 
-        printf("PLAIN |"); 
-        repr(seg->plain.base, seg->plain.len);
-        printf("|\n");
-        break;
+    case HEAD: type = "HEAD"; break;
+    case PLAIN: type = "PLAIN"; repr = PyObject_Repr(seg->plain); break;
     case RAW_VAR: 
-        printf("RAW_VAR |"); 
-        repr(seg->plain.base, seg->plain.len);
-        printf("|\n");
+        type = "RAW_VAR"; 
+        repr = seg->var.is_complex ? seg->var.code : seg->var.name;
         break;
     case SQL_VAR: 
-        printf("SQL_VAR |"); 
-        repr(seg->plain.base, seg->plain.len);
-        printf("|\n");
+        type = "SQL_VAR"; 
+        repr = seg->var.is_complex ? seg->var.code : seg->var.name;
         break;
     case INVIS_VAR: 
-        printf("INVIS_VAR |"); 
-        repr(seg->plain.base, seg->plain.len);
-        printf("|\n");
+        type = "INVIS_VAR"; 
+        repr = seg->var.is_complex ? seg->var.code : seg->var.name;
         break;
-    case OPT_SEG: printf("OPT_SEG\n"); break;
-    case OR_SEG: printf("OR_SEG\n"); break;
+    case OPT_SEG: type = "OPT_SEG"; break;
+    case OR_SEG: type = "OR_SEG"; break;
     }
+    printf("%s |%s|\n", type, repr ? PyString_AS_STRING(repr) : "");
+    Py_XDECREF(repr);
 }
 
 void print_segs(sqlSeg * head, int indent) {
@@ -261,6 +270,7 @@ void print_err(const char * tmpl, parseErrCode code, int pos) {
 static memPool seg_pool;
 
 int main() {
+    Py_Initialize();
     if (!mem_pool_init(&seg_pool, sizeof(sqlSeg), 256))
         return 1;
     
@@ -276,10 +286,12 @@ int main() {
         print_err(tmpl, err_code, err_pos);
     }
     else {
+    printf("hahhaha\n");
         print_segs(&head, 0);
     }
 
     free(tmpl);
     mem_pool_finalize(&seg_pool);
+    Py_Finalize();
     return 0;
 }
