@@ -6,6 +6,7 @@
 #define _(x) (*(x))
 #define CNTX_HEAD int __resume_lineno
 #define CNTX_VAR(T, name, cntx) T * name = &((cntx).name)
+#define CNTX_INIT(cntx) (cntx).__resume_lineno = 0
 #define BEGIN(cntx) switch((cntx).__resume_lineno) { default:;
 // !!note: do not call YIELD() in an switch statement
 #define YIELD(cntx, ret) { (cntx).__resume_lineno = __LINE__ + 1; return (ret); }\
@@ -47,6 +48,24 @@ typedef struct {
     parserEvent curr;                   // current parser event
     parserCntx cntx;                    // parser contex
 } PyDynSqlParser;
+
+static inline void reset_cntx(parserCntx * cntx) {
+    CNTX_INIT(*cntx);
+    cntx->p = cntx->base = 0;
+    cntx->all_whitespace = 1;
+    cntx->stack_sz = 0;
+}
+
+// 0 for ok, -1 for failed
+static inline int init_cntx(parserCntx * cntx) {
+    memset(cntx, 0, sizeof(parserCntx));
+    cntx->stack = PyMem_New(char, (cntx->stack_capacity = 8));
+    if (!cntx->stack)
+        return -1;
+    cntx->stack_inc = 5;
+    reset_cntx(cntx);
+    return 0;
+}
 
 static inline char * stack_push(parserCntx * cntx) {
     if (cntx->stack_sz >= cntx->stack_capacity) {
@@ -188,4 +207,39 @@ int _parse(PyDynSqlParser * parser) {
     return 0;
 }
 
+static int PyDynSqlParser_init(PyDynSqlParser * parser, PyObject * args, PyObject * kw) {
+    if (!PyArg_ParseTuple(args, "S:__init__", &parser->tmpl))
+        return -1;
+    Py_INCREF(parser->tmpl);
 
+    parser->curr.type = UNKOWN;
+    if (init_cntx(&parser->cntx) < 0)
+        goto failed;
+
+failed:
+    Py_DECREF(parser->tmpl);
+    return -1;
+}
+
+static void PyDynSqlParser_dealloc(PyDynSqlParser * parser) {
+    Py_DECREF(parser->tmpl);
+    PyMem_Del(parser->cntx.stack);
+    parser->ob_type->tp_free((PyObject *)parser);
+}
+
+static PyObject * PyDynSqlParser_iternext(PyDynSqlParser * parser) {
+    // not bound to tmpl yet
+    if (!parser->cntx.p) {
+        parser->cntx.p = parser->cntx.base = PyString_AS_STRING(parser->tmpl);
+    }
+    switch (_parse(parser)) {
+    case -1:
+        PyErr_SetString(PyExc_SyntaxError, "sytanx error");       
+    case 0:
+        return NULL;
+    default:
+        break;
+    }
+    parserEvent * ev = &parser->curr;
+    return Py_BuildValue("(icii)", ev->type, ev->kind, ev->start, ev->end);
+}
