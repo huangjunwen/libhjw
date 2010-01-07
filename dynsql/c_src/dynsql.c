@@ -3,320 +3,302 @@
 #include <Python.h>
 #include <string.h>
 
+// ref: http://www.sics.se/~adam/pt/ 
+
+#define _(x) (*(x))
+#define CNTX_HEAD int __resume_lineno
+#define CNTX_VAR(T, name, cntx) T * name = &((cntx).name)
+#define CNTX_INIT(cntx) (cntx).__resume_lineno = 0
+#define BEGIN(cntx) switch((cntx).__resume_lineno) { default: case 0:
+// !!note: do not call YIELD() in an switch statement
+#define YIELD(cntx, ret) { (cntx).__resume_lineno = __LINE__; return (ret); }   \
+    case __LINE__: 
+#define END() }
+
 typedef enum {
-    UNKNOWN = 0,
-    HEAD,                       // head seg
-    PLAIN,                      // plain text
+    INIT = 0,
+    PLAIN,                          // got a plain text
+    VAR,                            // got a variable
+    EXPR,                           // got a expression
+    SUB_START,                      // a sub tree start
+    SUB_END,                        // a sub tree end
+    SYTAX_ERR,                      // some err
+} parserEventType;
 
-    RAW_VAR,                    // raw variable ( `raw` means directly render in the result sql )
-    SQL_VAR,                    // variable use in sql ( just a/a list of place holder)
-    INVIS_VAR,                  // invisalbe var
+typedef struct {
+    parserEventType type;
+    char kind;                      // '?'/'$'/'#'/'['/'{'
+    int start;                      // [start, end)
+    int end;
+} parserEvent;
 
-    OPT_SEG,                    // optional segment
-    OR_SEG                      // or segment
-} sqlSegType;
-
-typedef enum {
-    NO_ERR = 0,
-    MEM_ERR,
-    PY_ERR,
-    SYNTAX_ERR,
-    EMPTY_CHILD
-} parseErrCode;
-
-typedef struct sqlSeg {
-    struct sqlSeg * parent;     
-    struct sqlSeg * first_child;
-    struct sqlSeg * sibling;
-    sqlSegType type;
-    int start;
-    int len;
-    union {
-        PyObject * plain;               // plain string
-        struct {
-            int is_complex;             // it's a complex expression, not a simple identify
-            union {
-                PyObject * name;        // simple identify (string object)
-                PyObject * code;        // code object (code object)
-            };
-        } var;
-    };
-} sqlSeg;
-
-
-static inline sqlSeg * init_seg(sqlSeg * seg, sqlSegType type, 
-        sqlSeg * parent, sqlSeg * prev) {
-    memset(seg, 0, sizeof(sqlSeg));
-    seg->parent = parent;
-    seg->type = type;
-    if (prev)
-        prev->sibling = seg;
-    return seg;
-}
-
-static inline sqlSeg * new_seg(sqlSegType type, sqlSeg * parent, 
-        sqlSeg * prev) {
-    sqlSeg * ret = PyMem_New(sqlSeg, 1);
-    if (!ret)
-        return 0;
-    return init_seg(ret, type, parent, prev);
-}
-
-int parse_seg(const char * tmpl, sqlSeg * head_seg, 
-        parseErrCode * err_code, int * err_pos) {
-
-    const char *p, *base;
-    int len;
-    sqlSeg *parent, *last;
-    sqlSegType type;
+typedef struct {
+    CNTX_HEAD;
     char c;
-    int all_whitespace;
+    const char * p;                 // current position
+    const char * base;              // base position
+    int all_whitespace;             // does from base to p are all white spaces
 
-#define ERR_RET(code) { *err_pos = base - tmpl; *err_code = code; return 0; }
-#define BEGIN_PLAIN() { base = p; len = 0; all_whitespace = 1; }
-#define STORE_PLAIN() if (len && !all_whitespace) { \
-    if (!(last = new_seg(PLAIN, parent, last))) ERR_RET(MEM_ERR); \
-    last->start = base - tmpl; last->len = len; \
-    if (!(last->plain = PyString_FromStringAndSize(base, len))) ERR_RET(PY_ERR); }
+    char * stack;                   // bracket stack
+    int stack_sz;
+    int stack_capacity;
+    int stack_inc;
 
-    parent = 0;
-    last = init_seg(head_seg, HEAD, parent, 0);
-    p = tmpl;
-    BEGIN_PLAIN();
-
-    // `p` always point to the next char's address
-    // `parent` point to last's parent
-    // `last` point to the last segment in this level
-    while ((c = *p++)) {
-        switch (c) {
-        case '?': type = RAW_VAR; goto STORE_VAR;
-        case '#': type = INVIS_VAR; goto STORE_VAR;
-        case '$': type = SQL_VAR; goto STORE_VAR;
-        case '[': type = OR_SEG; goto DOWN_TREE;
-        case '{': type = OPT_SEG; goto DOWN_TREE;
-        case ']': type = OR_SEG; goto UP_TREE;
-        case '}': type = OPT_SEG; goto UP_TREE;
-        default:
-            if (!isspace(c) && isprint(c))
-                all_whitespace = 0;
-            ++len;
-            break;
-        }
-        continue;
-
-STORE_VAR:
-        STORE_PLAIN();
-
-        int is_complex, nest, enclosed, paren_cnt;
-
-        is_complex = 0;
-        nest = 0;
-        base = p;
-        len = 0;
-        enclosed = *base == '(';
-        paren_cnt = enclosed ? -1 : 0;
-
-        while ((c = *p++)) {
-            if (!isprint(c)) {
-                ERR_RET(SYNTAX_ERR);
-            }
-            else if (c == '(') {
-                ++nest;
-                ++paren_cnt;
-            }
-            else if (c == ')') {
-                if (--nest == 0) {
-                    ++len;
-                    break;
-                }
-                if (nest < 0)                               // asymmetric decteced
-                    ERR_RET(SYNTAX_ERR);
-            }
-            else if (!isalnum(c) && c != '_') {
-                if (nest == 0) {
-                    --p;                                    // backward one char
-                    break;
-                }
-                is_complex = 1;
-            }
-            ++len;
-        }
-        if (nest != 0 || !len || (enclosed && len <= 2))    // must be complete and has length
-            ERR_RET(SYNTAX_ERR);
-        
-        if (paren_cnt > 0)
-            is_complex = 1;
-        
-        if (!(last = new_seg(type, parent, last)))
-            ERR_RET(MEM_ERR);
-
-        last->start = base - tmpl;
-        last->len = len;
-        last->var.is_complex = is_complex;
-        if (is_complex) {
-            char tmp[len + 1];
-            strncpy(tmp, base, len);
-            tmp[len] = '\0';
-            last->var.code = Py_CompileString(tmp, "dynsql", Py_eval_input);
-            if (!last->var.code)
-                ERR_RET(PY_ERR);
-        }
-        else {
-            if (enclosed)
-                last->var.name = PyString_FromStringAndSize(base + 1, len - 2);
-            else
-                last->var.name = PyString_FromStringAndSize(base, len);
-            if (!last->var.name)
-                ERR_RET(PY_ERR);
-        }
-
-        BEGIN_PLAIN();
-        continue;
-
-DOWN_TREE:
-        STORE_PLAIN();
-
-        if (!(last = new_seg(type, parent, last)))
-            ERR_RET(MEM_ERR);
-        last->start = p - tmpl;
-
-        parent = last;                  // down one level
-        if (!(last->first_child = new_seg(HEAD, parent, 0)))
-            ERR_RET(MEM_ERR);
-        last = last->first_child;
-
-        BEGIN_PLAIN();
-        continue;
-
-UP_TREE:
-        STORE_PLAIN();
-
-        last = parent;
-        if (!last || last->type != type)
-            ERR_RET(SYNTAX_ERR);
-        if (!last->first_child->sibling)
-            ERR_RET(EMPTY_CHILD);
-        parent = last->parent;
-        last->len = p - 1 - tmpl - last->start;
-
-        BEGIN_PLAIN();
-        continue;
-    }
-
-    STORE_PLAIN();
-    if (parent != 0)
-        ERR_RET(SYNTAX_ERR);
-    *err_code = NO_ERR;
-    return 1;   
-}
-
-// depth first traverse
-void free_seg(sqlSeg * seg) {
-    sqlSeg * curr = seg, * next = 0;
-    while (curr) {
-        switch (curr->type) {
-        case PLAIN:
-            Py_XDECREF(curr->plain);
-        case UNKNOWN:
-        case HEAD:
-            next = curr->sibling ? curr->sibling : curr->parent;
-            break;
-        case RAW_VAR:
-        case SQL_VAR:
-        case INVIS_VAR:
-            next = curr->sibling ? curr->sibling : curr->parent;
-            if (curr->var.is_complex)
-                Py_XDECREF(curr->var.code);
-            else
-                Py_XDECREF(curr->var.name);
-            break;
-        case OPT_SEG:
-        case OR_SEG:
-            next = curr->first_child;
-            curr->type = UNKNOWN;
-            break;
-        }
-        PyMem_Del(curr);
-        curr = next;
-    }
-}
+    parserEvent curr;               // current parser event
+} parserCntx;
 
 typedef struct {
     PyObject_VAR_HEAD
-    PyObject * tmpl;        // tmpl string
-    int parsed;             // does the tmpl already parsed
-    sqlSeg head;            // head seg   
-} PyDynSqlObject;
+    PyObject * tmpl;                    // the template
+    parserCntx cntx;                    // parser contex
+} dynsqlParser;
 
+static inline void reset_cntx(parserCntx * cntx, const char * tmpl) {
+    CNTX_INIT(*cntx);                   // this will make _parse run from the begining
+    cntx->p = cntx->base = tmpl;
+    cntx->all_whitespace = 1;
+    cntx->stack_sz = 0;                 
+    cntx->curr.type = INIT;             // reset event
+}
 
-static int dynsql_init(PyDynSqlObject * ds, PyObject * args, PyObject * kw) {
-    ds->tmpl = 0;
-    if (!PyArg_ParseTuple(args, "|S:__init__", &ds->tmpl))
+// 0 for ok, -1 for failed
+static inline int init_cntx(parserCntx * cntx, const char * tmpl) {
+    memset(cntx, 0, sizeof(parserCntx));
+    cntx->stack = PyMem_New(char, (cntx->stack_capacity = 8));
+    if (!cntx->stack)
         return -1;
-
-    if (ds->tmpl != 0)
-        Py_INCREF(ds->tmpl);
-    else
-        ds->tmpl = PyString_FromString("");
-    ds->parsed = 0;
+    cntx->stack_inc = 5;
+    reset_cntx(cntx, tmpl);
     return 0;
 }
 
-static void dynsql_dealloc(PyDynSqlObject * ds) {
-    if (ds->parsed) {
-        free_seg(ds->head.sibling);
+static inline char * stack_push(parserCntx * cntx) {
+    if (cntx->stack_sz >= cntx->stack_capacity) {
+        int new_capacity = cntx->stack_capacity + cntx->stack_inc;
+        if (!(cntx->stack = PyMem_Resize(cntx->stack, char, new_capacity)))
+            return 0;
+        cntx->stack_inc = cntx->stack_capacity;
+        cntx->stack_capacity = new_capacity;
     }
-    ds->ob_type->tp_free((PyObject *)ds);
+    return &cntx->stack[cntx->stack_sz++];
 }
 
-static PyObject * dynsql_str(PyDynSqlObject * ds) {
-    Py_INCREF(ds->tmpl);
-    return ds->tmpl;
+static inline char stack_top(parserCntx * cntx) {
+    if (!cntx->stack_sz)
+        return '\0';
+    return cntx->stack[cntx->stack_sz - 1];
 }
 
-PyTypeObject PyDynSql_Type = {
+static inline void stack_pop(parserCntx * cntx) {
+    --cntx->stack_sz;
+}
+
+#define PARSER_VAR(T, name) CNTX_VAR(T, name, parser->cntx)
+#define PARSER_BEGIN() BEGIN(parser->cntx)
+#define PARSER_END() END()
+#define PARSER_YIELD(T, K, S, E) {               \
+            parser->cntx.curr.type = (T);        \
+            parser->cntx.curr.kind = (K);        \
+            parser->cntx.curr.start = (S);       \
+            parser->cntx.curr.end = (E);         \
+        }                                   \
+        YIELD(parser->cntx, 1)
+
+#define BEGIN_PLAIN() {                     \
+            _(base) = _(p);                 \
+            _(all_whitespace) = 1;          \
+        }
+
+#define STORE_PLAIN() if ( _(base) != _(p) && !_(all_whitespace) ) {    \
+            PARSER_YIELD(PLAIN, '\0', _(base) - tmpl, _(p) - tmpl);  \
+        }
+    
+// 0 for finish, -1 for failed
+// on success, *p point to the next address of " or '
+int _consume_str(const char * tmpl, const char ** p) {
+    char q = *_(p)++;
+    int ret = -1;
+    char c;
+    while (( c = *_(p)++ )) {
+        if (c == '\\') {
+            ++_(p);
+            continue;
+        }
+        else if (c == q) {
+            ret = 0;
+            break;
+        }
+    }
+    return ret;
+}
+
+// 1 for yielding events, 0 for finish
+static inline int _parse(dynsqlParser * parser) {
+    PARSER_VAR(char, c);
+    PARSER_VAR(const char *, p);
+    PARSER_VAR(const char *, base);
+    PARSER_VAR(int, all_whitespace);
+
+    const char * tmpl = PyString_AS_STRING(parser->tmpl);
+
+PARSER_BEGIN();
+
+    BEGIN_PLAIN();
+
+    while (( _(c) = *_(p) )) {
+        switch ( _(c) ) {
+        /*
+        case '?':
+        case '#':
+        case '$':  
+            goto STORE_VAR_OR_EXPR;*/
+        case '[':
+        case '{':
+            goto TREE_DOWN;
+        case ']':
+        case '}':
+            goto TREE_UP;
+        case '\'':
+        case '"':
+            if (_consume_str(tmpl, p) < 0)
+                goto ERR;
+            continue;
+        default:
+            if (isprint( _(c) ) && !isspace( _(c) ))
+                _(all_whitespace) = 0;
+            ++_(p);
+            continue;
+        }
+/*
+    STORE_VAR_OR_EXPR:
+        STORE_PLAIN();
+        BEGIN_PLAIN();
+        continue;*/
+    TREE_DOWN:
+        STORE_PLAIN();
+
+        // push
+        *stack_push(&parser->cntx) = _(c);
+
+        // yield
+        ++_(p);
+        PARSER_YIELD(SUB_START, _(c), _(p) - tmpl, -1);  // we don't know end so -1
+
+        BEGIN_PLAIN();
+        continue;
+    TREE_UP:
+        STORE_PLAIN();
+        
+        // some check then pop
+        if (parser->cntx.curr.type == SUB_START)            // empty child
+            goto ERR;
+        if (_(c) - stack_top(&parser->cntx) != 2)           // bracket mismatch
+            goto ERR;
+        stack_pop(&parser->cntx);
+        
+        // yield
+        PARSER_YIELD(SUB_END, _(c), -1, _(p) - tmpl);       // we don't know start so -1
+
+        ++_(p);
+        BEGIN_PLAIN();
+        continue;
+
+    }
+    STORE_PLAIN();
+
+    if (parser->cntx.stack_sz)
+        goto ERR;
+    return 0;
+
+    // once error then finished
+    ERR:
+        PARSER_YIELD(SYTAX_ERR, _(c), _(base) - tmpl, _(p) - tmpl);              
+        return 0;
+
+PARSER_END();
+
+}
+
+
+/* Python Interface functions */
+
+static int dynsqlParser_init(dynsqlParser * parser, PyObject * args, PyObject * kw) {
+    // init template string
+    parser->tmpl = 0;
+    if (!PyArg_ParseTuple(args, "|S:__init__", &parser->tmpl))
+        return -1;
+    if (parser->tmpl)
+        Py_INCREF(parser->tmpl);
+    else
+        parser->tmpl = PyString_FromString("");
+
+    // init template contex
+    if (init_cntx(&parser->cntx, PyString_AS_STRING(parser->tmpl)) < 0)
+        goto failed;
+
+    return 0;
+
+failed:
+    Py_DECREF(parser->tmpl);
+    return -1;
+}
+
+static void dynsqlParser_dealloc(dynsqlParser * parser) {
+    Py_DECREF(parser->tmpl);
+    PyMem_Del(parser->cntx.stack);
+    parser->ob_type->tp_free((PyObject *)parser);
+}
+
+static PyObject * dynsqlParser_iternext(dynsqlParser * parser) {
+    if (_parse(parser) == 0)                        // finished
+        return NULL;
+
+    parserEvent * ev = &parser->cntx.curr;
+    return Py_BuildValue("(icii)", ev->type, ev->kind, ev->start, ev->end);
+}
+
+PyTypeObject dynsqlParser_Type = {
     PyObject_HEAD_INIT(&PyType_Type)
     0,
-    "dynsql",
-    sizeof(PyDynSqlObject),
+    "dynsqlParser",
+    sizeof(dynsqlParser),
     0,
-    (destructor)dynsql_dealloc,     /* tp_dealloc */
-    0,                              /* tp_print */
-    0,                              /* tp_getattr */
-    0,                              /* tp_setattr */
-    0,                              /* tp_compare */
-    0,                              /* tp_repr */
-    0,                              /* tp_as_number */
-    0,                              /* tp_as_sequence */
-    0,                              /* tp_as_mapping */
-    0,                              /* tp_hash */
-    0,                              /* tp_call */
-    (reprfunc)dynsql_str,           /* tp_str */
-    0,                              /* tp_getattro */
-    0,                              /* tp_setattro */
-    0,                              /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,             /* tp_flags */
-    "dynsql",                       /* tp_doc */
-    0,                              /* tp_traverse */
-    0,                              /* tp_clear */
-    0,                              /* tp_richcompare */
-    0,                              /* tp_weaklistoffset */
-    0,                              /* tp_iter */
-    0,                              /* tp_iternext */
-    0,                 /* tp_methods */
-    0,                 /* tp_members */
-    0,                              /* tp_getset */
-    0,                              /* tp_base */
-    0,                              /* tp_dict */
-    0,                              /* tp_descr_get */
-    0,                              /* tp_descr_set */
-    0,                              /* tp_dictoffset */
-    (initproc)dynsql_init,          /* tp_init */
-    PyType_GenericAlloc,            /* tp_alloc */
-    PyType_GenericNew,              /* tp_new */
-    0,                              /* tp_free */
+    (destructor)dynsqlParser_dealloc,       /* tp_dealloc */
+    0,                                      /* tp_print */
+    0,                                      /* tp_getattr */
+    0,                                      /* tp_setattr */
+    0,                                      /* tp_compare */
+    0,                                      /* tp_repr */
+    0,                                      /* tp_as_number */
+    0,                                      /* tp_as_sequence */
+    0,                                      /* tp_as_mapping */
+    0,                                      /* tp_hash */
+    0,                                      /* tp_call */
+    0,                                      /* tp_str */
+    0,                                      /* tp_getattro */
+    0,                                      /* tp_setattro */
+    0,                                      /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                     /* tp_flags */
+    "",                               /* tp_doc */
+    0,                                      /* tp_traverse */
+    0,                                      /* tp_clear */
+    0,                                      /* tp_richcompare */
+    0,                                      /* tp_weaklistoffset */
+    PyObject_SelfIter,                      /* tp_iter */
+    (iternextfunc)dynsqlParser_iternext,    /* tp_iternext */
+    0,                                      /* tp_methods */
+    0,                                      /* tp_members */
+    0,                                      /* tp_getset */
+    0,                                      /* tp_base */
+    0,                                      /* tp_dict */
+    0,                                      /* tp_descr_get */
+    0,                                      /* tp_descr_set */
+    0,                                      /* tp_dictoffset */
+    (initproc)dynsqlParser_init,            /* tp_init */
+    PyType_GenericAlloc,                    /* tp_alloc */
+    PyType_GenericNew,                      /* tp_new */
+    0,                                      /* tp_free */
 };
-
 
 void initdynsql(void) {
     PyObject * mod;
@@ -327,10 +309,10 @@ void initdynsql(void) {
         return;
     }
 
-    if (PyType_Ready(&PyDynSql_Type) < 0) {
+    if (PyType_Ready(&dynsqlParser_Type) < 0) {
         return;
     }
 
-    Py_INCREF(&PyDynSql_Type);
-    PyModule_AddObject(mod, "dynsql", (PyObject *)&PyDynSql_Type);
+    Py_INCREF(&dynsqlParser_Type);
+    PyModule_AddObject(mod, "dynsqlParser", (PyObject *)&dynsqlParser_Type);
 }
