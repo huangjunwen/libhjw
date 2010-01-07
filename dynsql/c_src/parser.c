@@ -49,21 +49,21 @@ typedef struct {
     parserCntx cntx;                    // parser contex
 } PyDynSqlParser;
 
-static inline void reset_cntx(parserCntx * cntx) {
+static inline void reset_cntx(parserCntx * cntx, const char * tmpl) {
     CNTX_INIT(*cntx);
-    cntx->p = cntx->base = 0;
+    cntx->p = cntx->base = tmpl;
     cntx->all_whitespace = 1;
     cntx->stack_sz = 0;
 }
 
 // 0 for ok, -1 for failed
-static inline int init_cntx(parserCntx * cntx) {
+static inline int init_cntx(parserCntx * cntx, const char * tmpl) {
     memset(cntx, 0, sizeof(parserCntx));
     cntx->stack = PyMem_New(char, (cntx->stack_capacity = 8));
     if (!cntx->stack)
         return -1;
     cntx->stack_inc = 5;
-    reset_cntx(cntx);
+    reset_cntx(cntx, tmpl);
     return 0;
 }
 
@@ -175,9 +175,9 @@ int _parse(PyDynSqlParser * parser) {
         *stack_push(&parser->cntx) = _(c);
 
         // yield
+        ++_(p);
         PARSER_YIELD(SUB_START, _(c), _(p) - tmpl, -1);     // we don't know end so -1
 
-        ++_(p);
         BEGIN_PLAIN();
         continue;
     TREE_UP:
@@ -213,7 +213,7 @@ static int PyDynSqlParser_init(PyDynSqlParser * parser, PyObject * args, PyObjec
     Py_INCREF(parser->tmpl);
 
     parser->curr.type = UNKOWN;
-    if (init_cntx(&parser->cntx) < 0)
+    if (init_cntx(&parser->cntx, PyString_AS_STRING(parser->tmpl)) < 0)
         goto failed;
 
 failed:
@@ -228,14 +228,10 @@ static void PyDynSqlParser_dealloc(PyDynSqlParser * parser) {
 }
 
 static PyObject * PyDynSqlParser_iternext(PyDynSqlParser * parser) {
-    // not bound to tmpl yet
-    if (!parser->cntx.p) {
-        parser->cntx.p = parser->cntx.base = PyString_AS_STRING(parser->tmpl);
-    }
     switch (_parse(parser)) {
-    case -1:
+    case -1:                                                    // error
         PyErr_SetString(PyExc_SyntaxError, "sytanx error");       
-    case 0:
+    case 0:                                                     // finished
         return NULL;
     default:
         break;
