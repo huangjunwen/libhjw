@@ -298,15 +298,19 @@ PARSER_END();
 
 /* Python Interface functions */
 
+// standard functions 
+
 static int dynsqlParser_init(dynsqlParser * parser, PyObject * args, PyObject * kw) {
     // init template string
     parser->tmpl = 0;
     if (!PyArg_ParseTuple(args, "|S:__init__", &parser->tmpl))
         return -1;
-    if (parser->tmpl)
+    if (parser->tmpl) {
         Py_INCREF(parser->tmpl);
-    else
+    }
+    else {
         parser->tmpl = PyString_FromString("");
+    }
 
     // init template contex
     if (init_cntx(&parser->cntx, PyString_AS_STRING(parser->tmpl)) < 0)
@@ -332,6 +336,27 @@ static PyObject * dynsqlParser_iternext(dynsqlParser * parser) {
     parserEvent * ev = &parser->cntx.curr;
     return Py_BuildValue("(icii)", ev->type, ev->kind, ev->start, ev->end);
 }
+
+// methods
+
+static PyObject * dynsqlParser_set(dynsqlParser * parser, PyObject * tmpl) {
+//METH_O 
+    if (!PyString_Check(tmpl)) {
+        PyErr_SetString(PyExc_ValueError, "a string is expected");
+        return NULL;
+    }
+    Py_DECREF(parser->tmpl);
+    Py_INCREF(tmpl);
+    parser->tmpl = tmpl;
+    reset_cntx(&parser->cntx, PyString_AS_STRING(parser->tmpl));
+
+    Py_RETURN_NONE;
+}
+
+static PyMethodDef dynsqlParser_methods[] = {
+    {"set", (PyCFunction)dynsqlParser_set, METH_O, "set a new template string for the parser"},
+    { NULL }
+};
 
 PyTypeObject dynsqlParser_Type = {
     PyObject_HEAD_INIT(&PyType_Type)
@@ -362,7 +387,7 @@ PyTypeObject dynsqlParser_Type = {
     0,                                      /* tp_weaklistoffset */
     PyObject_SelfIter,                      /* tp_iter */
     (iternextfunc)dynsqlParser_iternext,    /* tp_iternext */
-    0,                                      /* tp_methods */
+    dynsqlParser_methods,                   /* tp_methods */
     0,                                      /* tp_members */
     0,                                      /* tp_getset */
     0,                                      /* tp_base */
