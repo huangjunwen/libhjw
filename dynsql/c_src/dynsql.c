@@ -113,25 +113,84 @@ static inline void stack_pop(parserCntx * cntx) {
             PARSER_YIELD(PLAIN, '\0', _(base) - tmpl, _(p) - tmpl);  \
         }
     
-// 0 for finish, -1 for failed
-// on success, *p point to the next address of " or '
+// input param: tmpl, p
+// output param: p
+//      on success, *p point to the next address of last " or '
+// return true/false
 int _consume_str(const char * tmpl, const char ** p) {
     char q = *_(p)++;
-    int ret = -1;
     char c;
     while (( c = *_(p)++ )) {
-        if (c == '\\') {
+        if (c == q)
+            return 1;
+        else if (c == '\\')
             ++_(p);
-            continue;
-        }
-        else if (c == q) {
-            ret = 0;
-            break;
-        }
     }
-    return ret;
+    return 0;
 }
 
+// input param: tmpl, p
+// output param: base, p
+//      on success, *p point to the next address of last char in the var
+// return true/false
+int _consume_var(const char * tmpl, const char ** base, 
+        const char **p, int * is_expr) {
+    char c;
+    int is_enclosed, nest_cnt, paren_cnt;
+
+    _(base) = ++_(p);                       // base point to the first char after '$#?'
+    *is_expr = 0;
+    is_enclosed = *_(base) == '(';
+    nest_cnt = 0;
+    paren_cnt = is_enclosed ? -1 : 0;
+
+    while (( c = *_(p) )) {
+        switch (c) {
+        case '(':
+            ++nest_cnt;
+            ++paren_cnt;
+            break;
+        case ')':
+            if (--nest_cnt == 0) {
+                ++_(p);
+                goto end;
+            }
+            if (nest_cnt < 0)
+                return 0;
+            break;
+        case '\'':
+        case '"':
+            if (!_consume_str(tmpl, p))
+                return 0;
+            --_(p);
+            break;
+        default:
+            if (!isprint(c))
+                return 0;
+            if (!isalnum(c) && c != '_') {
+                if (nest_cnt == 0)
+                    goto end;
+                *is_expr = 1;
+            }
+        }
+        ++_(p);
+    }
+end:
+    // _(p) finally point to the next address of the var or expression
+    if (nest_cnt != 0)
+        return 0;
+
+    if ((_(p) - _(base) - is_enclosed ? 2 : 0) <= 0)
+        return 0;
+
+    if (paren_cnt > 0)
+        *is_expr = 1;
+
+    return 1;
+
+}
+
+// main parser function
 // 1 for yielding events, 0 for finish
 static inline int _parse(dynsqlParser * parser) {
     PARSER_VAR(char, c);
@@ -139,7 +198,10 @@ static inline int _parse(dynsqlParser * parser) {
     PARSER_VAR(const char *, base);
     PARSER_VAR(int, all_whitespace);
 
+    // local variable can be used. but it must be read-only, or not used 
+    // cross yields
     const char * tmpl = PyString_AS_STRING(parser->tmpl);
+    int is_expr;
 
 PARSER_BEGIN();
 
@@ -147,11 +209,10 @@ PARSER_BEGIN();
 
     while (( _(c) = *_(p) )) {
         switch ( _(c) ) {
-        /*
         case '?':
         case '#':
         case '$':  
-            goto STORE_VAR_OR_EXPR;*/
+            goto STORE_VAR_OR_EXPR;
         case '[':
         case '{':
             goto TREE_DOWN;
@@ -160,7 +221,7 @@ PARSER_BEGIN();
             goto TREE_UP;
         case '\'':
         case '"':
-            if (_consume_str(tmpl, p) < 0)
+            if (!_consume_str(tmpl, p))
                 goto ERR;
             continue;
         default:
@@ -169,11 +230,26 @@ PARSER_BEGIN();
             ++_(p);
             continue;
         }
-/*
+
     STORE_VAR_OR_EXPR:
         STORE_PLAIN();
+
+        if (!_consume_var(tmpl, base, p, &is_expr))
+            goto ERR;
+
+        if (is_expr) {
+            PARSER_YIELD(EXPR, _(c), _(base) - tmpl, _(p) - tmpl);
+        }
+        else if (*_(base) == '(') {
+            PARSER_YIELD(VAR, _(c), _(base) - tmpl + 1, _(p) - tmpl - 1);
+        }
+        else {
+            PARSER_YIELD(VAR, _(c), _(base) - tmpl, _(p) - tmpl);
+        }
+
         BEGIN_PLAIN();
-        continue;*/
+        continue;
+
     TREE_DOWN:
         STORE_PLAIN();
 
@@ -244,8 +320,8 @@ failed:
 }
 
 static void dynsqlParser_dealloc(dynsqlParser * parser) {
-    Py_DECREF(parser->tmpl);
     PyMem_Del(parser->cntx.stack);
+    Py_DECREF(parser->tmpl);
     parser->ob_type->tp_free((PyObject *)parser);
 }
 
@@ -279,7 +355,7 @@ PyTypeObject dynsqlParser_Type = {
     0,                                      /* tp_setattro */
     0,                                      /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,                     /* tp_flags */
-    "",                               /* tp_doc */
+    "dynsql parser",                        /* tp_doc */
     0,                                      /* tp_traverse */
     0,                                      /* tp_clear */
     0,                                      /* tp_richcompare */
