@@ -303,9 +303,13 @@ PARSER_END();
 static int dynsqlParser_init(dynsqlParser * parser, PyObject * args, PyObject * kw) {
     // init template string
     parser->tmpl = 0;
-    if (!PyArg_ParseTuple(args, "|S:__init__", &parser->tmpl))
+    if (!PyArg_UnpackTuple(args, "dynsqlParser", 0, 1, &parser->tmpl))
         return -1;
     if (parser->tmpl) {
+        if (!PyString_Check(parser->tmpl)) {
+            PyErr_SetString(PyExc_ValueError, "a string is expected");
+            return -1;
+        }
         Py_INCREF(parser->tmpl);
     }
     else {
