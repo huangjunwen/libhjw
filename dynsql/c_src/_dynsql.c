@@ -302,13 +302,14 @@ PARSER_END();
 
 static int dynsqlParser_init(dynsqlParser * parser, PyObject * args, PyObject * kw) {
     // init template string
-    parser->tmpl = 0;
+    parser->tmpl = NULL;
     if (!PyArg_UnpackTuple(args, "dynsqlParser", 0, 1, &parser->tmpl))
         return -1;
+
     if (parser->tmpl) {
         if (!PyString_Check(parser->tmpl)) {
             PyErr_SetString(PyExc_ValueError, "a string is expected");
-            return -1;
+            goto failed;
         }
         Py_INCREF(parser->tmpl);
     }
@@ -324,12 +325,16 @@ static int dynsqlParser_init(dynsqlParser * parser, PyObject * args, PyObject * 
 
 failed:
     Py_DECREF(parser->tmpl);
+    parser->tmpl = NULL;
     return -1;
 }
 
 static void dynsqlParser_dealloc(dynsqlParser * parser) {
-    PyMem_Del(parser->cntx.stack);
-    Py_DECREF(parser->tmpl);
+    // !!! note that this function will be called when init is failed
+    // so some fields may be not fill in this case
+    if (parser->cntx.stack)
+        PyMem_Del(parser->cntx.stack);
+    Py_XDECREF(parser->tmpl);
     parser->ob_type->tp_free((PyObject *)parser);
 }
 
