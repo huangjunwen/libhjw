@@ -344,7 +344,6 @@ static PyObject * dynsqlParser_iternext(dynsqlParser * parser) {
 // methods
 
 static PyObject * dynsqlParser_set(dynsqlParser * parser, PyObject * tmpl) {
-//METH_O 
     if (!PyString_Check(tmpl)) {
         PyErr_SetString(PyExc_ValueError, "a string is expected");
         return NULL;
@@ -405,11 +404,11 @@ PyTypeObject dynsqlParser_Type = {
     0,                                      /* tp_free */
 };
 
-void initdynsql(void) {
+void init_dynsql(void) {
     PyObject * mod;
 
     // Create the module
-    mod = Py_InitModule3("dynsql", NULL, "dynsql c module");
+    mod = Py_InitModule3("_dynsql", NULL, "dynsql c module");
     if (mod == NULL) {
         return;
     }
