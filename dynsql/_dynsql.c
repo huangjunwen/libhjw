@@ -367,6 +367,13 @@ static PyMethodDef dynsqlParser_methods[] = {
     { NULL }
 };
 
+PyDoc_STRVAR(dynsqlParser_doc, "syntax err includes:\n"\
+    "bracket mismatch\n"\
+    "empty sub tree\n"\
+    "syntax err in variable/expression\n"\
+    "open string literal\n");
+
+
 PyTypeObject dynsqlParser_Type = {
     PyObject_HEAD_INIT(&PyType_Type)
     0,
@@ -389,7 +396,7 @@ PyTypeObject dynsqlParser_Type = {
     0,                                      /* tp_setattro */
     0,                                      /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,                     /* tp_flags */
-    "dynsql parser",                        /* tp_doc */
+    dynsqlParser_doc,                       /* tp_doc */
     0,                                      /* tp_traverse */
     0,                                      /* tp_clear */
     0,                                      /* tp_richcompare */
