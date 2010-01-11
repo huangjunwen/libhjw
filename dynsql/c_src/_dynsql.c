@@ -22,7 +22,7 @@ typedef enum {
     EXPR,                           // got a expression
     SUB_START,                      // a sub tree start
     SUB_END,                        // a sub tree end
-    SYTAX_ERR,                      // some err
+    SYNTAX_ERR,                      // some err
 } parserEventType;
 
 typedef struct {
@@ -223,6 +223,7 @@ PARSER_BEGIN();
         case '"':
             if (!_consume_str(tmpl, p))
                 goto ERR;
+            _(all_whitespace) = 0;
             continue;
         default:
             if (isprint( _(c) ) && !isspace( _(c) ))
@@ -288,7 +289,7 @@ PARSER_BEGIN();
 
     // once error then finished
     ERR:
-        PARSER_YIELD(SYTAX_ERR, _(c), _(base) - tmpl, _(p) - tmpl);              
+        PARSER_YIELD(SYNTAX_ERR, _(c), _(base) - tmpl, _(p) - tmpl);              
         return 0;
 
 PARSER_END();
@@ -424,4 +425,11 @@ void init_dynsql(void) {
 
     Py_INCREF(&dynsqlParser_Type);
     PyModule_AddObject(mod, "dynsqlParser", (PyObject *)&dynsqlParser_Type);
+
+    PyModule_AddIntConstant(mod, "PLAIN", PLAIN);
+    PyModule_AddIntConstant(mod, "VAR", VAR);
+    PyModule_AddIntConstant(mod, "EXPR", EXPR);
+    PyModule_AddIntConstant(mod, "SUB_START", SUB_START);
+    PyModule_AddIntConstant(mod, "SUB_END", SUB_END);
+    PyModule_AddIntConstant(mod, "SYNTAX_ERR", SYNTAX_ERR);
 }
