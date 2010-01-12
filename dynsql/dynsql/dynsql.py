@@ -1,5 +1,6 @@
 
 from _dynsql import *
+from std_globals import std_globals
 
 ##########################
 
@@ -7,6 +8,8 @@ __all__ = ['DynSql']
 
 class EvalErr(Exception): 
     pass
+
+objAddr = lambda obj: hex(id(obj))
 
 class SegBase(object):
     
@@ -24,6 +27,10 @@ class SegBase(object):
         # sub type init
         self.init(raw)
 
+    def __repr__(self):
+        return "<%s %r at %s>" % (self.__class__.__name__, 
+            str(self), objAddr(self))
+
     #----- sub class methods
 
     def init(self, raw):
@@ -37,6 +44,9 @@ class SegBase(object):
         @return: (sql_seg, sql_var, next_seg)
             sql_var is a list (maybe empty)
         """
+        raise NotImplementedError()
+
+    def __str__(self):
         raise NotImplementedError()
 
 
@@ -53,12 +63,16 @@ class _Var(object):
         if val is None:
             raise EvalErr()
         
-        return self.eval_val(val)
+        return self.eval_val(val, g, l)
+
+    def __str__(self):
+        return "%s(%s)" % (self.kind, self.name)
 
 
 class _Expr(object):
 
     def init(self, raw):
+        self.raw = raw
         self.code = compile(raw, "dynsql", "eval")
     
     def __call__(self, g, l):
@@ -67,24 +81,36 @@ class _Expr(object):
         except:
             raise EvalErr()
 
-        return self.eval_val(val)
+        return self.eval_val(val, g, l)
+    
+    def __str__(self):
+        return "%s%s" % (self.kind, self.raw)
 
 
 class _Invis(object):
 
-    def eval_val(self, val):
+    kind = "#"
+
+    def eval_val(self, val, g, l):
         return "", [], self.sibling
 
 
 class _Raw(object):
 
-    def eval_val(self, val):
+    kind = "?"
+
+    def eval_val(self, val, g, l):
+        if type(val) is DynSql:                 # !! this allows DynSql nesting
+            segs, vars = val(l, g)
+            return segs, vars, self.sibling
         return str(val), [], self.sibling
 
 
 class _Sql(object):
 
-    def eval_val(self, val):
+    kind = "$"
+
+    def eval_val(self, val, g, l):
         if type(val) is tuple:
             if not len(val):
                 raise ValueError("empty tuple")
@@ -98,9 +124,21 @@ class _Tree(object):
         child = self.child
         while child is not None:
             seg, var, child = child(g, l)
+            if not seg:
+                continue
             sql_segs.append(seg)
             sql_vars.extend(var)
-        return "".join(sql_segs), sql_vars
+        if not sql_segs:
+            return "", []
+        return " %s " % "".join(sql_segs), sql_vars
+
+    def __str__(self):
+        strs = []
+        child = self.child
+        while child is not None:
+            strs.append(str(child))
+            child = child.sibling
+        return self.kind % "".join(strs)
 
 ##########################
 
@@ -118,6 +156,8 @@ class RawExprSeg(_Expr, _Sql, SegBase): pass
 
 class OptSeg(_Tree, SegBase):
     
+    kind = "{%s}"
+
     def __call__(self, g, l):
         try:
             segs, vars = self.eval_child(g, l)
@@ -126,6 +166,8 @@ class OptSeg(_Tree, SegBase):
         return segs, vars, self.sibling
                 
 class OrSeg(_Tree, SegBase):
+
+    kind = "[%s]"
 
     def __call__(self, g, l):
         try:
@@ -149,6 +191,12 @@ class PlainSeg(SegBase):
     def __call__(self, g, l):
         return self.plain, [], self.sibling
 
+    def __str__(self):
+        return self.plain
+
+class RootSeg(OptSeg):
+
+    kind = "%s"
     
 ##########################
 
@@ -156,11 +204,11 @@ class DynSql(_Tree):
     
     def __init__(self, tmpl):
         self.tmpl = tmpl
-        self.root = None
+        self.parse()
 
-    def _parse(self):
+    def parse(self):
         tmpl = self.tmpl
-        self.root = parent = OptSeg()
+        self.root = parent = RootSeg()
         prev = None
         for ev, kind, start, end in dynsqlParser(tmpl):
             if ev == PLAIN:
@@ -196,16 +244,19 @@ class DynSql(_Tree):
                 prev = parent
                 parent = prev.parent
             elif ev == SYNTAX_ERR:
-                raise SyntaxError("dynsql syntax error near %r" % tmpl[start:start + 4])
+                raise SyntaxError("dynsql syntax error near %d %r" % 
+                    (start, tmpl[start: start + 4]))
             else:
                 assert 0
                 
     def __call__(self, cntx, g=None):
-        if self.root is None:
-            self._parse()
-        if g is None:
-            g = globals()
-        return self.root(g, cntx)[:2]
+        return self.root(g or std_globals, cntx)[:2]
+
+    def __str__(self):
+        return str(self.root)
+
+    def __repr__(self):
+        return "<DynSql %r at %s>" % (str(self), objAddr(self))
 
 
 def test_syntax_err():
