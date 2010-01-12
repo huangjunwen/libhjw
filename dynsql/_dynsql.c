@@ -180,7 +180,7 @@ end:
     if (nest_cnt != 0)
         return 0;
 
-    if ((_(p) - _(base) - is_enclosed ? 2 : 0) <= 0)
+    if ((_(p) - _(base) - (is_enclosed ? 2 : 0)) <= 0)
         return 0;
 
     if (paren_cnt > 0)

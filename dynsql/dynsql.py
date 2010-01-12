@@ -196,7 +196,7 @@ class DynSql(_Tree):
                 prev = parent
                 parent = prev.parent
             elif ev == SYNTAX_ERR:
-                raise SyntaxError("dynsql syntax error")
+                raise SyntaxError("dynsql syntax error near %r" % tmpl[start:start + 4])
             else:
                 assert 0
                 
@@ -206,3 +206,26 @@ class DynSql(_Tree):
         if g is None:
             g = globals()
         return self.root(g, cntx)[:2]
+
+
+def test_syntax_err():
+    def one(tmpl, cntx={}):
+        raised = False
+        try:
+            DynSql(tmpl)(cntx)
+        except SyntaxError, e:
+            raised = True
+            err = str(e)
+        if raised:
+            print "%r -> %r -> passed" % (tmpl, err)
+        else:
+            print "%r, failed" % tmpl
+
+    one("#!abc")        # invalid var
+    one("$()")          # empty var
+    one(r"'\'\\")       # open string
+    one("{ }}")         # bracket mismatch
+    one("{{ }")         # bracket mismatch
+    one("{]")           # bracket mismatch
+    one("[]")           # empty child
+
