@@ -130,7 +130,7 @@ class _Tree(object):
             sql_vars.extend(var)
         if not sql_segs:
             return "", []
-        return " %s " % "".join(sql_segs), sql_vars
+        return "".join(sql_segs), sql_vars
 
     def __str__(self):
         strs = []
@@ -212,7 +212,10 @@ class DynSql(_Tree):
         prev = None
         for ev, kind, start, end in dynsqlParser(tmpl):
             if ev == PLAIN:
-                prev = PlainSeg(tmpl[start:end], parent, prev)
+                s = tmpl[start: end]
+                if prev is None:                # add a space on left
+                    s = " " + s.lstrip()            
+                prev = PlainSeg(s, parent, prev)
             elif ev == VAR:
                 if kind == '$':
                     t = SqlVarSeg
