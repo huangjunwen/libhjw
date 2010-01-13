@@ -38,7 +38,7 @@ class SegBase(object):
         sub class init
         """
     
-    def __call__(self, g, l):
+    def eval(self, g, l):
         """
         @param g/l: context for evaluate this seg's value
         @return: (sql_seg, sql_var, next_seg)
@@ -55,10 +55,8 @@ class _Var(object):
     def init(self, raw):
         self.name = raw
 
-    def __call__(self, g, l):
-        val = l.get(self.name, None)
-        if val is None:
-            val = g.get(self.name, None)
+    def eval(self, g, l):
+        val = l.get(self.name, None) or g.get(self.name, None)
 
         if val is None:
             raise EvalErr()
@@ -75,7 +73,7 @@ class _Expr(object):
         self.raw = raw
         self.code = compile(raw, "dynsql", "eval")
     
-    def __call__(self, g, l):
+    def eval(self, g, l):
         try:
             val = eval(self.code, g, l)
         except:
@@ -123,7 +121,7 @@ class _Tree(object):
         sql_segs, sql_vars = [], []
         child = self.child
         while child is not None:
-            seg, var, child = child(g, l)
+            seg, var, child = child.eval(g, l)
             if not seg:
                 continue
             sql_segs.append(seg)
@@ -152,13 +150,13 @@ class InvisExprSeg(_Expr, _Invis, SegBase): pass
 
 class SqlExprSeg(_Expr, _Sql, SegBase): pass
 
-class RawExprSeg(_Expr, _Sql, SegBase): pass
+class RawExprSeg(_Expr, _Raw, SegBase): pass
 
 class OptSeg(_Tree, SegBase):
     
     kind = "{%s}"
 
-    def __call__(self, g, l):
+    def eval(self, g, l):
         try:
             segs, vars = self.eval_child(g, l)
         except EvalErr:
@@ -169,7 +167,7 @@ class OrSeg(_Tree, SegBase):
 
     kind = "[%s]"
 
-    def __call__(self, g, l):
+    def eval(self, g, l):
         try:
             segs, vars = self.eval_child(g, l)
             next = self.sibling
@@ -188,7 +186,7 @@ class PlainSeg(SegBase):
     def init(self, raw):
         self.plain = raw
 
-    def __call__(self, g, l):
+    def eval(self, g, l):
         return self.plain, [], self.sibling
 
     def __str__(self):
@@ -252,8 +250,8 @@ class DynSql(_Tree):
             else:
                 assert 0
                 
-    def __call__(self, cntx, g=None):
-        return self.root(g or std_globals, cntx)[:2]
+    def eval(self, cntx, g=None):
+        return self.root.eval(g or std_globals, cntx)[:2]
 
     def __str__(self):
         return str(self.root)
