@@ -19,10 +19,11 @@ typedef enum {
     INIT = 0,
     PLAIN,                          // got a plain text
     VAR,                            // got a variable
-    EXPR,                           // got a expression
+    EXPR,                           // got an expression
+    FLAG,                           // got a flag
     SUB_START,                      // a sub tree start
     SUB_END,                        // a sub tree end
-    SYNTAX_ERR,                      // some err
+    SYNTAX_ERR,                     // syntax err
 } parserEventType;
 
 typedef struct {
@@ -38,11 +39,7 @@ typedef struct {
     const char * p;                 // current position
     const char * base;              // base position
     int all_whitespace;             // does from base to p are all white spaces
-
-    char * stack;                   // bracket stack
-    int stack_sz;
-    int stack_capacity;
-    int stack_inc;
+    int nest_cnt;                   // '[' nest level
 
     parserEvent curr;               // current parser event
 } parserCntx;
@@ -57,40 +54,13 @@ static inline void reset_cntx(parserCntx * cntx, const char * tmpl) {
     CNTX_INIT(*cntx);                   // this will make _parse run from the begining
     cntx->p = cntx->base = tmpl;
     cntx->all_whitespace = 1;
-    cntx->stack_sz = 0;                 
+    cntx->nest_cnt = 0;                 
     cntx->curr.type = INIT;             // reset event
 }
 
-// 0 for ok, -1 for failed
-static inline int init_cntx(parserCntx * cntx, const char * tmpl) {
+static inline void init_cntx(parserCntx * cntx, const char * tmpl) {
     memset(cntx, 0, sizeof(parserCntx));
-    cntx->stack = PyMem_New(char, (cntx->stack_capacity = 8));
-    if (!cntx->stack)
-        return -1;
-    cntx->stack_inc = 5;
     reset_cntx(cntx, tmpl);
-    return 0;
-}
-
-static inline char * stack_push(parserCntx * cntx) {
-    if (cntx->stack_sz >= cntx->stack_capacity) {
-        int new_capacity = cntx->stack_capacity + cntx->stack_inc;
-        if (!(cntx->stack = PyMem_Resize(cntx->stack, char, new_capacity)))
-            return 0;
-        cntx->stack_inc = cntx->stack_capacity;
-        cntx->stack_capacity = new_capacity;
-    }
-    return &cntx->stack[cntx->stack_sz++];
-}
-
-static inline char stack_top(parserCntx * cntx) {
-    if (!cntx->stack_sz)
-        return '\0';
-    return cntx->stack[cntx->stack_sz - 1];
-}
-
-static inline void stack_pop(parserCntx * cntx) {
-    --cntx->stack_sz;
 }
 
 #define PARSER_VAR(T, name) CNTX_VAR(T, name, parser->cntx)
@@ -130,6 +100,7 @@ int _consume_str(const char * tmpl, const char ** p) {
 }
 
 // input param: tmpl, p
+//      *p point to '$' or '#' or '?'
 // output param: base, p
 //      on success, *p point to the next address of last char in the var
 // return true/false
@@ -190,6 +161,31 @@ end:
 
 }
 
+// input param: tmpl, p
+//      *p point to '{'
+// output param: base, p
+//      on success, *p point to the next address of last char in the var
+// return true/false
+int _consume_flag(const char * tmpl, const char ** base,
+        const char **p) {
+    char c;
+    _(base) = ++_(p);
+    while (( c = *_(p) )) {
+        switch (c) {
+        case '{':
+            return 0;                   // error, not support nest flag
+        case '}':
+            if ( _(base) == _(p) )      // empty flag
+                return 0;
+            return 1;
+        default:
+            break;
+        }
+        ++_(p);
+    }
+    return 0;
+}
+
 // main parser function
 // 1 for yielding events, 0 for finish
 static inline int _parse(dynsqlParser * parser) {
@@ -213,12 +209,14 @@ PARSER_BEGIN();
         case '#':
         case '$':  
             goto STORE_VAR_OR_EXPR;
-        case '[':
         case '{':
+            goto FLAG;
+        case '[':
             goto TREE_DOWN;
         case ']':
-        case '}':
             goto TREE_UP;
+        case '}':
+            goto ERR;
         case '\'':
         case '"':
             if (!_consume_str(tmpl, p))
@@ -231,6 +229,17 @@ PARSER_BEGIN();
             ++_(p);
             continue;
         }
+
+    FLAG:
+        STORE_PLAIN();
+        
+        if (!_consume_flag(tmpl, base, p))
+            goto ERR;
+        PARSER_YIELD(FLAG, _(c), _(base) -  tmpl, _(p) - tmpl);
+        ++_(p);
+
+        BEGIN_PLAIN();
+        continue;
 
     STORE_VAR_OR_EXPR:
         STORE_PLAIN();
@@ -254,8 +263,7 @@ PARSER_BEGIN();
     TREE_DOWN:
         STORE_PLAIN();
 
-        // push
-        *stack_push(&parser->cntx) = _(c);
+        ++parser->cntx.nest_cnt;
 
         // yield
         ++_(p);
@@ -266,12 +274,11 @@ PARSER_BEGIN();
     TREE_UP:
         STORE_PLAIN();
         
-        // some check then pop
+        // some check 
         if (parser->cntx.curr.type == SUB_START)            // empty child
             goto ERR;
-        if (_(c) - stack_top(&parser->cntx) != 2)           // bracket mismatch
+        if (--parser->cntx.nest_cnt < 0)
             goto ERR;
-        stack_pop(&parser->cntx);
         
         // yield
         PARSER_YIELD(SUB_END, _(c), -1, _(p) - tmpl);       // we don't know start so -1
@@ -283,7 +290,7 @@ PARSER_BEGIN();
     }
     STORE_PLAIN();
 
-    if (parser->cntx.stack_sz)
+    if (parser->cntx.nest_cnt != 0)
         goto ERR;
     return 0;
 
@@ -319,9 +326,7 @@ static int dynsqlParser_init(dynsqlParser * parser, PyObject * args, PyObject * 
     }
 
     // init template contex
-    if (init_cntx(&parser->cntx, PyString_AS_STRING(parser->tmpl)) < 0)
-        goto failed;
-
+    init_cntx(&parser->cntx, PyString_AS_STRING(parser->tmpl));
     return 0;
 
 failed:
@@ -333,8 +338,6 @@ failed:
 static void dynsqlParser_dealloc(dynsqlParser * parser) {
     // !!! note that this function will be called when init is failed
     // so some fields may be not fill in this case
-    if (parser->cntx.stack)
-        PyMem_Del(parser->cntx.stack);
     Py_XDECREF(parser->tmpl);
     parser->ob_type->tp_free((PyObject *)parser);
 }
@@ -436,6 +439,7 @@ void init_dynsql(void) {
     PyModule_AddIntConstant(mod, "PLAIN", PLAIN);
     PyModule_AddIntConstant(mod, "VAR", VAR);
     PyModule_AddIntConstant(mod, "EXPR", EXPR);
+    PyModule_AddIntConstant(mod, "FLAG", EXPR);
     PyModule_AddIntConstant(mod, "SUB_START", SUB_START);
     PyModule_AddIntConstant(mod, "SUB_END", SUB_END);
     PyModule_AddIntConstant(mod, "SYNTAX_ERR", SYNTAX_ERR);
