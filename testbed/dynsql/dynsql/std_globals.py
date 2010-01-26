@@ -1,3 +1,0 @@
-
-std_globals = {
-}
