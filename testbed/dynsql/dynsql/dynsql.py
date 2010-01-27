@@ -1,3 +1,4 @@
+from const import *
 from context import Context
 from env import Env
 
@@ -20,11 +21,18 @@ class Dynsql(object):
     def __str__(self):
         return self.dsql
 
-    def __call__(self, d):
+    def __call__(self, d={}, **kw):
+        if kw:
+            kw.update(d)
+            d = kw
         st, sql, args = self.fn(Context(d))
+        assert st is NotNil
         return sql, args
         
-    def specialize(self, d):
+    def specialize(self, d={}, **kw):
+        if kw:
+            kw.update(d)
+            d = kw
         st, dsql, args = self.fn(Context(d, full_eval=False))
         return Dynsql(dsql, args, self.env)
 
