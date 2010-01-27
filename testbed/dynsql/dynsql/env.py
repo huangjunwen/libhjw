@@ -146,11 +146,11 @@ class Mutex(Cntrl):
         if val is Unknown:
             return Unknown
         if val:
-            return NotNil
-        return Nil
+            return Nil
+        return NotNil
     
     def on_succ(self, cntx):
-        cntx[self.param] = False
+        cntx[self.param] = True
 
 class Succ(Cntrl):
     
