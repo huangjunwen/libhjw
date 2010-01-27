@@ -2,7 +2,7 @@ from const import *
 from context import Context
 from env import Env
 
-class Dynsql(object):
+class DynSql(object):
 
     def __init__(self, dsql, args=[], env=None):
         self.env = env or Env.default
@@ -13,7 +13,7 @@ class Dynsql(object):
         self.fn = self.env.parser(dsql, args)
 
     def __repr__(self):
-        return "<Dynsql %r>" % self.dsql
+        return "<DynSql %r>" % self.dsql
 
     def __dynsql_repr__(self):
         return self.dsql, self.args   
@@ -34,5 +34,5 @@ class Dynsql(object):
             kw.update(d)
             d = kw
         st, dsql, args = self.fn(Context(d, full_eval=False))
-        return Dynsql(dsql, args, self.env)
+        return DynSql(dsql, args, self.env)
 
