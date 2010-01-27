@@ -117,7 +117,7 @@ class Cntrl(object):
 
 class If(Cntrl):
     
-    names = ("if")
+    names = ("if",)
 
     def __call__(self, val):
         if val is Unknown:
@@ -128,7 +128,7 @@ class If(Cntrl):
 
 class Ifn(Cntrl):
     
-    names = ("ifn")
+    names = ("ifn",)
 
     def __call__(self, val):
         if val is Unknown:
