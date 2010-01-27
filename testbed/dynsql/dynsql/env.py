@@ -1,21 +1,69 @@
 from const import *
+from parser import make_lexer, make_parser
 
-__all__ = ['Env']
+__all__ = ['Env', 'Cntrl']
+
+######################
+#        Env         #
+######################
 
 class Env(object):
 
-    cntrls = {}
+    envs = {}                   # {name: Env}
 
-    def __init__(self, sql_var_marker):
-        self.sql_var_marker = sql_var_marker            # %s
+    default = None              # default env
 
-    def build_cntrl(self, cntrl_name, param_name):
-        cntrl_cls = self.cntrls.get(cntrl_name, None)
-        if not cntrl_cls:
-            raise ValueError("can't find cntrl named: %s" % cntrl_name)
-        return cntrl_cls(param_name)
+    def __init__(self, name, placeholder, raw_marker, var_marker, const_marker, 
+            cntrl_marker,
+            sub_start_marker,
+            sub_end_marker):
+        loc = locals()
+        for n in loc:
+            if n == 'self':
+                continue
+            setattr(self, n, loc[n])
+        Env.envs[name] = self
+
+    def as_default(self):
+        Env.default = self
+
+    @staticmethod
+    def get(name):
+        return Env.envs[name]
+
+    @property
+    def cntrls(self):
+        return Cntrl.cntrls
+
+    @property
+    def lexer(self):
+        if not hasattr(self, '_lexer'):
+            self._lexer = make_lexer(self.raw_marker, self.var_marker, 
+                self.const_marker,
+                self.cntrl_marker,
+                self.sub_start_marker,
+                self.sub_end_marker)
+        return self._lexer
+
+    @property
+    def parser(self):
+        if not hasattr(self, '_parser'):
+            self._parser = make_parser(self.placeholder, self.raw_marker, 
+                self.var_marker,
+                self.const_marker,
+                self.cntrl_marker,
+                self.sub_start_marker,
+                self.sub_end_marker,
+                self.cntrls,
+                self.lexer)
+        return self._parser           
+
+Env('MySQLdb', '%s', '?', '$', '@', '#', '[', ']')
 
 
+######################
+#       Cntrls       #
+######################
     
 class CntrlMeta(type):
     
@@ -27,15 +75,17 @@ class CntrlMeta(type):
         if not cntrl_names:
             raise ValueError("class %s has no cntrl names" % name)
         for n in cntrl_names:
-            if Env.cntrls.has_key(n):
+            if Cntrl.cntrls.has_key(n):
                 raise ValueError("cntrl name conflict: %s" % n)
-            Env.cntrls[n] = t
+            Cntrl.cntrls[n] = t
         return t
 
 
 class Cntrl(object):
     
     __metaclass__ = CntrlMeta
+
+    cntrls = {}                 # all cntrls
 
     names = ()
 
