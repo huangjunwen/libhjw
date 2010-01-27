@@ -89,8 +89,8 @@ class Cntrl(object):
 
     names = ()
 
-    def __init__(self, _):
-        pass
+    def __init__(self, param):
+        self.param = param
 
     def __call__(self, val):
         """
@@ -117,7 +117,7 @@ class Cntrl(object):
 
 class If(Cntrl):
     
-    names = ("if", "nnil")
+    names = ("if")
 
     def __call__(self, val):
         if val is Unknown:
@@ -128,7 +128,7 @@ class If(Cntrl):
 
 class Ifn(Cntrl):
     
-    names = ("ifn", "nil")
+    names = ("ifn")
 
     def __call__(self, val):
         if val is Unknown:
@@ -142,11 +142,6 @@ class Mutex(Cntrl):
     
     names = ("mutex", "m", "mtx")
 
-    def __init__(self, n):
-        if not n:
-            raise ValueError("A string that length>=1 is expected")
-        self.n = n
-
     def __call__(self, val):
         if val is Unknown:
             return Unknown
@@ -155,7 +150,21 @@ class Mutex(Cntrl):
         return Nil
     
     def on_succ(self, cntx):
-        cntx[self.n] = False
+        cntx[self.param] = False
+
+class Succ(Cntrl):
+    
+    names = ("succ",)
+
+    def on_succ(self, cntx):
+        cntx[self.param] = True
+
+def Fail(Cntrl):
+    
+    names = ("fail",)
+
+    def on_fail(self, cntx):
+        cntx[self.param] = True
 
 class Err(Cntrl):
     

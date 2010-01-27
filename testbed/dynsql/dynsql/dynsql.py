@@ -27,7 +27,7 @@ class DynSql(object):
             d = kw
         st, sql, args = self.fn(Context(d))
         assert st is NotNil
-        return sql, args
+        return sql, tuple(args)
         
     def specialize(self, d={}, **kw):
         if kw:
