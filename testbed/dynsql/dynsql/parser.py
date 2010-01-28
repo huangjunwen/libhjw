@@ -223,27 +223,38 @@ def make_parser(placeholder, raw_marker, var_marker, const_marker, cntrl_marker,
         else:
             orig_tmpl = "%s%%s%s" % (sub_start_marker, sub_end_marker)
         sub_nodes, sub_cntrls = stack.pop()
+
         def _ret(cntx):
-            has_unknown = False
-            sqls = []
-            args = []
+            any_unknown = any_nonsub_unkown = False
+            sqls, args = [], []
             for node in sub_nodes:
                 st, s, a = node(cntx)
-                if node.token_type != SUB:            # we only pay attention to nodes of this level
+                if node.token_type == SUB:
+                    if st is Unknown:
+                        any_unknown = True
+                else:
                     if st is Nil:
                         for c in sub_cntrls:
                             c.on_fail(cntx)
                         return Nil, '', []
                     elif st is Unknown:
-                        has_unknown = True
+                        any_unknown = any_nonsub_unkown = True
+                    
                 sqls.append(s)
                 args.extend(a)
-            
-            if has_unknown:
+
+            # only Unknown or NotNil can run to here
+            if any_nonsub_unkown:
                 return Unknown, orig_tmpl % ''.join(sqls), args
+
+            st = NotNil
+            if any_unknown:
+                st = Unknown
+            
             for c in sub_cntrls:
                 c.on_succ(cntx)
-            return NotNil, ''.join(sqls), args
+            return st, ''.join(sqls), args
+
         _ret.token_type = SUB
         stack[-1][0].append(_ret)
     
