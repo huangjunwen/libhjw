@@ -11,6 +11,7 @@ class DynSql(object):
         self.dsql = dsql
         self.args = args
         self.fn = self.env.parser(dsql, args)
+        self.sub_dsql = {}
 
     def __repr__(self):
         return "<DynSql %r>" % self.dsql
@@ -36,3 +37,11 @@ class DynSql(object):
         st, dsql, args = self.fn(Context(d, full_eval=False))
         return DynSql(dsql, args, self.env)
 
+    def __getattr__(self, name):
+        try:
+            return self.sub_dsql[name]
+        except KeyError:
+            raise AttributeError("DynSql named %s not found", name)
+
+    def __setattr__(self, name, val):
+        self.sub_dsql[name] = self.specialize(val)

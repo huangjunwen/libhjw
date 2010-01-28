@@ -58,9 +58,6 @@ class Env(object):
                 self.lexer)
         return self._parser           
 
-Env('MySQLdb', '%s', '?', '$', '@', '#', '{', '}')
-
-
 ######################
 #       Cntrls       #
 ######################
