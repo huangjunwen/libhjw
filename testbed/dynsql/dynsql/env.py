@@ -166,9 +166,9 @@ def Fail(Cntrl):
     def on_fail(self, cntx):
         cntx[self.param] = True
 
-class Err(Cntrl):
+class __Nil__(Cntrl):
     
-    names = ("err",)
+    names = ("nil", "err")
 
     def __call__(self, val):
         return Nil
