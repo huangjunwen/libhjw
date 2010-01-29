@@ -5,5 +5,5 @@ setup(
     description = "a sql template engine",
     author = "jayven",
     author_email = "kassarar@gmail.com",
-    packages = ["dynsql",],
+    packages = ["dynsql", "dynsql.core"],
 )

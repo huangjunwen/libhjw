@@ -13,7 +13,7 @@ class DynSql(tuple):
             raise ValueError("No Env provided. Perhaps you forget to set the default Env?")
         self.dsql = dsql
         self.consts = consts
-        self.fn = self.env.parser(dsql, args)
+        self.fn = self.env.parser(dsql, consts)
 
     def __repr__(self):
         return "<DynSql %r>" % self.dsql

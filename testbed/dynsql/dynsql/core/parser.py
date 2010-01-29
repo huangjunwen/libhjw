@@ -167,8 +167,8 @@ def make_parser(placeholder, raw_marker, var_marker, const_marker, cntrl_marker,
             if val is Nil:
                 val = default
 
-            if val is Unknown:
-                return Unknown, orig, []
+            if val in (Unknown, NotNil):
+                return val, orig, []
             elif val is Nil:
                 return Nil, '', []
 
@@ -184,8 +184,8 @@ def make_parser(placeholder, raw_marker, var_marker, const_marker, cntrl_marker,
         orig = "%s(%s)" % (var_marker, name)
         def _ret(cntx):
             val = cntx[name]
-            if val is Unknown:
-                return Unknown, orig, []
+            if val in (Unknown, NotNil):
+                return val, orig, []
             elif val is Nil:
                 return Nil, '', []
             
