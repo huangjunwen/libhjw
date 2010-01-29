@@ -2,7 +2,10 @@ from base import *
 from context import Context
 from env import Env
 
-class DynSql(object):
+class DynSql(tuple):
+
+    def __new__(cls, dsql, args=[], env=None):
+        return tuple.__new__(cls, (dsql, args))
 
     def __init__(self, dsql, args=[], env=None):
         self.env = env or Env.default
@@ -11,13 +14,9 @@ class DynSql(object):
         self.dsql = dsql
         self.args = args
         self.fn = self.env.parser(dsql, args)
-        self.sub_dsql = {}
 
     def __repr__(self):
         return "<DynSql %r>" % self.dsql
-
-    def __dynsql_repr__(self):
-        return self.dsql, self.args   
 
     def __str__(self):
         return self.dsql
@@ -36,12 +35,3 @@ class DynSql(object):
             d = kw
         st, dsql, args = self.fn(Context(d, full_eval=False))
         return DynSql(dsql, args, self.env)
-
-    def __getattr__(self, name):
-        try:
-            return self.sub_dsql[name]
-        except KeyError:
-            raise AttributeError("DynSql named %s not found", name)
-
-    def __setattr__(self, name, val):
-        self.sub_dsql[name] = self.specialize(val)

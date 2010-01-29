@@ -172,8 +172,8 @@ def make_parser(placeholder, raw_marker, var_marker, const_marker, cntrl_marker,
             elif val is Nil:
                 return Nil, '', []
 
-            if hasattr(val, '__dynsql_repr__'):
-                s, a = val.__dynsql_repr__()
+            if isinstance(val, tuple) and len(val) == 2:
+                s, a = val
             else:
                 s, a = str(val), []
             return NotNil, s, a
