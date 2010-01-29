@@ -4,15 +4,15 @@ from env import Env
 
 class DynSql(tuple):
 
-    def __new__(cls, dsql, args=[], env=None):
-        return tuple.__new__(cls, (dsql, args))
+    def __new__(cls, dsql, consts=[], env=None):
+        return tuple.__new__(cls, (dsql, consts))
 
-    def __init__(self, dsql, args=[], env=None):
+    def __init__(self, dsql, consts=[], env=None):
         self.env = env or Env.default
         if not self.env:
             raise ValueError("No Env provided. Perhaps you forget to set the default Env?")
         self.dsql = dsql
-        self.args = args
+        self.consts = consts
         self.fn = self.env.parser(dsql, args)
 
     def __repr__(self):
