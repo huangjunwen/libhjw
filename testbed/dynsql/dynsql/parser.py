@@ -1,6 +1,6 @@
 
 import re
-from const import *
+from base import *
 
 
 PLAIN = 1

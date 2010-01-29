@@ -1,4 +1,4 @@
-from const import *
+from base import *
 from parser import make_lexer, make_parser
 
 __all__ = ['Env', 'Cntrl']
@@ -76,7 +76,6 @@ class CntrlMeta(type):
                 raise ValueError("cntrl name conflict: %s" % n)
             Cntrl.cntrls[n] = t
         return t
-
 
 class Cntrl(object):
     
@@ -156,9 +155,15 @@ class Succ(Cntrl):
     def on_succ(self, cntx):
         cntx[self.param] = True
 
+    def on_fail(self, cntx):
+        cntx[self.param] = False
+
 def Fail(Cntrl):
     
     names = ("fail",)
+
+    def on_fail(self, cntx):
+        cntx[self.param] = True
 
     def on_fail(self, cntx):
         cntx[self.param] = True
