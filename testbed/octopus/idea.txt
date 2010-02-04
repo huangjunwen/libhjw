@@ -1,0 +1,27 @@
+
+定位: 
+    web-based 项目开发管理系统
+
+参考:
+
+服务端用 twisted 吧
+
+实现 web-based terminal 可以节省很多事情(例如编辑器), 因为我们本身习惯在终端下工作, 转移到 web 上必须能保证已有的习惯能够得以保存:
+
+    web-based terminal:
+        http://antony.lesuisse.org/software/ajaxterm/   
+        http://anyterm.org/howitworks.html
+        linux 下 man 4 console_codes
+        http://vt100.net/emu/
+        
+    js 端阻断快捷键(但有一些还是不行, 例如 Alt+Tab 以及 Ctrl+Tab, 不过问题不大)
+        http://www.openjs.com/scripts/events/keyboard_shortcuts/
+
+    py ssh
+        http://www.lag.net/paramiko/docs/
+
+    是使用一般的 http req/resp 还是 web-socket, 最好兼容
+        http://drawlogic.com/2009/12/09/web-sockets-in-google-chrome-and-proposed-standard-for-html5/
+
+
+        
