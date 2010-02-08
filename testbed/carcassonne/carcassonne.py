@@ -77,6 +77,26 @@ CITY = 3
 CLOISTER = 4
 
 
+class Board(object):
+
+    def __init__(self):
+        self.open_terra = set()
+        self.closed_terra = set()
+        self.adjacent = {}
+
+    def add_tile(self, tile):
+        closed_terra = set()
+
+        # XXX(Tile.terras) for each terra on a tile
+        for terra in tile.terras:                               
+            # XXX(Terra.closed) if the terra is itself closed (CLOISTER)
+            if terra.closed:                                    
+                closed_terra.add(terra)
+                continue
+
+
+
+
 class Terra(object):
     
     def __init__(self, terra_type, size, open_tiepoint, adjacent):
