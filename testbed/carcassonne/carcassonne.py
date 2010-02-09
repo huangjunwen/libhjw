@@ -11,12 +11,25 @@
 
 游戏初始化的时候摆下的第一个 tile 的坐标是 (0, 0), 它的左右两边的坐标分别是 (-1, 0), (1, 0), 它的上下两块的坐标分别是 (0, 1), (0, -1)
 
-tile 旋转
+定义 tile 旋转
  * rotation % 4 == 0 -> 无旋转
  * rotation % 4 == 1 -> 顺时针 90 度 
  * rotation % 4 == 2 -> 顺时针 180 度 
  * rotation % 4 == 3 -> 顺时针 270 度
 
+
+定义 tile 边 (boundary) 编号
+
+                      0
+                +---+---+---+
+                |           |  
+                +           +
+              3 |           | 1
+                +           +
+                |           |  
+                +---+---+---+
+                      2
+    
 == terra ==
 
 地形有数种, 包括 ROAD/FIELD/CITY/CLOISTER, 扩展包可能还包括河流等, 每一个 tile 上包含一种到数种地形
@@ -66,7 +79,27 @@ terra 有可能闭合或尚未闭合, 通过 tiepoint (每个 tile 每一边共�
                  (0,3x-1,2y-1) (0,3x,2y-1) (0,3x+1,2y-1)
 
 
+定义 tiepoint 位置编号:
+
+                  0   1   2
+                +---+---+---+
+             11 |           | 3
+                +           +
+             10 |           | 4
+                +           +
+              9 |           | 5
+                +---+---+---+
+                  8   7   6
+
+meeple 站位可以为任意 tiepoint 编号 (0~11) 以及站在修道院上 (12), 或者不占(-1)
+
 """
+
+from random import shuffle
+
+################
+#     const    #
+################
 
 FIELD = 1
 
@@ -76,56 +109,331 @@ CITY = 3
 
 CLOISTER = 4
 
+################
+#     class    #
+################
 
 class Board(object):
 
     def __init__(self):
-        self.open_terra = set()
-        self.closed_terra = set()
-        self.adjacent = {}
+        self.reset()
 
-    def add_tile(self, tile):
-        closed_terra = set()
+    def reset(self):
+        """
+        Reinit the board for a new game
+        """
+        self.tiles = {}                                                         # {coord: tile}
+        self.open_tps = {}                                                      # {tilepoint: terra}
+        self.all_tps = {}                                                       # {tilepoint: terra}
+        self.all_terra = set()                                                  # set([terra,])
 
-        # XXX(Tile.terras) for each terra on a tile
-        for terra in tile.terras:                               
-            # XXX(Terra.closed) if the terra is itself closed (CLOISTER)
-            if terra.closed:                                    
-                closed_terra.add(terra)
+        # shuffle the pile and add the first one
+        first, self.tile_pile = TilePile.shuffle()
+        first.set_pos((0, 0))
+        self.add_tile(first, is_first=True)
+
+        self.curr_tile = None                                                   # curr tile at player's hand
+
+    def pick_tile(self):
+        """
+        Return a tile or None
+        """
+        try:
+            self.curr_tile = self.tile_pile.pop()
+        except IndexError:
+            self.curr_tile = None
+        return self.curr_tile
+
+    def add_tile(self, tile, is_first=False):
+        """
+        Add a tile inst to the board
+        """
+        assert tile.pos_set
+        # add tile itself
+        if not self._check_tile_on_board(tile, is_first):
+            return False
+        self.tiles[tile.coord] = tile
+
+        # add terras on tile
+        for terra in tile._terra_on_tile():
+            if terra.closed:                                                    # if the terra is itself closed (CLOISTER)
+                self.all_terra.add(terra)
                 continue
 
+            joint_terra = set()
+            closed_tps = set()
+            # get the common open tiepoints
+            for tp in terra.open_tps:
+                if tp not in self.open_tps:
+                    continue
+                # remove from board's open_tps set and the t's open_tps set
+                t = self.open_tps.pop(tp)
+                t._close_tiepoint(tp)
+                # collect
+                closed_tps.add(tp)
+                joint_terra.add(t)
+            # remove closed_tps in terra
+            terra._close_tiepoint(closed_tps)
+                
+            # make a big one and place to all_terra
+            for t in joint_terra:
+                terra._join(t)
+                self.all_terra.remove(t)
+            self.all_terra.add(terra)
+            
+            # update board's tps dict
+            for tp in terra.open_tps:
+                self.open_tps[tp] = terra
+            for tp in terra.all_tps:
+                self.all_tps[tp] = terra
+            
+        return True
+
+    def _check_tile_on_board(self, tile, is_first):
+        if tile.coord in self.tiles:                                            # occupied
+            return False
+
+        # check 4 neighbours and their boundaries
+        has_neighbour = False
+        x, y = tile.coord
+        neighbour_coords = ((x, y+1), (x+1, y), (x, y-1), (x-1, y))
+        for i in xrange(4):                                                     
+            c = neighbour_coords[i]
+            if c not in self.tiles:
+                continue
+            has_neighbour = True
+            t = self.tiles[c]
+            if tile.bounds[i] != t.bounds[(i+2) % 4]:
+                return False
+        
+        if not is_first and not has_neighbour:
+            return False
+        return True
 
 
 
 class Terra(object):
+    """
+    Terra is generated by Tiles and joined in Board
+    """
     
-    def __init__(self, terra_type, size, open_tiepoint, adjacent):
-        self.terra_type = terra_type                # FIELD/ROAD/CITY/CLOISTER
-        self.size = size                            # how many tiles are there on this terra
-        self.open_tiepoint = set(open_tiepoint)     # all open tiepoint coord
-        self.adjacent = set()
-        for a in adjacent:
-            assert a.terra_type != terra_type
-            self.adjacent.add(a)                    # adjacent groups
+    ### !! the following methods should be called by Tile only
 
-    def merge(self, t):
-        assert self.terra_type == t.terra_type
-        self.size += t.size
-        self.open_tiepoint ^= t.open_tiepoint
-        self.adjacent |= t.adjacent
+    def __init__(self, tile, terra_type, tps):
+        self.terra_type = terra_type                                            # FIELD/ROAD/CITY/CLOISTER
+        tps = set(tps)
+        self.open_tps = tps                                                     # set of open tiepoints
+        self.all_tps = tps                                                      # set of all tiepoints
+        self.all_tiles = set([tile,])                                           # set of all tiles
+        self.adjacent = set()                                                   # set of all adjacent terra
+                                                                                #   tile should add adjacent after __init__
+    ### !! the following methods should be called by Board only
+
+    def _close_tiepoint(self, tp):
+        if type(tp) is set:
+            self.open_tps -= tp
+        else:
+            self.open_tps.discard(tp)
+
+    def _join(self, terra):
+        assert self.terra_type == terra.terra_type
+        self.open_tps |= terra.open_tps
+        self.all_tps |= terra.all_tps
+        self.all_tiles |= terra.all_tiles
+        self.adjacent |= terra.adjacent
+        for t in terra.adjacent:
+            t.adjacent.remove(terra)
+            t.adjacent.add(self)
+
+    ### attributes and properties are public
 
     @property
     def closed(self):
-        return len(self.open_tiepoint) == 0
+        return not self.open_tps
 
 
-class Tile(object):
 
-    def __init__(self, coord, rotation=0):
-        pass
+class TilePile(type):
 
-    @property
-    def terras(self):
-        pass
-        
+    """
+    想要放入 TilePile 的类需要继承 TileBase, 并且类名为 Tile
+
+    Tile 子类指定以下类变量, 例如中间一条路, 两旁是农田的 Tile 子类可以这样表达:
+
+        terra = [(ROAD, [1,7]), (FIELD, [2,3,4,5,6]), (FIELD, [8,9,10,11,0])]
+
+    TilePile 将之一份变 4 份 (每一个 rotation 一份), 同时生成一个类变量 bounds, 如上例子:
+
+        bounds[0] = (ROAD, FIELD, ROAD, FIELD)
+        bounds[1] = (FIELD, ROAD, FIELD, ROAD)
+        ...
+
+    另外 Tile 子类必须指定以下这些类变量
+
+        有多少张这种 Tile:
+            amount = 3 
+    
+        terra 的邻接关系:
+            adjacent = [(0, 1), (0, 2)]
+
+        图片上这种 tile 的坐标:
+            spirit_coord = (x, y)
+
+        是否是第一块 Tile, 默认为 False:
+            start = True
+    """
+
+    tile_cls = []
+
+    start_tile_cls = None
+
+    spirit_coords = set()
+
+    def __new__(mcls, name, base, attr):
+        if name != 'Tile':
+            return type.__new__(mcls, name, base, attr)
+
+        # uniq coord
+        spirit_coord = attr['spirit_coord']
+        assert spirit_coord not in TilePile.spirit_coords
+        name += '%d_%d' % spirit_coord
+        TilePile.spirit_coords.add(spirit_coord)
+
+        # transform attributes
+        terra = attr['terra']
+        tp2tt = dict([(tp, tt) for tt, tps in terra for tp in tps])             # {tiepoint: terra_type}
+        bounds = [tp2tt[x] for x in (1, 4, 7, 10)]
+        t, b = [], []
+        for i in xrange(4):
+            t.append(terra)
+            b.append(bounds)
+            terra = [(tt, map(lambda x: (x+3)%12, tps)) for tt, tps in terra]
+            bounds = bounds[-1:] + bounds[:-1]
+        attr['bounds'] = b
+        attr['terra'] = t
+
+        # make and put to the pile
+        ret = type.__new__(mcls, name, base, attr)
+        amount = attr['amount']
+        if attr.get('start', False):
+            assert TilePile.start_tile_cls is None
+            amount -= 1
+            TilePile.start_tile_cls = ret
+        TilePile.tile_cls.extend([ret] * amount)
+        return ret
+
+    @staticmethod
+    def shuffle():
+        """
+        Shuffle the tile pile
+        Return the first tile and the rest of the pile
+        """
+        shuffle(TilePile.tile_cls)
+        return TilePile.start_tile_cls(), [cls() for cls in TilePile.tile_cls]
+
+
+
+class TileBase(object):
+
+    __metaclass__ = TilePile
+
+    coord2tiepoint = {
+        0: lambda x, y: (0, 3*x-1, 2*y+1),
+        1: lambda x, y: (0, 3*x, 2*y+1),
+        2: lambda x, y: (0, 3*x+1, 2*y+1),
+        3: lambda x, y: (1, 2*x+1, 3*y+1),
+        4: lambda x, y: (1, 2*x+1, 3*y),
+        5: lambda x, y: (1, 2*x+1, 3*y-1),
+        6: lambda x, y: (0, 3*x+1, 2*y-1),
+        7: lambda x, y: (0, 3*x, 2*y-1),
+        8: lambda x, y: (0, 3*x-1, 2*y-1),
+        9: lambda x, y: (1, 2*x-1, 3*y-1),
+        10: lambda x, y: (1, 2*x-1, 3*y),
+        11: lambda x, y: (1, 2*x-1, 3*y+1),
+    }
+
+    def __init__(self):
+        self.pos_set = False
+
+    def set_pos(self, coord, rotation=0):
+        """
+        Set the coord and rotation for this tile
+        """
+        cls = self.__class__
+        self.coord = coord
+        rotation %= 4
+        self.bounds = cls.bounds[rotation]
+        self.terra = cls.terra[rotation]
+        self._make_terra_inst()
+        self.pos_set = True
+
+    def _make_terra_inst(self):
+        # make terra instance on this tile
+        terra_inst = []
+        x, y = self.coord
+        coord2tiepoint = self.coord2tiepoint
+        for tt, tps in self.terra:
+            tps = map(lambda z: coord2tiepoint[z](x, y), tps)
+            terra_inst.append(Terra(self, tt, tps))
+
+        # link them
+        for first, second in self.adjacent:
+            first, second = terra_inst[first], terra_inst[second]
+            first.adjacent.add(second)
+            second.adjacent.add(first)
+        self._terra_inst = terra_inst
+
+    def _terra_on_tile(self):
+        # !! should only called by board once
+        # after join in the board's terra
+        # terra on tile are no longer exist
+        assert hasattr(self, '_terra_inst')
+        ret = self._terra_inst
+        del self._terra_inst
+        return ret
+
+################
+#     tiles    #
+################
+
+class Tile(TileBase):
+    spirit_coord = (0, 0)
+    terra = [(ROAD, [1,]), (FIELD, [2, 3]), (ROAD, [4,]), (FIELD, [5, 6]), (ROAD, [7,]), 
+        (FIELD, [8, 9]),
+        (ROAD, [10,]),
+        (FIELD, [11, 0])]
+    adjacent = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 0)]
+    amount = 1
+
+
+class Tile(TileBase):
+    spirit_coord = (1, 0)
+    terra = [(CITY, range(12))]
+    adjacent = []
+    amount = 1
+
+
+class Tile(TileBase):
+    spirit_coord = (2, 0)
+    terra = [(FIELD, range(12)), (CLOISTER, [])]
+    adjacent = [(0, 1)]
+    amount = 4
+
+
+class Tile(TileBase):
+    spirit_coord = (3, 0)
+    terra = [(FIELD, [x for x in xrange(12) if x != 7]), (CLOISTER, []), (ROAD, [7,])]
+    adjacent = [(0, 1), (1, 2), (2, 0)]
+    amount = 2
+
+
+class Tile(TileBase):
+    spirit_coord = (4, 0)
+    terra = [(FIELD, [11, 0, 1, 2, 3]), (ROAD, [4,]), (FIELD, [5, 6]), (ROAD, [7,]), 
+        (FIELD, [8, 9]),
+        (ROAD, [10,])]
+    adjacent = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)]
+    amount = 4
+    start = True
+
 
