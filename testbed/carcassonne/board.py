@@ -101,6 +101,8 @@ from random import shuffle
 #     base class    #
 #####################
 
+__all__ = ['Board',]
+
 class Board(object):
     """
     Game board
@@ -108,6 +110,7 @@ class Board(object):
     Public methods and attributes:
 
         tiles (r): all tiles on board and pile
+        last_tile (r): get the last tile
         next_tile (r): get the next tile
         open_tps (r): dict of open tiepoint -> terra
         all_tps (r): dict of tiepoint -> terra
@@ -115,6 +118,7 @@ class Board(object):
 
         reset (x): reset the board
         put_tile (x): put the top tile on pile to the board
+        put_meeple (x): put a meeple on the tile
         __getitem__ (x): get a tile on the specified coord
 
     """
@@ -144,6 +148,10 @@ class Board(object):
         self.tiles = TilePile.shuffle()
         self.next_tile_idx = 0
         self.put_tile(0, 0, is_first=True)
+
+    @property
+    def last_tile(self):
+        return self.tiles[self.next_tile_idx - 1]
 
     @property
     def next_tile(self):
@@ -224,6 +232,16 @@ class Board(object):
         
         if not is_first and not has_neighbour:
             return False
+        return True
+
+    def put_meeple(self, meeple, tpn):
+        tile = self.last_tile
+        terra = tile.terra(tpn)
+        if not terra:
+            return False
+        if terra.meeples:
+            return False
+        terra.meeples.add(meeple)
         return True
 
 
@@ -394,6 +412,7 @@ class TileBase(object):
         return self.board.all_tps.get(self.tiepoint(tpn), None)
 
 
+
 class TerraMeta(type):
     
     def __repr__(cls):
@@ -412,6 +431,7 @@ class Terra(object):
         extra (r): dict of extra attributes for this terra
         adjacent (r): set of adjacent terras
         closed (r): is this terra closed
+        meeples (r): set of meeples on this terra
     """
 
     __metaclass__ = TerraMeta
@@ -425,6 +445,8 @@ class Terra(object):
         self.extra = extra
         self.adjacent = set()                                                   # set of all adjacent terra
                                                                                 #   tile should add adjacent after __init__
+        self.meeples = set()
+
     ### !! the following methods should be called by Board only
 
     def _close_tiepoint(self, tp):
@@ -439,6 +461,7 @@ class Terra(object):
         self.all_tps |= terra.all_tps
         self.all_tiles |= terra.all_tiles
         self.adjacent |= terra.adjacent
+        self.meeples |= terra.meeples
         for t in terra.adjacent:
             t.adjacent.remove(terra)
             t.adjacent.add(self)
