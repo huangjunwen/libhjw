@@ -122,40 +122,45 @@ class Board(object):
         """
         Reinit the board for a new game
         """
-        self.tiles = {}                                                         # {coord: tile}
+        self.coords = {}                                                        # {coord: tile}
         self.open_tps = {}                                                      # {tilepoint: terra}
         self.all_tps = {}                                                       # {tilepoint: terra}
         self.all_terra = set()                                                  # set([terra,])
 
         # shuffle the pile and add the first one
-        first, self.tile_pile = TilePile.shuffle()
-        first.set_pos((0, 0))
-        self.add_tile(first, is_first=True)
+        self.tile_pile = TilePile.shuffle()
+        self.top_tile_idx = 0
+        self.put_top_tile((0, 0), is_first=True)
 
-        self.curr_tile = None                                                   # curr tile at player's hand
-
-    def pick_tile(self):
+    @property
+    def top_tile(self):
         """
-        Return a tile or None
+        Get the top tile on the tile pile
         """
         try:
-            self.curr_tile = self.tile_pile.pop()
+            return self.tile_pile[self.top_tile_idx]
         except IndexError:
-            self.curr_tile = None
-        return self.curr_tile
+            return None
 
-    def add_tile(self, tile, is_first=False):
+    def put_top_tile(self, coord, rotation=0, is_first=False):
         """
-        Add a tile inst to the board
+        Put the top tile on the tile pile into the board
         """
-        assert tile.pos_set
-        # add tile itself
+        # some checks
+        tile = self.top_tile
+        if not tile:
+            return False
+        tile._set_pos(coord, rotation)
+
         if not self._check_tile_on_board(tile, is_first):
             return False
-        self.tiles[tile.coord] = tile
+
+        # add tile itself
+        self.coords[tile.coord] = tile
+        self.top_tile_idx += 1
 
         # add terras on tile
-        for terra in tile._terra_on_tile():
+        for terra in tile._pre_join_terra:
             if terra.closed:                                                    # if the terra is itself closed (CLOISTER)
                 self.all_terra.add(terra)
                 continue
@@ -187,10 +192,13 @@ class Board(object):
             for tp in terra.all_tps:
                 self.all_tps[tp] = terra
             
+        del tile._pre_join_terra
+        tile.board = self
+
         return True
 
     def _check_tile_on_board(self, tile, is_first):
-        if tile.coord in self.tiles:                                            # occupied
+        if tile.coord in self.coords:                                          # occupied
             return False
 
         # check 4 neighbours and their boundaries
@@ -199,10 +207,10 @@ class Board(object):
         neighbour_coords = ((x, y+1), (x+1, y), (x, y-1), (x-1, y))
         for i in xrange(4):                                                     
             c = neighbour_coords[i]
-            if c not in self.tiles:
+            if c not in self.coords:
                 continue
             has_neighbour = True
-            t = self.tiles[c]
+            t = self.coords[c]
             if tile.bounds[i] != t.bounds[(i+2) % 4]:
                 return False
         
@@ -260,7 +268,7 @@ class TilePile(type):
 
     Tile 子类指定以下类变量, 例如中间一条路, 两旁是农田的 Tile 子类可以这样表达:
 
-        terra = [(ROAD, [1,7]), (FIELD, [2,3,4,5,6]), (FIELD, [8,9,10,11,0])]
+        terra_proto = [(ROAD, [1,7]), (FIELD, [2,3,4,5,6]), (FIELD, [8,9,10,11,0])]
 
     TilePile 将之一份变 4 份 (每一个 rotation 一份), 同时生成一个类变量 bounds, 如上例子:
 
@@ -296,21 +304,21 @@ class TilePile(type):
         # uniq coord
         spirit_coord = attr['spirit_coord']
         assert spirit_coord not in TilePile.spirit_coords
-        name += '%d_%d' % spirit_coord
+        name += '_%d_%d' % spirit_coord
         TilePile.spirit_coords.add(spirit_coord)
 
         # transform attributes
-        terra = attr['terra']
-        tp2tt = dict([(tp, tt) for tt, tps in terra for tp in tps])             # {tiepoint: terra_type}
+        terra_proto = attr['terra_proto']
+        tp2tt = dict([(tp, tt) for tt, tps in terra_proto for tp in tps])       # {tiepoint: terra_type}
         bounds = [tp2tt[x] for x in (1, 4, 7, 10)]
         t, b = [], []
         for i in xrange(4):
-            t.append(terra)
+            t.append(terra_proto)
             b.append(bounds)
-            terra = [(tt, map(lambda x: (x+3)%12, tps)) for tt, tps in terra]
+            terra_proto = [(tt, map(lambda x: (x+3)%12, tps)) for tt, tps in terra_proto]
             bounds = bounds[-1:] + bounds[:-1]
         attr['bounds'] = b
-        attr['terra'] = t
+        attr['terra_proto'] = t
 
         # make and put to the pile
         ret = type.__new__(mcls, name, base, attr)
@@ -326,10 +334,14 @@ class TilePile(type):
     def shuffle():
         """
         Shuffle the tile pile
-        Return the first tile and the rest of the pile
+        Return shuffled tile pile (Tile instances)
         """
         shuffle(TilePile.tile_cls)
-        return TilePile.start_tile_cls(), [cls() for cls in TilePile.tile_cls]
+
+        ret = [TilePile.start_tile_cls(0)]
+        for i in xrange(len(TilePile.tile_cls)):
+            ret.append(TilePile.tile_cls[i](i+1))
+        return ret
 
 
 
@@ -352,45 +364,34 @@ class TileBase(object):
         11: lambda x, y: (1, 2*x-1, 3*y+1),
     }
 
-    def __init__(self):
-        self.pos_set = False
+    def __init__(self, idx):
+        self.idx = idx
+        self.board = None
 
-    def set_pos(self, coord, rotation=0):
-        """
-        Set the coord and rotation for this tile
-        """
+    def _set_pos(self, coord, rotation):
         cls = self.__class__
         self.coord = coord
         rotation %= 4
         self.bounds = cls.bounds[rotation]
-        self.terra = cls.terra[rotation]
-        self._make_terra_inst()
-        self.pos_set = True
+        self.terra_proto = cls.terra_proto[rotation]
+        self._make_pre_join_terra()
 
-    def _make_terra_inst(self):
+    def _make_pre_join_terra(self):
         # make terra instance on this tile
-        terra_inst = []
+        pre_join_terra = []
         x, y = self.coord
         coord2tiepoint = self.coord2tiepoint
-        for tt, tps in self.terra:
+        for tt, tps in self.terra_proto:
             tps = map(lambda z: coord2tiepoint[z](x, y), tps)
-            terra_inst.append(Terra(self, tt, tps))
+            pre_join_terra.append(Terra(self, tt, tps))
 
         # link them
         for first, second in self.adjacent:
-            first, second = terra_inst[first], terra_inst[second]
+            first, second = pre_join_terra[first], pre_join_terra[second]
             first.adjacent.add(second)
             second.adjacent.add(first)
-        self._terra_inst = terra_inst
+        self._pre_join_terra = pre_join_terra
 
-    def _terra_on_tile(self):
-        # !! should only called by board once
-        # after join in the board's terra
-        # terra on tile are no longer exist
-        assert hasattr(self, '_terra_inst')
-        ret = self._terra_inst
-        del self._terra_inst
-        return ret
 
 ################
 #     tiles    #
@@ -398,7 +399,7 @@ class TileBase(object):
 
 class Tile(TileBase):
     spirit_coord = (0, 0)
-    terra = [(ROAD, [1,]), (FIELD, [2, 3]), (ROAD, [4,]), (FIELD, [5, 6]), (ROAD, [7,]), 
+    terra_proto = [(ROAD, [1,]), (FIELD, [2, 3]), (ROAD, [4,]), (FIELD, [5, 6]), (ROAD, [7,]), 
         (FIELD, [8, 9]),
         (ROAD, [10,]),
         (FIELD, [11, 0])]
@@ -408,32 +409,31 @@ class Tile(TileBase):
 
 class Tile(TileBase):
     spirit_coord = (1, 0)
-    terra = [(CITY, range(12))]
+    terra_proto = [(CITY, range(12))]
     adjacent = []
     amount = 1
 
 
 class Tile(TileBase):
     spirit_coord = (2, 0)
-    terra = [(FIELD, range(12)), (CLOISTER, [])]
+    terra_proto = [(FIELD, range(12)), (CLOISTER, [])]
     adjacent = [(0, 1)]
     amount = 4
 
 
 class Tile(TileBase):
     spirit_coord = (3, 0)
-    terra = [(FIELD, [x for x in xrange(12) if x != 7]), (CLOISTER, []), (ROAD, [7,])]
+    terra_proto = [(FIELD, [x for x in xrange(12) if x != 7]), (CLOISTER, []), (ROAD, [7,])]
     adjacent = [(0, 1), (1, 2), (2, 0)]
     amount = 2
 
 
 class Tile(TileBase):
     spirit_coord = (4, 0)
-    terra = [(FIELD, [11, 0, 1, 2, 3]), (ROAD, [4,]), (FIELD, [5, 6]), (ROAD, [7,]), 
+    terra_proto = [(FIELD, [11, 0, 1, 2, 3]), (ROAD, [4,]), (FIELD, [5, 6]), (ROAD, [7,]), 
         (FIELD, [8, 9]),
         (ROAD, [10,])]
     adjacent = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)]
     amount = 4
     start = True
-
 
