@@ -97,11 +97,13 @@ terra 有可能闭合或尚未闭合, 通过 tiepoint (每个 tile 每一边共�
 
 from random import shuffle
 
-#####################
-#     base class    #
-#####################
 
-__all__ = ['Board',]
+class Meeple(object):
+
+    def __init__(self, player):
+        self.player = player
+
+
 
 class Board(object):
     """
@@ -109,15 +111,19 @@ class Board(object):
 
     Public methods and attributes:
 
-        tiles (r): all tiles on board and pile
-        last_tile (r): get the last tile
-        next_tile (r): get the next tile
+        last_tile (r): last picked up tile
+        tiles_on_board (r): set of tiles on board
+        tiles_discard (r): set of tiles discard by players
+        tiles_on_pile (r): list of tiles on pile. tiles_on_pile[0] is the next pile to be picked up
+
         open_tps (r): dict of open tiepoint -> terra
         all_tps (r): dict of tiepoint -> terra
         all_terra (r): all terra on the board
 
         reset (x): reset the board
+        pick_tile (x): pick up a tile from pile
         put_tile (x): put the top tile on pile to the board
+        discard_tile (x): discard a tile
         put_meeple (x): put a meeple on the tile
         __getitem__ (x): get a tile on the specified coord
 
@@ -125,6 +131,23 @@ class Board(object):
 
     def __init__(self):
         self.reset()
+
+    def reset(self):
+        """
+        Reinit the board for a new game
+        """
+        self.open_tps = {}                                                      # {tilepoint: terra}
+        self.all_tps = {}                                                       # {tilepoint: terra}
+        self.all_terra = set()                                                  # set([terra,])
+
+        self.last_tile = None
+        self.coords = {}                                                        # {coord: tile}
+        self.tiles_on_pile = TilePile.shuffle()
+        self.tiles_on_board = set()
+        self.tiles_discard = set()
+
+        first = self.pick_tile()
+        self.put_tile(first, 0, 0)
 
     def __getitem__(self, coord):
         """
@@ -135,56 +158,47 @@ class Board(object):
         except KeyError:
             raise IndexError("No tile found at %r" % (coord,))
 
-    def reset(self):
+    def pick_tile(self):
         """
-        Reinit the board for a new game
+        Pick up a tile from pile
         """
-        self.coords = {}                                                        # {coord: tile}
-        self.open_tps = {}                                                      # {tilepoint: terra}
-        self.all_tps = {}                                                       # {tilepoint: terra}
-        self.all_terra = set()                                                  # set([terra,])
-
-        # shuffle the pile and add the first one
-        self.tiles = TilePile.shuffle()
-        self.next_tile_idx = 0
-        self.put_tile(0, 0, is_first=True)
-
-    @property
-    def last_tile(self):
-        return self.tiles[self.next_tile_idx - 1]
-
-    @property
-    def next_tile(self):
-        """
-        Get the top tile on the tile pile
-        """
+        last_tile = self.last_tile
+        # make sure the last one has been handled
+        assert last_tile is None or last_tile in tiles_on_board or \
+            last_tile in tiles_discard
         try:
-            return self.tiles[self.next_tile_idx]
+            self.last_tile = self.tiles_on_pile.pop(0)
         except IndexError:
-            return None
+            self.last_tile = None
+        return self.last_tile
 
-    def put_tile(self, x, y, rotation=0, is_first=False):
+    def discard_tile(self, tile):
+        assert tile is self.last_tile and tile not in self.tiles_on_board
+        self.tiles_discard.add(tile)
+
+    def put_tile(self, tile, x, y, rotation=0, is_first=False):
         """
         Put the top tile on the tile pile into the board
         """
-        # some checks
-        tile = self.next_tile
-        if not tile:
-            return False
+        # check
+        assert tile is self.last_tile and tile not in self.tiles_discard
+        if tile.board:
+            return True
+
         coord = (x, y)
         tile._set_pos(coord, rotation)
-
-        if not self._check_tile_on_board(tile, is_first):
+        if not self._check_tile_pos(tile, not self.tiles_on_board):
             return False
 
-        # add tile itself
+        # add tile
         self.coords[tile.coord] = tile
-        self.next_tile_idx += 1
+        self.tiles_on_board.add(tile)
 
         # add terras on tile
         for terra in tile._make_pre_join_terra():
             joint_terra = set()
             closed_tps = set()
+
             # get the common open tiepoints
             for tp in terra.open_tps:
                 if tp not in self.open_tps:
@@ -213,7 +227,7 @@ class Board(object):
         tile.board = self
         return True
 
-    def _check_tile_on_board(self, tile, is_first):
+    def _check_tile_pos(self, tile, is_first):
         if tile.coord in self.coords:                                          # occupied
             return False
 
@@ -227,15 +241,15 @@ class Board(object):
                 continue
             has_neighbour = True
             t = self.coords[c]
-            if tile.bounds[i] != t.bounds[(i+2) % 4]:
+            if tile.bounds[i] != t.bounds[(i+2) % 4]:                           # check bounds
                 return False
         
         if not is_first and not has_neighbour:
             return False
         return True
 
-    def put_meeple(self, meeple, tpn):
-        tile = self.last_tile
+    def put_meeple(self, tile, meeple, tpn):
+        assert tile is self.last_tile and tile in self.tiles_on_board
         terra = tile.terra(tpn)
         if not terra:
             return False
@@ -396,7 +410,7 @@ class TileBase(object):
             tps = map(self.tiepoint, tpns)
             pre_join_terra.append(tcls(self, tps, ex))
 
-        # link them
+        # add adjacent link
         for first, second in self.adjacent:
             first, second = pre_join_terra[first], pre_join_terra[second]
             first.adjacent.add(second)
@@ -499,201 +513,3 @@ class CLOISTER(Terra):
 
 # class RIVER(Terra):
 #     terra_type = 5   
-
-
-################
-#     tiles    #
-################
-
-class Tile(TileBase):
-    spirit_coord = (0, 0)
-    terra_proto = [(ROAD, [1,], {}), (FIELD, [2, 3], {}), (ROAD, [4,], {}), (FIELD, [5, 6], {}), 
-        (ROAD, [7,], {}), 
-        (FIELD, [8, 9], {}),
-        (ROAD, [10,], {}),
-        (FIELD, [11, 0], {})]
-    adjacent = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 0)]
-    amount = 1
-
-
-class Tile(TileBase):
-    spirit_coord = (1, 0)
-    terra_proto = [(CITY, range(12), {'shield': 1})]
-    adjacent = []
-    amount = 1
-
-
-class Tile(TileBase):
-    spirit_coord = (2, 0)
-    terra_proto = [(FIELD, range(12), {}), (CLOISTER, [12,], {})]
-    adjacent = [(0, 1)]
-    amount = 4
-
-
-class Tile(TileBase):
-    spirit_coord = (3, 0)
-    terra_proto = [(FIELD, range(0, 7) + range(8, 12), {}), (CLOISTER, [12,], {}), 
-        (ROAD, [7,], {})]
-    adjacent = [(0, 1), (1, 2), (2, 0)]
-    amount = 2
-
-
-class Tile(TileBase):
-    spirit_coord = (4, 0)
-    terra_proto = [(FIELD, [11, 0, 1, 2, 3], {}), (ROAD, [4,], {}), (FIELD, [5, 6], {}), 
-        (ROAD, [7,], {}), 
-        (FIELD, [8, 9], {}),
-        (ROAD, [10,], {})]
-    adjacent = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)]
-    amount = 4
-
-
-class Tile(TileBase):
-    spirit_coord = (5, 0)
-    terra_proto = [(CITY, range(0, 6) + range(9, 12), {}), (FIELD, [6, 7, 8], {})]
-    adjacent = [(0, 1)]
-    amount = 3
-
-
-class Tile(TileBase):
-    spirit_coord = (6, 0)
-    terra_proto = [(CITY, range(0, 6) + range(9, 12), {'shield': 1}), (FIELD, [6, 7, 8], {})]
-    adjacent = [(0, 1)]
-    amount = 1
-
-
-class Tile(TileBase):
-    spirit_coord = (7, 0)
-    terra_proto = [(CITY, range(0, 6) + range(9, 12), {}), (ROAD, [7,], {}),
-        (FIELD, [6,], {}),
-        (FIELD, [8,], {})]
-    adjacent = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)]
-    amount = 1
-
-
-class Tile(TileBase):
-    spirit_coord = (0, 1)
-    terra_proto = [(CITY, range(0, 6) + range(9, 12), {'shield': 1}), (ROAD, [7,], {}),
-        (FIELD, [6,], {}),
-        (FIELD, [8,], {})]
-    adjacent = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)]
-    amount = 2
-
-
-class Tile(TileBase):
-    spirit_coord = (1, 1)
-    terra_proto = [(ROAD, [2, 7], {}), (FIELD, range(3, 8), {}), (FIELD, [8, 9, 10, 11, 0], {})]
-    adjacent = [(0, 1), (0, 2)]
-    amount = 8
-
-
-class Tile(TileBase):
-    spirit_coord = (2, 1)
-    terra_proto = [(FIELD, range(3, 9), {}), (CITY, [9, 10, 11, 0, 1, 2], {})]
-    adjacent = [(0, 1)]
-    amount = 3
-
-
-class Tile(TileBase):
-    spirit_coord = (3, 1)
-    terra_proto = [(FIELD, range(3, 9), {}), (CITY, [9, 10, 11, 0, 1, 2], {'shield': 1})]
-    adjacent = [(0, 1)]
-    amount = 2
-
-
-class Tile(TileBase):
-    spirit_coord = (4, 1)
-    terra_proto = [(CITY, [9, 10, 11, 0, 1, 2], {}), (FIELD, [3, 8], {}), (ROAD, [4, 7], {}), 
-        (FIELD, [5, 6], {})]
-    adjacent = [(0, 1), (1, 2), (2, 3)]
-    amount = 3
-
-
-class Tile(TileBase):
-    spirit_coord = (5, 1)
-    terra_proto = [(CITY, [9, 10, 11, 0, 1, 2], {'shield': 1}), (FIELD, [3, 8], {}), 
-        (ROAD, [4, 7], {}), 
-        (FIELD, [5, 6], {})]
-    adjacent = [(0, 1), (1, 2), (2, 3)]
-    amount = 2
-
-
-class Tile(TileBase):
-    spirit_coord = (6, 1)
-    terra_proto = [(FIELD, range(0, 7) + [11], {}), (ROAD, [7, 10], {}), (FIELD, [8, 9], {})]
-    adjacent = [(0, 1), (1, 2)]
-    amount = 9
-
-
-class Tile(TileBase):
-    spirit_coord = (7, 1)
-    terra_proto = [(FIELD, range(0, 3), {}), (CITY, range(3, 6) + range(9, 12), {}), 
-        (FIELD, range(6, 9), {})]
-    adjacent = [(0, 1), (1, 2)]
-    amount = 1
-
-
-class Tile(TileBase):
-    spirit_coord = (0, 2)
-    terra_proto = [(FIELD, range(0, 3), {}), (CITY, range(3, 6) + range(9, 12), {'shield': 1}), 
-        (FIELD, range(6, 9), {})]
-    adjacent = [(0, 1), (1, 2)]
-    amount = 2
-
-
-class Tile(TileBase):
-    spirit_coord = (1, 2)
-    terra_proto = [(CITY, range(0, 3), {}), (FIELD, range(8, 12) + [3,], {}), (ROAD, [4, 7], {}),
-        (FIELD, [5, 6], {})]
-    adjacent = [(0, 1), (1, 2), (2, 3)]
-    amount = 3
-
-
-class Tile(TileBase):
-    spirit_coord = (2, 2)
-    terra_proto = [(CITY, range(0, 3), {}), (FIELD, range(3, 7) + [11,], {}), (ROAD, [10, 7], {}),
-        (FIELD, [8, 9], {})]
-    adjacent = [(0, 1), (1, 2), (2, 3)]
-    amount = 3
-
-
-class Tile(TileBase):
-    spirit_coord = (3, 2)
-    terra_proto = [(CITY, range(0, 3), {}), (FIELD, range(3, 12), {})]
-    adjacent = [(0, 1)]
-    amount = 5
-
-
-class Tile(TileBase):
-    spirit_coord = (4, 2)
-    terra_proto = [(CITY, range(0, 3), {}), (CITY, range(3, 6), {}), (FIELD, range(6, 12), {})]
-    adjacent = [(0, 2), (1, 2)]
-    amount = 2
-
-
-class Tile(TileBase):
-    spirit_coord = (5, 2)
-    terra_proto = [(FIELD, range(0, 3) + range(6, 9), {}), (CITY, range(3, 6), {}), (CITY, range(9, 12), {})]
-    adjacent = [(0, 1), (0, 2)]
-    amount = 3
-
-
-class Tile(TileBase):
-    spirit_coord = (6, 2)
-    terra_proto = [(CITY, range(0, 3), {}), (FIELD, [3, 11], {}), (ROAD, [4,], {}), (FIELD, [5, 6], {}),
-        (ROAD, [7,], {}),
-        (FIELD, [8, 9], {}),
-        (ROAD, [10,], {})]
-    adjacent = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 1)]
-    amount = 3
-
-
-class Tile(TileBase):
-    spirit_coord = (7, 2)
-    terra_proto = [(CITY, range(0, 3), {}), (FIELD, [3, 11], {}), (ROAD, [4, 10], {}), 
-        (FIELD, range(5, 10), {})]
-    adjacent = [(0, 1), (1, 2), (2, 3)]
-    amount = 4
-    start = True
-
-b = Board()
