@@ -1,0 +1,135 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"> 
+ 
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"> 
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+        <title>carcassonne</title>
+        <script type="text/javascript" src="mootools-1.2.4-core.js"></script>
+        <script type="text/javascript" src="mootools-1.2.4.4-more.js"></script>
+        <script type="text/javascript" src="res.js"></script>
+        <script type="text/javascript">
+            Element.Events.spacePressed = {
+                base: 'keypress',
+                condition: function(ev) {
+                    return ev.key == 'space' && !ev.alt && !ev.control && !ev.shift;
+                }
+            };
+
+            var tileCreated = 0;
+            var coordConvs = [function(x,y){return [x,y];}, function(x,y){return [tileImgSize-y,x];}, 
+                function(x,y){return [tileImgSize-x,tileImgSize-y];}, 
+                function(x,y){return [y,tileImgSize-x];}
+            ];
+            var Tile = new Class({
+                initialize: function(tileIdx) {
+                    // attr
+                    this.stopped = false;
+                    this.createId = tileCreated++;
+                    this.tileIdx = tileIdx;
+                    this.rotation = -1;
+
+                    // create container div and the img (for image map)
+                    this.el = new Element('div');
+                    this.img = new Element('img', {
+                        "border": "0",
+                        "padding": "0px 0px 0px 0px",
+                        "styles": {
+                            "display": "block",
+                            "background-image": "url('" + tileImgUrl + "')",
+                            "background-repeat": "no-repeat",
+                            "width": tileImgSize + "px",
+                            "height": tileImgSize + "px"
+                        }
+                    });
+                    this.img.inject(this.el);
+
+                    // init rotation
+                    this.rotate();
+                },
+                toElement: function() {                   // ref: http://n2.nabble.com/Extends-Element-in-1-2-td796845.html
+                    return this.el;
+                },
+                stop: function() {                        // after stop, one can't rotate the tile anymore  
+                    if (this.stopped)
+                        return;
+                    this.stopped = true;
+
+                    // stopped, so create the image map
+                    var inst = this;
+                    var coordConv = coordConvs[inst.rotation];
+                    var mapName = "TM" + inst.createId;
+                    inst.map = new Element('map', {'name': mapName});
+                    $each(tileMap[inst.tileIdx], function(a) {
+                        // calculate coords
+                        var coords = [];
+                        $each(a.coords, function(c) {
+                            coords.push(coordConv(c[0], c[1]).join(','));
+                        });
+                        coords = coords.join(',');
+                        
+                        // create element
+                        (new Element('area', {shape: a.shape, terra: a.terra, alt: a.title,
+                            title: a.title,
+                            nohref: true,
+                            coords: coords
+                        })).inject(inst.map);
+                    });
+                    inst.map.inject(inst.el);
+                    inst.img.setProperty("usemap", "#" + mapName);
+                },
+                rotate: function() {
+                    if (this.stopped)
+                        return false;
+
+                    // update rotation
+                    this.rotation = (this.rotation + 1) % 4;
+
+                    // update background image
+                    this.img.setStyle('background-position', "{x}px {y}px".substitute({
+                        x: -this.tileIdx * tileImgSize,
+                        y: -this.rotation * tileImgSize
+                    }));
+                    return true;
+                }
+            });
+            window.addEvent('domready', function() {
+                var tile;
+                $("width").set("text", window.getSize().x);
+                $("height").set("text", window.getSize().y);
+                $("addTile").addEvent("click", function() {
+                    tile = new Tile(Math.floor(Math.random()*24));
+                    $(tile).inject($("cont"));
+                    $(tile).makeDraggable();
+                });
+                $("stop").addEvent("click", function() {
+                    if (!tile)
+                        return;
+                    tile.stop();
+                    $each(tile.map.getChildren(), function(a) {
+                        a.addEvent('mouseover', function() {
+                            $("terra").set("text", this.get("title") + " " + this.get("terra"));
+                        });
+                    });
+                    
+                });
+                window.addEvent("spacePressed", function() {
+                    if (tile)
+                        tile.rotate();
+                });
+
+            });
+        </script>
+    </head>
+    <body>
+        <div id="cont">
+            <div>!!Work only on chrome 4+</div>
+            <div>width:<span id="width"></span></div>
+            <div>height:<span id="height"></span></div>
+            <div>x:<span id="x"></span></div>
+            <div>y:<span id="y"></span></div>
+            <div>terra:<span id="terra"></span></div>
+            <input type="button" id="addTile" name="addTile" value="addTile" />
+            <input type="button" id="stop" name="stop" value="stop" />
+        </div>
+    </body>
+</html>
