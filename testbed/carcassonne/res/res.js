@@ -1,10 +1,10 @@
 var tileImgSize = 108;
 
-var tileImgUrl = 'carcassonne.jpg';
+var tilesImgUrl = 'carcassonne.jpg';
 
 var transparentUrl = 'transparent.png';
 
-var tileMap = [[{"shape":"rect","coords":[[0,0],[48,48]],"terra":0,"title":"\u519c\u7530"},{"shape":"rect","coords":[[48,0],[60,48]],"terra":1,"title":"\u9053\u8def"},{"shape":"rect","coords":[[60,0],[108,48]],"terra":2,"title":"\u519c\u7530"},{"shape":"rect","coords":[[60,48],[108,60]],"terra":3,"title":"\u9053\u8def"},{"shape":"rect","coords":[[60,60],[108,108]],"terra":4,"title":"\u519c\u7530"},{"shape":"rect","coords":[[48,60],[60,108]],"terra":5,"title":"\u9053\u8def"},{"shape":"rect","coords":[[0,60],[48,108]],"terra":6,"title":"\u519c\u7530"},{"shape":"rect","coords":[[0,48],[48,60]],"terra":7,"title":"\u9053\u8def"}],
+var tilesMap = [[{"shape":"rect","coords":[[0,0],[48,48]],"terra":0,"title":"\u519c\u7530"},{"shape":"rect","coords":[[48,0],[60,48]],"terra":1,"title":"\u9053\u8def"},{"shape":"rect","coords":[[60,0],[108,48]],"terra":2,"title":"\u519c\u7530"},{"shape":"rect","coords":[[60,48],[108,60]],"terra":3,"title":"\u9053\u8def"},{"shape":"rect","coords":[[60,60],[108,108]],"terra":4,"title":"\u519c\u7530"},{"shape":"rect","coords":[[48,60],[60,108]],"terra":5,"title":"\u9053\u8def"},{"shape":"rect","coords":[[0,60],[48,108]],"terra":6,"title":"\u519c\u7530"},{"shape":"rect","coords":[[0,48],[48,60]],"terra":7,"title":"\u9053\u8def"}],
  [{"shape":"rect","coords":[[0,0],[108,108]],"terra":0,"title":"\u57ce\u5821"}],
  [{"shape":"rect","coords":[[36,24],[84,72]],"terra":1,"title":"\u4fee\u9053\u9662"},{"shape":"rect","coords":[[0,0],[108,108]],"terra":0,"title":"\u519c\u7530"}],
  [{"shape":"rect","coords":[[36,24],[84,72]],"terra":2,"title":"\u4fee\u9053\u9662"},{"shape":"rect","coords":[[36,72],[60,108]],"terra":1,"title":"\u9053\u8def"},{"shape":"rect","coords":[[0,0],[108,108]],"terra":0,"title":"\u519c\u7530"}],

@@ -22,13 +22,15 @@
             ];
             var Tile = new Class({
                 initialize: function(tileIdx) {
+                    // alias
+                    var inst = this;
+
                     // attr
-                    this.stopped = false;
                     this.createId = tileCreated++;
                     this.tileIdx = tileIdx;
                     this.rotation = -1;
 
-                    // create container div and the img (for image map)
+                    // create container div and the img ( for image map )
                     this.el = new Element('div');
                     this.img = new Element('img', {
                         "border": "0",
@@ -36,7 +38,7 @@
                         "src": transparentUrl,
                         "styles": {
                             "display": "block",
-                            "background-image": "url('" + tileImgUrl + "')",
+                            "background-image": "url('" + tilesImgUrl + "')",
                             "background-repeat": "no-repeat",
                             "width": tileImgSize + "px",
                             "height": tileImgSize + "px"
@@ -44,44 +46,40 @@
                     });
                     this.img.inject(this.el);
 
+                    // image maps
+                    $each(coordConvs, function(coordConv, r) {
+                        var map = new Element('map', {'name': inst.mapName(r)});
+                        $each(tilesMap[inst.tileIdx], function(a) {
+                            // calculate coords
+                            var coords = [];
+                            $each(a.coords, function(c) {
+                                coords.push(coordConv(c[0], c[1]).join(','));
+                            });
+                            coords = coords.join(',');
+
+                            // add element to the map
+                            (new Element('area', {shape: a.shape, terra: a.terra, alt: a.title,
+                                title: a.title,
+                                nohref: true,
+                                coords: coords
+                            })).inject(map);
+                        });
+                        map.inject(inst.el);
+                    });
+
                     // init rotation
                     this.rotate();
                 },
                 toElement: function() {                   // ref: http://n2.nabble.com/Extends-Element-in-1-2-td796845.html
                     return this.el;
                 },
-                stop: function() {                        // after stop, one can't rotate the tile anymore  
-                    if (this.stopped)
-                        return;
-                    this.stopped = true;
-
-                    // stopped, so create the image map
-                    var inst = this;
-                    var coordConv = coordConvs[inst.rotation];
-                    var mapName = "TM" + inst.createId;
-                    inst.map = new Element('map', {'name': mapName});
-                    $each(tileMap[inst.tileIdx], function(a) {
-                        // calculate coords
-                        var coords = [];
-                        $each(a.coords, function(c) {
-                            coords.push(coordConv(c[0], c[1]).join(','));
-                        });
-                        coords = coords.join(',');
-                        
-                        // create element
-                        (new Element('area', {shape: a.shape, terra: a.terra, alt: a.title,
-                            title: a.title,
-                            nohref: true,
-                            coords: coords
-                        })).inject(inst.map);
-                    });
-                    inst.map.inject(inst.el);
-                    inst.img.setProperty("usemap", "#" + mapName);
+                mapName: function(rotation) {
+                    return 'TM' + this.createId + '_' + rotation;
+                },
+                areas: function() {                     // find areas in all rotation
+                    return this.el.getElements('map area');
                 },
                 rotate: function() {
-                    if (this.stopped)
-                        return false;
-
                     // update rotation
                     this.rotation = (this.rotation + 1) % 4;
 
@@ -90,28 +88,28 @@
                         x: -this.tileIdx * tileImgSize,
                         y: -this.rotation * tileImgSize
                     }));
-                    return true;
+
+                    // update map
+                    this.img.setProperty('usemap', '#' + this.mapName(this.rotation));
                 }
             });
+            var tile;
             window.addEvent('domready', function() {
-                var tile;
                 $("width").set("text", window.getSize().x);
                 $("height").set("text", window.getSize().y);
                 $("addTile").addEvent("click", function() {
                     tile = new Tile(Math.floor(Math.random()*24));
                     $(tile).inject($("cont"));
                     $(tile).makeDraggable();
-                });
-                $("stop").addEvent("click", function() {
-                    if (!tile)
-                        return;
-                    tile.stop();
-                    $each(tile.map.getChildren(), function(a) {
-                        a.addEvent('mouseover', function() {
-                            $("terra").set("text", this.get("title") + " " + this.get("terra"));
+                    $each(tile.areas(), function(a) {
+                        a.addEvent('click', function() {
+                            $('terra').set('text', this.getProperty('title') + ' ' + this.getProperty('terra'));
                         });
                     });
-                    
+                });
+                $("rotate").addEvent("click", function() {
+                    if (tile)
+                        tile.rotate();
                 });
                 window.addEvent("spacePressed", function() {
                     if (tile)
@@ -130,7 +128,7 @@
             <div>y:<span id="y"></span></div>
             <div>terra:<span id="terra"></span></div>
             <input type="button" id="addTile" name="addTile" value="addTile" />
-            <input type="button" id="stop" name="stop" value="stop" />
+            <input type="button" id="rotate" name="rotate" value="rotate" />
         </div>
     </body>
 </html>
