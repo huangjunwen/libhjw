@@ -75,6 +75,11 @@ var Tile = (function() {
         areas: function() {                     // find areas in all rotation
             return this.el.getElements('map area');
         },
+        bounds: function() {
+            var b = tilesBounds[this.tileIdx];
+            var r = -this.rotation;
+            return b.slice(r).extend(b.slice(0, r)); 
+        },
         rotate: function() {
             // update rotation
             this.rotation = (this.rotation + 1) % 4;
