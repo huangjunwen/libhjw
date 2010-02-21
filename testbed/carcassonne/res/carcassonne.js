@@ -118,7 +118,7 @@ var Board = (function() {
                     'border': 'solid',
                     'position': 'relative',
                     'width': (tileImgSize * 6) + "px",
-                    'height': (tileImgSize * 5) + "px"
+                    'height': (tileImgSize * 6) + "px"
                 }
             });
         },

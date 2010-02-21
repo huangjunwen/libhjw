@@ -36,6 +36,7 @@
                     }).makeDraggable({
                         onStart: function(el) {
                             tile = el.retrieve('tile');
+                            tile.getShadow().inject(board);
                         },
                         onDrag: function(el, ev) {
                             var coord = el.getCoordinates();
@@ -43,7 +44,7 @@
                             if (!coord)
                                 return;
                             var shadow = tile.getShadow();
-                            shadow.inject(board).setPosition(coord).setStyle('display', 'block').store('gridCoord', coord);
+                            shadow.setPosition(coord).setStyle('display', 'block').store('gridCoord', coord);
                         },
                         onComplete: function(el) {
                             var gridCoord = el.retrieve('tile').getShadow().retrieve('gridCoord');
