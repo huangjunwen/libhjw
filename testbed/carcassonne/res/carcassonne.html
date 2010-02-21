@@ -9,6 +9,7 @@
         <script type="text/javascript" src="res.js"></script>
         <script type="text/javascript" src="carcassonne.js"></script>
         <script type="text/javascript">
+            var board;
             var tile;
 
             Element.Events.spacePressed = {
@@ -19,26 +20,52 @@
             };
 
             window.addEvent('domready', function() {
+                board = new Board();
+                $(board).inject($("cont"));
+
                 $("width").set("text", window.getSize().x);
                 $("height").set("text", window.getSize().y);
                 $("addTile").addEvent("click", function() {
                     tile = new Tile(Math.floor(Math.random()*24));
-                    $(tile).inject($("cont"));
-                    $(tile).makeDraggable({
+                    $(tile).inject(board);
+                    $(tile).addEvent('click', function(ev) {
+                        var pos = this.getPosition();
+                        $("x").set("text", ev.page.x - pos.x);
+                        $("y").set("text", ev.page.y - pos.y);
+                        $("target").set("text", ev.target.getProperty('title') + ' ' + ev.target.getProperty('terra'));
+                    }).makeDraggable({
                         onStart: function(el) {
                             tile = el.retrieve('tile');
+                        },
+                        onDrag: function(el, ev) {
+                            var coord = el.getCoordinates();
+                            coord = board.convGridCoord(coord.left + coord.width/2, coord.top + coord.height/2);
+                            if (!coord)
+                                return;
+                            var shadow = tile.getShadow();
+                            shadow.inject(board).setPosition(coord).setStyle('display', 'block').store('gridCoord', coord);
+                        },
+                        onComplete: function(el) {
+                            var gridCoord = el.retrieve('tile').getShadow().retrieve('gridCoord');
+                            if (gridCoord) {
+                                el.inject(board);
+                                (new Fx.Morph(el, {duration: 'short', transition: Fx.Transitions.Sine.easeOut})).start({
+                                    'left': gridCoord.x,
+                                    'top': gridCoord.y
+                                });
+                            }
                         }
                     });
-                    /*
-                    $each(tile.areas(), function(a) {
+                    $each(tile.getAreas(), function(a) {
+                        /*
                         var tips = new Tips(a, {
                             'showDelay': 0,
                             'hideDelay': 0,
                             'className': 'meeple',
                             'title': function() {},
                             'offset': {'x': 16, 'y': -16}
-                        });
-                    });*/
+                        });*/
+                    });
                     this.blur();
                 });
                 $("rotate").addEvent("click", function() {
@@ -52,11 +79,12 @@
                 });
                 $("bounds").addEvent("click", function() {
                     if (tile)
-                        alert(tile.bounds());
+                        alert(tile.getBounds());
                 });
                 window.addEvent("spacePressed", function() {
                     if (tile)
                         tile.rotate();
+                    return false;
                 });
 
             });
@@ -69,13 +97,13 @@
             <div>height:<span id="height"></span></div>
             <div>x:<span id="x"></span></div>
             <div>y:<span id="y"></span></div>
-            <div>terra:<span id="terra"></span></div>
+            <div>target:<span id="target"></span></div>
             <input type="button" id="addTile" name="addTile" value="addTile" />
             <input type="button" id="rotate" name="rotate" value="rotate" />
             <input type="button" id="stop" name="stop" value="stop" />
             <input type="button" id="bounds" name="bounds" value="bounds" />
         </div>
-        <div id="cont" style="position:absolute;padding:108px 108px 108px 108px">
+        <div id="cont">
         </div>
     </body>
 </html>

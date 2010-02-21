@@ -15,6 +15,10 @@ var Tile = (function() {
         function(x,y){return [y,tileImgSize-x];}
     ];
 
+    var mapName = function(createId, rotation) {
+        return 'TM' + createId + '_' + rotation;
+    };
+
     return new Class({
         initialize: function(tileIdx) {
             // alias
@@ -30,9 +34,9 @@ var Tile = (function() {
             this.el.store('tile', this);
             this.img = new Element('img', {
                 "border": "0",
-                "padding": "0px 0px 0px 0px",
-                "src": transparentUrl,
+                "src": transparentUrl,                          // FF needs a src, otherwise image map will not work
                 "styles": {
+                    "padding": "0px",
                     "display": "block",
                     "background-image": "url('" + tilesImgUrl + "')",
                     "background-repeat": "no-repeat",
@@ -44,7 +48,7 @@ var Tile = (function() {
 
             // image maps
             $each(coordConvs, function(coordConv, r) {
-                var map = new Element('map', {'name': inst.mapName(r)});
+                var map = new Element('map', {'name': mapName(inst.createId, r)});
                 $each(tilesMap[inst.tileIdx], function(a) {
                     // calculate coords
                     var coords = [];
@@ -63,35 +67,72 @@ var Tile = (function() {
                 map.inject(inst.el);
             });
 
+            // shadow (shadow is used for positioning)
+            this.shadow = this.img.clone(false);
+            this.shadow.setStyles({
+                'display': 'none',
+                'position': 'absolute',
+                'opacity': 0.5
+            });
+
             // init rotation
             this.rotate();
         },
-        toElement: function() {                   // ref: http://n2.nabble.com/Extends-Element-in-1-2-td796845.html
+        toElement: function() {                         // ref: http://n2.nabble.com/Extends-Element-in-1-2-td796845.html
             return this.el;
         },
-        mapName: function(rotation) {
-            return 'TM' + this.createId + '_' + rotation;
-        },
-        areas: function() {                     // find areas in all rotation
+        getAreas: function() {                          // find areas in all rotation
             return this.el.getElements('map area');
         },
-        bounds: function() {
+        getBounds: function() {
             var b = tilesBounds[this.tileIdx];
             var r = -this.rotation;
             return b.slice(r).extend(b.slice(0, r)); 
+        },
+        getShadow: function() {
+            return this.shadow;
         },
         rotate: function() {
             // update rotation
             this.rotation = (this.rotation + 1) % 4;
 
             // update background image
-            this.img.setStyle('background-position', "{x}px {y}px".substitute({
-                x: -this.tileIdx * tileImgSize,
-                y: -this.rotation * tileImgSize
-            }));
+            var bgPos = "{x}px {y}px".substitute({ x: -this.tileIdx * tileImgSize, y: -this.rotation * tileImgSize })
+            this.img.setStyle('background-position', bgPos);
+            this.shadow.setStyle('background-position', bgPos);
 
             // update map
-            this.img.setProperty('usemap', '#' + this.mapName(this.rotation));
+            this.img.setProperty('usemap', '#' + mapName(this.createId, this.rotation));
         }
     });
+})();
+
+var Board = (function() {
+
+    var halfTileImgSize = tileImgSize/2;
+
+    return new Class({
+        initialize: function() {
+            this.el = new Element('div', {
+                'styles': {
+                    'border': 'solid',
+                    'position': 'relative',
+                    'width': (tileImgSize * 6) + "px",
+                    'height': (tileImgSize * 5) + "px"
+                }
+            });
+        },
+        toElement: function() {
+            return this.el;
+        },
+        convGridCoord: function(x, y) {
+            var coord = this.el.getCoordinates();
+            x -= coord.left;
+            y -= coord.top;
+            if (x < 0 || y < 0 || x > coord.width - halfTileImgSize
+                    || y > coord.height - halfTileImgSize)
+                return false;
+            return {'x': x - x % tileImgSize, 'y': y - y % tileImgSize};
+        }
+    }); 
 })();
