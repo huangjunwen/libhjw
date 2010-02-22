@@ -34,7 +34,7 @@ var Tile = (function() {
             this.el.store('tile', this);
             this.img = new Element('img', {
                 "border": "0",
-                "src": transparentUrl,                          // FF needs a src, otherwise image map will not work
+                "src": tileTransparentUrl,                          // FF needs a src, otherwise image map will not work
                 "styles": {
                     "padding": "0px",
                     "display": "block",
@@ -92,6 +92,14 @@ var Tile = (function() {
         getShadow: function() {
             return this.shadow;
         },
+        setFitStyle: function() {
+            this.img.setProperty('src', tileTransparentUrl);
+            this.shadow.setProperty('src', tileTransparentUrl);
+        },
+        setNotFitStyle: function() {
+            this.img.setProperty('src', tileTransparentRedUrl);
+            this.shadow.setProperty('src', tileTransparentRedUrl);
+        },
         rotate: function() {
             // update rotation
             this.rotation = (this.rotation + 1) % 4;
@@ -113,26 +121,52 @@ var Board = (function() {
 
     return new Class({
         initialize: function() {
+            this.gridHeight = this.gridWidth = 3;
+            this.maxGridY = this.maxGridX = 1;
+            this.minGridY = this.minGridX = -1;
             this.el = new Element('div', {
                 'styles': {
-                    'border': 'solid',
-                    'position': 'relative',
-                    'width': (tileImgSize * 6) + "px",
-                    'height': (tileImgSize * 6) + "px"
+                    'background-color': '#e0e0e0',
+                    'border': 'none',                           // no border for caculating coord simpler
+                    'position': 'absolute',
+                    'left': '300px',
+                    'top': '300px',
+                    'width': (tileImgSize*this.gridWidth) + "px",
+                    'height': (tileImgSize*this.gridHeight) + "px"
                 }
             });
+            this.openGrid = {'0_0': true};
         },
         toElement: function() {
             return this.el;
         },
-        convGridCoord: function(x, y) {
+        grid2Coord: function(g) {                       // grid to coord (lefttop corner relative to $(board))
+            if (!g)
+                return null;
+            var gX = g.gX, gY = g.gY;
+            if (gX < this.minGridX || gX > this.maxGridX || gY < this.minGridY || gY > this.maxGridY)
+                return null;
+            g.x = (gX - this.minGridX)*tileImgSize;
+            g.y = (this.maxGridY - gY)*tileImgSize;
+            return g;
+        },
+        coord2Grid: function(c) {                       // coord (lefttop corner relative to $(board)) to grid
+            if (!c)
+                return null;
+            var x = c.x, y = c.y, coord = this.el.getCoordinates();
+            if (x < 0 || y < 0 || x > coord.width || y > coord.height)
+                return null;
+            c.gX = this.minGridX + (x/tileImgSize).toInt();
+            c.gY = this.maxGridY - (y/tileImgSize).toInt();
+            return c;
+        },
+        abs2GridCoord: function(c) {                    // c is the absolute coord (relative to the document, e.g ev.page)
             var coord = this.el.getCoordinates();
-            x -= coord.left;
-            y -= coord.top;
-            if (x < 0 || y < 0 || x > coord.width - halfTileImgSize
-                    || y > coord.height - halfTileImgSize)
-                return false;
-            return {'x': x - x % tileImgSize, 'y': y - y % tileImgSize};
+            var x = c.x - coord.left;
+            var y = c.y - coord.top;
+            if (x < 0 || y < 0 || x >= coord.width || y >= coord.height)
+                return null;
+            return {'x': x - x%tileImgSize, 'y': y - y%tileImgSize};
         }
     }); 
 })();

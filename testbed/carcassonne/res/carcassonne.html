@@ -26,6 +26,10 @@
                 $("width").set("text", window.getSize().x);
                 $("height").set("text", window.getSize().y);
                 $("addTile").addEvent("click", function() {
+                    var c = $(board).getCoordinates();
+                    c = "left: {left}, top: {top}, right: {right}, bottom: {bottom}, width: {width}, height: {height}".substitute(c);
+                    $("board_coord").set("text", c);
+
                     tile = new Tile(Math.floor(Math.random()*24));
                     $(tile).inject(board);
                     $(tile).addEvent('click', function(ev) {
@@ -37,25 +41,28 @@
                         onStart: function(el) {
                             tile = el.retrieve('tile');
                             tile.getShadow().inject(board);
+                            $(tile).inject(board);
+                            tile.setFitStyle();
                         },
                         onDrag: function(el, ev) {
-                            var coord = el.getCoordinates();
-                            coord = board.convGridCoord(coord.left + coord.width/2, coord.top + coord.height/2);
+                            var coord = board.abs2GridCoord(ev.page);
                             if (!coord)
                                 return;
                             var shadow = tile.getShadow();
                             shadow.setPosition(coord).setStyle('display', 'block').store('gridCoord', coord);
                         },
                         onComplete: function(el) {
-                            var gridCoord = el.retrieve('tile').getShadow().retrieve('gridCoord');
+                            var t = el.retrieve('tile');
+                            var gridCoord = t.getShadow().retrieve('gridCoord');
                             if (gridCoord) {
                                 el.inject(board);
                                 (new Fx.Morph(el, {duration: 'short', transition: Fx.Transitions.Sine.easeOut})).start({
                                     'left': gridCoord.x,
                                     'top': gridCoord.y
                                 });
+                                t.setNotFitStyle();
                             }
-                        }
+                        },
                     });
                     $each(tile.getAreas(), function(a) {
                         /*
@@ -75,8 +82,9 @@
                     this.blur();
                 });
                 $("stop").addEvent("click", function() {
-                    if (tile)
+                    if (tile) {
                         $(tile).retrieve('dragger').detach();
+                    }
                 });
                 $("bounds").addEvent("click", function() {
                     if (tile)
@@ -99,6 +107,7 @@
             <div>x:<span id="x"></span></div>
             <div>y:<span id="y"></span></div>
             <div>target:<span id="target"></span></div>
+            <div>board coord: <span id="board_coord"></span></div>
             <input type="button" id="addTile" name="addTile" value="addTile" />
             <input type="button" id="rotate" name="rotate" value="rotate" />
             <input type="button" id="stop" name="stop" value="stop" />

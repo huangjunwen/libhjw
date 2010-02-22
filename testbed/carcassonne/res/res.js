@@ -2,7 +2,9 @@ var tileImgSize = 108;
 
 var tilesImgUrl = 'carcassonne.jpg';
 
-var transparentUrl = 'transparent.png';
+var tileTransparentUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGwAAABsCAYAAACPZlfNAAAAAXNSR0IArs4c6QAAAERJREFUeNrtwTEBAAAAwqD1T20IX6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4DbasAAEBrI08AAAAAElFTkSuQmCC';
+
+var tileTransparentRedUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGwAAABsCAMAAAC4uKf/AAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAAGUExURf9/f////wnD88UAAAACdFJOU/8A5bcwSgAAAElJREFUeNrszwENAAAMw6Dev+n7WAgKqBuVmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmdmMF2AAFyAWyT9Vw1cAAAAASUVORK5CYII=';
 
 var tilesMap = [[{"shape":"rect","coords":[[0,0],[48,48]],"terra":0,"title":"\u519c\u7530"},{"shape":"rect","coords":[[48,0],[60,48]],"terra":1,"title":"\u9053\u8def"},{"shape":"rect","coords":[[60,0],[108,48]],"terra":2,"title":"\u519c\u7530"},{"shape":"rect","coords":[[60,48],[108,60]],"terra":3,"title":"\u9053\u8def"},{"shape":"rect","coords":[[60,60],[108,108]],"terra":4,"title":"\u519c\u7530"},{"shape":"rect","coords":[[48,60],[60,108]],"terra":5,"title":"\u9053\u8def"},{"shape":"rect","coords":[[0,60],[48,108]],"terra":6,"title":"\u519c\u7530"},{"shape":"rect","coords":[[0,48],[48,60]],"terra":7,"title":"\u9053\u8def"}],
  [{"shape":"rect","coords":[[0,0],[108,108]],"terra":0,"title":"\u57ce\u5821"}],
