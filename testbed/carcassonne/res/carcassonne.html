@@ -45,7 +45,7 @@
                             tile.setFitStyle();
                         },
                         onDrag: function(el, ev) {
-                            var coord = board.abs2GridCoord(ev.page);
+                            var coord = board.abs2OpenGridCoord(ev.page);
                             if (!coord)
                                 return;
                             var shadow = tile.getShadow();
