@@ -18,6 +18,12 @@
                     return ev.key == 'space' && !ev.alt && !ev.control && !ev.shift;
                 }
             };
+            Element.Events.enterPressed = {
+                base: 'keypress',
+                condition: function(ev) {
+                    return ev.key == 'enter' && !ev.alt && !ev.control && !ev.shift;
+                }
+            };
 
             window.addEvent('domready', function() {
                 board = new Board();
@@ -25,11 +31,13 @@
 
                 $("width").set("text", window.getSize().x);
                 $("height").set("text", window.getSize().y);
-                $("addTile").addEvent("click", function() {
-                    var c = $(board).getCoordinates();
-                    c = "left: {left}, top: {top}, right: {right}, bottom: {bottom}, width: {width}, height: {height}".substitute(c);
-                    $("board_coord").set("text", c);
 
+                window.addEvent('dblclick', function(ev) {
+                    var coord = board.abs2GridCoord(ev.page);
+                    coord['val'] = board.neighborCnt.get(coord.gX, coord.gY);
+                    $("mouse").set("text", "{gX} {gY} {val}".substitute(coord));
+                });
+                $("addTile").addEvent("click", function() {
                     tile = new Tile(Math.floor(Math.random()*24));
                     $(tile).inject(board);
                     $(tile).addEvent('click', function(ev) {
@@ -42,6 +50,7 @@
                             tile = el.retrieve('tile');
                             tile.getShadow().inject(board);
                             $(tile).inject(board);
+                            board.rmTile(tile);
                             tile.setFitStyle();
                         },
                         onDrag: function(el, ev) {
@@ -60,6 +69,7 @@
                                     'left': gridCoord.x,
                                     'top': gridCoord.y
                                 });
+                                board.addTile(gridCoord, t);
                                 t.setNotFitStyle();
                             }
                         },
@@ -107,7 +117,7 @@
             <div>x:<span id="x"></span></div>
             <div>y:<span id="y"></span></div>
             <div>target:<span id="target"></span></div>
-            <div>board coord: <span id="board_coord"></span></div>
+            <div>mouse: <span id="mouse"></span></div>
             <input type="button" id="addTile" name="addTile" value="addTile" />
             <input type="button" id="rotate" name="rotate" value="rotate" />
             <input type="button" id="stop" name="stop" value="stop" />

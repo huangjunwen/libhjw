@@ -124,7 +124,7 @@ var Tile = (function() {
 
 var Board = (function() {
 
-    var Dict2D = new Class({
+    var Grid = new Class({
         initialize: function() {
             this.d = new Hash({});
         },
@@ -145,14 +145,10 @@ var Board = (function() {
                 return;
             this.set(x, y, r)
         },
-        applyNeighbor: function(x, y, f) {                      // for each of the 8 neighbors
-            this.apply(x - 1, y + 1, f);
+        applyNeighbor: function(x, y, f) {                      // for each of the 4 neighbors
             this.apply(x, y + 1, f);
-            this.apply(x + 1, y + 1, f);
             this.apply(x + 1, y, f);
-            this.apply(x + 1, y - 1, f);
             this.apply(x, y - 1, f);
-            this.apply(x - 1, y - 1, f);
             this.apply(x - 1, y, f);
         }
     });
@@ -163,10 +159,9 @@ var Board = (function() {
             this.maxGridY = this.maxGridX = 1;
             this.minGridY = this.minGridX = -1;
 
-            this.openGrid = new Dict2D();                       // x -> y -> open ref count
-            this.openGrid.set(0, 0, 1);                         //   =0 not opened; >0 opened; <0 closed
-            //this.openGrid.set(0, 1, 1);
-            this.tiles = new Dict2D();
+            this.neighborCnt = new Grid();                      // x -> y -> neighbor count
+            this.tiles = new Grid();
+            this.tilesCnt = 0;
 
             // DOM
             this.el = new Element('div', {
@@ -176,69 +171,69 @@ var Board = (function() {
                     'position': 'absolute',
                     'left': '300px',                            // XXX
                     'top': '300px',                             // XXX
-                    'width': (tileImgSize*(this.maxGridX - this.minGridX + 1)) + "px",
-                    'height': (tileImgSize*(this.maxGridY - this.minGridY + 1)) + "px"
+                    'width': tileImgSize + "px",
+                    'height': tileImgSize + "px"
                 }
             });
         },
         toElement: function() {
             return this.el;
         },
-        
-        isGridOpen: function(gX, gY) {
-            return (this.openGrid.get(gX, gY) || 0) > 0;
+        canPlace: function(gX, gY) {
+            if (!this.tilesCnt && !gX && !gY)
+                return true;
+            if (this.tiles.get(gX, gY))
+                return false;
+            if ((this.neighborCnt.get(gX, gY) || 0) <= 0)
+                return false;
+            return true;
         },
-        abs2OpenGridCoord: function(c) {                        // c is the absolute coord (relative to the document, e.g Event.page)
-            var coord = this.el.getCoordinates();
-            var x = c.x - coord.left;
-            var y = c.y - coord.top;
-            if (x < 0 || y < 0 || x >= coord.width || y >= coord.height)
-                return null;
-            x -= x%tileImgSize;
-            y -= y%tileImgSize;
-            gX = this.minGridX + (x/tileImgSize).toInt();
-            gY = this.maxGridY - (y/tileImgSize).toInt();
-            if (!this.isGridOpen(gX, gY))
-                return null;
+        abs2GridCoord: function(c) {                            // c is the absolute coord (relative to the document, e.g Event.page)
+            var pos = this.el.getPosition();
+            var x = c.x - pos.x, y = c.y - pos.y;
+            var modX = x%tileImgSize, modY = y%tileImgSize;
+            if (modX < 0)
+                modX = tileImgSize + modX;
+            if (modY < 0)
+                modY = tileImgSize + modY;
+            x -= modX;
+            y -= modY;
+            gX = (x/tileImgSize).toInt();
+            gY = - (y/tileImgSize).toInt();
             return {'x': x, 'y': y, 'gX': gX, 'gY': gY};
         },
+        abs2OpenGridCoord: function(c) {
+            c = this.abs2GridCoord(c);
+            if (!this.canPlace(c.gX, c.gY))
+                return null;
+            return c;
+        },
+        rmTile: function(tile) {
+            if (!tile.coordOnBoard)
+                return;
+            var gX = tile.coordOnBoard.gX;
+            var gY = tile.coordOnBoard.gY;
+            this.neighborCnt.applyNeighbor(gX, gY, function(x, y, v) {                 // all neighbors -1 open ref count
+                return (v || 0) - 1;
+            });
+            this.tiles.set(gX, gY, null);
+            tile.coordOnBoard = null;
+            --this.tilesCnt;
+        },
         addTile: function(c, tile) {
-            var gX, gY;
-            if (!this.isGridOpen(c.gX, c.gY))
+            if (!this.canPlace(c.gX, c.gY))
                 return false;
 
-            if (tile.coordOnBoard) {
-                gX = tile.coordOnBoard.gX;
-                gY = tile.coordOnBoard.gY;
-                this.openGrid.set(gX, gY, 1);
-                this.openGrid.applyNeighbor(gX, gY, function(x, y, v) {             // all opened neighbors -1 open ref count
-                    v = v || 0;
-                    if (v > 0)
-                        return v - 1;
-                });
-                this.tiles.set(gX, gY, null);
-                tile.coordOnBoard = null;
-            }
+            this.rmTile(tile);
 
-            gX = c.gX;
-            gY = c.gY;
-            this.openGrid.set(gX, gY, 0);
-            this.openGrid.applyNeighbor(gX, gY, function(x, y, v) {                 // all not closed neighbors +1 open ref count
-                v = v || 0;
-                if (v >= 0)
-                    return v + 1;
+            var gX = c.gX;
+            var gY = c.gY;
+            this.neighborCnt.applyNeighbor(gX, gY, function(x, y, v) {              // all neighbors +1 open ref count
+                return (v || 0) + 1;
             });
             this.tiles.set(gX, gY, tile);
             tile.coordOnBoard = c;
-
-            // need to enlarge the board
-            if (gX == this.minGridX) {
-            } else if (gX == this.maxGridX) {
-            }
-
-            if (gY == this.minGridY) {
-            } else if (gY == this.maxGridY) {
-            }
+            ++this.tilesCnt;
         }
     }); 
 })();
