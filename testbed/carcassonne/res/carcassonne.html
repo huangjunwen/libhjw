@@ -27,7 +27,8 @@
 
             window.addEvent('domready', function() {
                 board = new Board();
-                $(board).inject($("cont"));
+                $(board).inject($("cont")).makeDraggable({handle: $("dragMe")});
+                $("dragMe").makeDraggable();
 
                 $("width").set("text", window.getSize().x);
                 $("height").set("text", window.getSize().y);
@@ -51,7 +52,7 @@
                             tile.getShadow().inject(board);
                             $(tile).inject(board);
                             board.rmTile(tile);
-                            tile.setFitStyle();
+                            tile.setFit();
                         },
                         onDrag: function(el, ev) {
                             var coord = board.abs2OpenGridCoord(ev.page);
@@ -70,7 +71,7 @@
                                     'top': gridCoord.y
                                 });
                                 board.addTile(gridCoord, t);
-                                t.setNotFitStyle();
+                                board.checkFit(t);
                             }
                         },
                     });
@@ -87,8 +88,11 @@
                     this.blur();
                 });
                 $("rotate").addEvent("click", function() {
-                    if (tile)
+                    if (tile) {
                         tile.rotate();
+                        if (tile.board)
+                            tile.board.checkFit(tile);
+                    }
                     this.blur();
                 });
                 $("stop").addEvent("click", function() {
@@ -101,8 +105,11 @@
                         alert(tile.getBounds());
                 });
                 window.addEvent("spacePressed", function() {
-                    if (tile)
+                    if (tile) {
                         tile.rotate();
+                        if (tile.board)
+                            tile.board.checkFit(tile);
+                    }
                     return false;
                 });
 
@@ -122,6 +129,7 @@
             <input type="button" id="rotate" name="rotate" value="rotate" />
             <input type="button" id="stop" name="stop" value="stop" />
             <input type="button" id="bounds" name="bounds" value="bounds" />
+            <div id="dragMe" style="border:solid;width:30px;height:30px">drag</div>
         </div>
         <div id="cont">
         </div>

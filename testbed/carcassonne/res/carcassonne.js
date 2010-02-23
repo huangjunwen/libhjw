@@ -31,9 +31,10 @@ var Tile = (function() {
             this.tileIdx = tileIdx;
             this.rotation = -1;
             this.fit = null;
+            this.board = null;                                      // set by board
             this.coordOnBoard = null;                               // set by board
 
-            // create container div and the img ( for image map )
+            // DOM: create container div and the img ( for image map )
             this.el = new Element('div');
             this.el.store('tile', this);
             this.img = new Element('img', {
@@ -88,20 +89,18 @@ var Tile = (function() {
         getAreas: function() {                          // find areas in all rotation
             return this.el.getElements('map area');
         },
-        getBounds: function() {
-            var b = tilesBounds[this.tileIdx];
-            var r = -this.rotation;
-            return b.slice(r).extend(b.slice(0, r)); 
+        getBound: function(d) {
+            return tilesBounds[this.tileIdx][(4 + d - this.rotation)%4];
         },
         getShadow: function() {
             return this.shadow;
         },
-        setFitStyle: function() {
+        setFit: function() {
             this.img.setProperty('src', tileTransparentUrl);
             this.shadow.setProperty('src', tileTransparentUrl);
             this.fit = true;
         },
-        setNotFitStyle: function() {
+        setUnFit: function() {
             this.img.setProperty('src', tileTransparentRedUrl);
             this.shadow.setProperty('src', tileTransparentRedUrl);
             this.fit = false;
@@ -139,17 +138,17 @@ var Board = (function() {
                 this.d[x] = new Hash({});
             this.d[x][y] = v;
         },
-        apply: function(x, y, f) {
-            var r = f(x, y, this.get(x, y));
+        apply: function(x, y, arg, f) {
+            var r = f(this.get(x, y), arg);
             if (!$defined(r))
                 return;
             this.set(x, y, r)
         },
         applyNeighbor: function(x, y, f) {                      // for each of the 4 neighbors
-            this.apply(x, y + 1, f);
-            this.apply(x + 1, y, f);
-            this.apply(x, y - 1, f);
-            this.apply(x - 1, y, f);
+            this.apply(x, y + 1, 0, f);                         // up
+            this.apply(x + 1, y, 1, f);                         // right
+            this.apply(x, y - 1, 2, f);                         // down
+            this.apply(x - 1, y, 3, f);                         // left
         }
     });
 
@@ -188,8 +187,8 @@ var Board = (function() {
                 return false;
             return true;
         },
-        abs2GridCoord: function(c) {                            // c is the absolute coord (relative to the document, e.g Event.page)
-            var pos = this.el.getPosition();
+        abs2GridCoord: function(c, relative) {                                  // c is the coord relative to the argument 'relative'
+            var pos = this.el.getPosition(relative);
             var x = c.x - pos.x, y = c.y - pos.y;
             var modX = x%tileImgSize, modY = y%tileImgSize;
             if (modX < 0)
@@ -202,21 +201,22 @@ var Board = (function() {
             gY = - (y/tileImgSize).toInt();
             return {'x': x, 'y': y, 'gX': gX, 'gY': gY};
         },
-        abs2OpenGridCoord: function(c) {
-            c = this.abs2GridCoord(c);
+        abs2OpenGridCoord: function(c, relative) {
+            c = this.abs2GridCoord(c, relative);
             if (!this.canPlace(c.gX, c.gY))
                 return null;
             return c;
         },
         rmTile: function(tile) {
-            if (!tile.coordOnBoard)
+            if (tile.board != this)
                 return;
             var gX = tile.coordOnBoard.gX;
             var gY = tile.coordOnBoard.gY;
-            this.neighborCnt.applyNeighbor(gX, gY, function(x, y, v) {                 // all neighbors -1 open ref count
+            this.neighborCnt.applyNeighbor(gX, gY, function(v, d) {                 // all neighbors -1 open ref count
                 return (v || 0) - 1;
             });
             this.tiles.set(gX, gY, null);
+            tile.board = null;
             tile.coordOnBoard = null;
             --this.tilesCnt;
         },
@@ -228,12 +228,28 @@ var Board = (function() {
 
             var gX = c.gX;
             var gY = c.gY;
-            this.neighborCnt.applyNeighbor(gX, gY, function(x, y, v) {              // all neighbors +1 open ref count
+            this.neighborCnt.applyNeighbor(gX, gY, function(v, d) {                 // all neighbors +1 open ref count
                 return (v || 0) + 1;
             });
             this.tiles.set(gX, gY, tile);
+            tile.board = this;
             tile.coordOnBoard = c;
             ++this.tilesCnt;
+            return true;
+        },
+        checkFit: function(tile) {
+            if (tile.board != this)
+                throw "Tile not on board";
+            var fit = true;
+            this.tiles.applyNeighbor(tile.coordOnBoard.gX, tile.coordOnBoard.gY, function(t, d) {
+                if (!t)
+                    return;
+                if (tile.getBound(d) != t.getBound((d + 2)%4))
+                    fit = false;
+            });
+
+            fit ? tile.setFit() : tile.setUnFit();
+            return fit;
         }
     }); 
 })();
