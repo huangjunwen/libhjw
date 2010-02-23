@@ -91,6 +91,8 @@
                 $("stop").addEvent("click", function() {
                     if (tile) {
                         $(tile).retrieve('dragger').detach();
+                        tile.freeze();
+                        $(board).makeDraggable({handle: $(tile)});
                     }
                 });
                 $("bounds").addEvent("click", function() {

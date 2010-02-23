@@ -31,6 +31,7 @@ var Tile = (function() {
             this.tileIdx = tileIdx;
             this.rotation = -1;
             this.fit = null;
+            this.frozed = false;
 
             // DOM: create container div and the img ( for image map )
             this.el = new Element('div');
@@ -108,17 +109,32 @@ var Tile = (function() {
                 return;
             this.el.morph({left: coord.x, top: coord.y});
         },*/
+        freeze: function() {
+            this.frozed = true;
+            var currMapName = mapName(this.createId, this.rotation);
+            $each(this.el.getElements("map"), function(m) { 
+                if (m.getProperty('name') != currMapName)
+                    m.dispose(); 
+            });
+            this.shadow.dispose();
+        },
         setFit: function() {
+            if (this.frozed)
+                return;
             this.img.setProperty('src', tileTransparentUrl);
             this.shadow.setProperty('src', tileTransparentUrl);
             this.fit = true;
         },
         setUnFit: function() {
+            if (this.frozed)
+                return;
             this.img.setProperty('src', tileTransparentRedUrl);
             this.shadow.setProperty('src', tileTransparentRedUrl);
             this.fit = false;
         },
         rotate: function() {
+            if (this.frozed)
+                return;
             // update rotation
             this.rotation = (this.rotation + 1) % 4;
 
