@@ -31,12 +31,11 @@ var Tile = (function() {
             this.tileIdx = tileIdx;
             this.rotation = -1;
             this.fit = null;
-            this.board = null;                                      // set by board
-            this.coordOnBoard = null;                               // set by board
 
             // DOM: create container div and the img ( for image map )
             this.el = new Element('div');
             this.el.store('tile', this);
+            this.el.set('morph', {duration: 'short', transition: Fx.Transitions.Sine.easeOut});
             this.img = new Element('img', {
                 "border": "0",
                 "src": tileTransparentUrl,                          // FF needs a src, otherwise image map will not work
@@ -75,13 +74,16 @@ var Tile = (function() {
             // shadow (shadow is used for positioning)
             this.shadow = this.img.clone(false);
             this.shadow.setStyles({
-                'display': 'none',
+                'display': 'block',
                 'position': 'absolute',
                 'opacity': 0.5
             });
 
             // init rotation
             this.rotate();
+        },
+        toID: function() {
+            return this.createId;
         },
         toElement: function() {                         // ref: http://n2.nabble.com/Extends-Element-in-1-2-td796845.html
             return this.el;
@@ -92,9 +94,20 @@ var Tile = (function() {
         getBound: function(d) {
             return tilesBounds[this.tileIdx][(4 + d - this.rotation)%4];
         },
-        getShadow: function() {
-            return this.shadow;
+        inject: function(cont) {
+            this.shadow.inject(cont);
+            this.el.inject(cont);
         },
+        /*
+        showShadowAt: function(coord) {
+            this.shadow.setPosition(coord).setStyles('display', 'block').store('coord', coord);
+        },
+        followShadow: function() {
+            var coord = this.shadow.retrieve('coord');
+            if (!coord)
+                return;
+            this.el.morph({left: coord.x, top: coord.y});
+        },*/
         setFit: function() {
             this.img.setProperty('src', tileTransparentUrl);
             this.shadow.setProperty('src', tileTransparentUrl);
@@ -123,43 +136,58 @@ var Tile = (function() {
 
 var Board = (function() {
 
-    var Grid = new Class({
+    var Grid = new Class({                                      // 2D dict, values stored in Grid can has a toID method
         initialize: function() {
-            this.d = new Hash({});
+            this.d = new Hash();
+            this.rd = new Hash();
         },
-        get: function(x, y) {
-            var r = this.d.get(x);
+        get: function(gX, gY) {
+            var r = this.d.get(gX);
             if (!r)
                 return null;
-            return r.get(y);
+            return r.get(gY);
         },
-        set: function(x, y, v) {
-            if (!this.d.has(x))
-                this.d[x] = new Hash({});
-            this.d[x][y] = v;
+        find: function(v) {
+            if (!v || !v.toID)
+                return null;
+            return this.rd.get(v.toID());
         },
-        apply: function(x, y, arg, f) {
-            var r = f(this.get(x, y), arg);
+        set: function(gX, gY, v) {
+            if (!this.d.has(gX))
+                this.d.set(gX, new Hash());
+            this.d.get(gX).set(gY, v);
+
+            if (v && v.toID)
+                this.rd.set(v.toID(), {'gX': gX, 'gY': gY});
+        },
+        erase: function(gX, gY) {
+            var r = this.d.get(gX);
+            if (!r)
+                return;
+            var v = r.get(gY);
+            r.erase(gY);
+            if (v && v.toID)
+                this.rd.erase(v.toID());
+        },
+        apply: function(gX, gY, arg, f) {
+            var r = f(this.get(gX, gY), arg);
             if (!$defined(r))
                 return;
-            this.set(x, y, r)
+            this.set(gX, gY, r)
         },
-        applyNeighbor: function(x, y, f) {                      // for each of the 4 neighbors
-            this.apply(x, y + 1, 0, f);                         // up
-            this.apply(x + 1, y, 1, f);                         // right
-            this.apply(x, y - 1, 2, f);                         // down
-            this.apply(x - 1, y, 3, f);                         // left
+        applyNeighbor: function(gX, gY, f) {                    // for each of the 4 neighbors
+            this.apply(gX, gY + 1, 0, f);                       // up
+            this.apply(gX + 1, gY, 1, f);                       // right
+            this.apply(gX, gY - 1, 2, f);                       // down
+            this.apply(gX - 1, gY, 3, f);                       // left
         }
     });
 
     return new Class({
         initialize: function() {
             // attr
-            this.maxGridY = this.maxGridX = 1;
-            this.minGridY = this.minGridX = -1;
-
-            this.neighborCnt = new Grid();                      // x -> y -> neighbor count
-            this.tiles = new Grid();
+            this.neighborCnt = new Grid();                      // (x, y) -> neighbor count
+            this.tiles = new Grid();                            // (x, y) -> tile
             this.tilesCnt = 0;
 
             // DOM
@@ -177,6 +205,9 @@ var Board = (function() {
         },
         toElement: function() {
             return this.el;
+        },
+        findTile: function(tile) {
+            return this.tiles.find(tile);
         },
         canPlace: function(gX, gY) {
             if (!this.tilesCnt && !gX && !gY)
@@ -208,16 +239,15 @@ var Board = (function() {
             return c;
         },
         rmTile: function(tile) {
-            if (tile.board != this)
+            var c = this.findTile(tile);
+            if (!c)
                 return;
-            var gX = tile.coordOnBoard.gX;
-            var gY = tile.coordOnBoard.gY;
-            this.neighborCnt.applyNeighbor(gX, gY, function(v, d) {                 // all neighbors -1 open ref count
+            var gX = c.gX;
+            var gY = c.gY;
+            this.neighborCnt.applyNeighbor(gX, gY, function(v, d) {                 // all neighbors -1 count
                 return (v || 0) - 1;
             });
-            this.tiles.set(gX, gY, null);
-            tile.board = null;
-            tile.coordOnBoard = null;
+            this.tiles.erase(gX, gY);
             --this.tilesCnt;
         },
         addTile: function(c, tile) {
@@ -228,20 +258,20 @@ var Board = (function() {
 
             var gX = c.gX;
             var gY = c.gY;
-            this.neighborCnt.applyNeighbor(gX, gY, function(v, d) {                 // all neighbors +1 open ref count
+            this.neighborCnt.applyNeighbor(gX, gY, function(v, d) {                 // all neighbors +1 count
                 return (v || 0) + 1;
             });
             this.tiles.set(gX, gY, tile);
-            tile.board = this;
-            tile.coordOnBoard = c;
+            this.checkFit(tile);
             ++this.tilesCnt;
             return true;
         },
         checkFit: function(tile) {
-            if (tile.board != this)
-                throw "Tile not on board";
+            var c = this.findTile(tile);
+            if (!c)
+                return;
             var fit = true;
-            this.tiles.applyNeighbor(tile.coordOnBoard.gX, tile.coordOnBoard.gY, function(t, d) {
+            this.tiles.applyNeighbor(c.gX, c.gY, function(t, d) {
                 if (!t)
                     return;
                 if (tile.getBound(d) != t.getBound((d + 2)%4))

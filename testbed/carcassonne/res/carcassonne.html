@@ -33,7 +33,7 @@
                 $("width").set("text", window.getSize().x);
                 $("height").set("text", window.getSize().y);
 
-                window.addEvent('dblclick', function(ev) {
+                window.addEvent('click', function(ev) {
                     var coord = board.abs2GridCoord(ev.page);
                     coord['val'] = board.neighborCnt.get(coord.gX, coord.gY);
                     $("mouse").set("text", "{gX} {gY} {val}".substitute(coord));
@@ -49,30 +49,23 @@
                     }).makeDraggable({
                         onStart: function(el) {
                             tile = el.retrieve('tile');
-                            tile.getShadow().inject(board);
-                            $(tile).inject(board);
-                            board.rmTile(tile);
+                            tile.inject(board);
+                            tile.shadow.setStyles('display', 'block');
                             tile.setFit();
+                            board.rmTile(tile);
                         },
                         onDrag: function(el, ev) {
                             var coord = board.abs2OpenGridCoord(ev.page);
                             if (!coord)
                                 return;
-                            var shadow = tile.getShadow();
-                            shadow.setPosition(coord).setStyle('display', 'block').store('gridCoord', coord);
+                            tile.shadow.setPosition(coord).store('coord', coord);
                         },
                         onComplete: function(el) {
-                            var t = el.retrieve('tile');
-                            var gridCoord = t.getShadow().retrieve('gridCoord');
-                            if (gridCoord) {
-                                el.inject(board);
-                                (new Fx.Morph(el, {duration: 'short', transition: Fx.Transitions.Sine.easeOut})).start({
-                                    'left': gridCoord.x,
-                                    'top': gridCoord.y
-                                });
-                                board.addTile(gridCoord, t);
-                                board.checkFit(t);
-                            }
+                            var c = tile.shadow.retrieve('coord');
+                            if (!c)
+                                return;
+                            board.addTile(c, tile);
+                            $(tile).morph({left: c.x, top: c.y});
                         },
                     });
                     $each(tile.getAreas(), function(a) {
@@ -107,8 +100,7 @@
                 window.addEvent("spacePressed", function() {
                     if (tile) {
                         tile.rotate();
-                        if (tile.board)
-                            tile.board.checkFit(tile);
+                        board.checkFit(tile);
                     }
                     return false;
                 });
