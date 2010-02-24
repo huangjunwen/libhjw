@@ -22,7 +22,20 @@ var Tile = (function() {
     };
 
     return new Class({
-        initialize: function(tileIdx) {
+        Implements: [Events, Options],
+
+        options: {
+            /*
+             * onPicked: function(tile, gridCoord)
+             * onPut: function(tile, gridCoord)
+             * onRotate: function(tile)
+             * onFreeze: function(tile)
+             *
+             * */
+        },
+
+        initialize: function(tileIdx, opt) {
+            this.setOptions(opt);
             // alias
             var inst = this;
 
@@ -83,33 +96,36 @@ var Tile = (function() {
             // init rotation
             this.rotate();
         },
-        toID: function() {
-            return this.createId;
-        },
+        // DOMs
         toElement: function() {                         // ref: http://n2.nabble.com/Extends-Element-in-1-2-td796845.html
             return this.el;
         },
         getAreas: function() {                          // find areas in all rotation
             return this.el.getElements('map area');
         },
+        // data
+        toID: function() {
+            return this.createId;
+        },
         getBound: function(d) {
             return tilesBounds[this.tileIdx][(4 + d - this.rotation)%4];
         },
-        inject: function(cont) {
-            this.shadow.inject(cont);
-            this.el.inject(cont);
+        // styles
+        setFit: function() {
+            this.img.setProperty('src', tileTransparentUrl);
+            this.shadow.setProperty('src', tileTransparentUrl);
+            this.fit = true;
         },
-        /*
-        showShadowAt: function(coord) {
-            this.shadow.setPosition(coord).setStyles('display', 'block').store('coord', coord);
+        setUnFit: function() {
+            this.img.setProperty('src', tileTransparentRedUrl);
+            this.shadow.setProperty('src', tileTransparentRedUrl);
+            this.fit = false;
         },
-        followShadow: function() {
-            var coord = this.shadow.retrieve('coord');
-            if (!coord)
-                return;
-            this.el.morph({left: coord.x, top: coord.y});
-        },*/
-        freeze: function() {
+        // actions
+        freeze: function() {        
+            /* 
+             * freeze actions and release some contents 
+             * */
             this.frozed = true;
             var currMapName = mapName(this.createId, this.rotation);
             $each(this.el.getElements("map[name!=" + currMapName + "]"), function(m) { 
@@ -117,20 +133,32 @@ var Tile = (function() {
             });
             this.shadow.dispose();
             this.shadow = null;
+            this.fireEvent('freeze', this);
         },
-        setFit: function() {
+        injectAt: function(cont, pos) {
             if (this.frozed)
                 return;
-            this.img.setProperty('src', tileTransparentUrl);
-            this.shadow.setProperty('src', tileTransparentUrl);
-            this.fit = true;
+            this.shadow.inject(cont);
+            this.showShadowAt(pos);
+            this.el.inject(cont).setPosition(pos);
         },
-        setUnFit: function() {
+        showShadowAt: function(pos) {
             if (this.frozed)
                 return;
-            this.img.setProperty('src', tileTransparentRedUrl);
-            this.shadow.setProperty('src', tileTransparentRedUrl);
-            this.fit = false;
+            this.shadow.setPosition(pos).store('pos', pos);
+        },
+        followShadow: function() {
+            if (this.frozed)
+                return;
+            var pos = this.shadow.retrieve('pos');
+            this.el.morph({left: pos.x, top: pos.y});
+            return this.el.get('morph');
+        },
+        moveTo: function(pos) {
+            if (this.frozed)
+                return;
+            this.showShadowAt(pos);
+            return this.followShadow(pos);
         },
         rotate: function() {
             if (this.frozed)
@@ -145,6 +173,7 @@ var Tile = (function() {
 
             // update map
             this.img.setProperty('usemap', '#' + mapName(this.createId, this.rotation));
+            this.fireEvent('rotate', this);
         }
     });
 })();
@@ -199,6 +228,8 @@ var Board = (function() {
         }
     });
 
+    var boundOpposite = [2, 3, 0, 1];
+
     return new Class({
         initialize: function() {
             // attr
@@ -212,8 +243,6 @@ var Board = (function() {
                     'background-color': '#e0e0e0',
                     'border': 'none',                           // no border for caculating coord simpler
                     'position': 'absolute',
-                    'left': '300px',                            // XXX
-                    'top': '300px',                             // XXX
                     'width': tileImgSize + "px",
                     'height': tileImgSize + "px"
                 }
@@ -222,16 +251,10 @@ var Board = (function() {
         toElement: function() {
             return this.el;
         },
-        canPlace: function(gX, gY) {
-            if (!this.tilesCnt && !gX && !gY)
-                return true;
-            if (this.tiles.get(gX, gY))
-                return false;
-            if ((this.neighborCnt.get(gX, gY) || 0) <= 0)
-                return false;
-            return true;
+        getNeighborCnt: function(c) {
+            return this.neighborCnt.get(c.gX, c.gY) || 0;
         },
-        abs2GridCoord: function(c, relative) {                                  // c is the coord relative to the argument 'relative'
+        abs2GridCoord: function(c, relative) {                                      // c is the coord relative to the argument 'relative'
             var pos = this.el.getPosition(relative);
             var x = c.x - pos.x, y = c.y - pos.y;
             var modX = x%tileImgSize, modY = y%tileImgSize;
@@ -245,19 +268,21 @@ var Board = (function() {
             gY = - (y/tileImgSize).toInt();
             return {'x': x, 'y': y, 'gX': gX, 'gY': gY};
         },
-        abs2OpenGridCoord: function(c, relative) {
-            c = this.abs2GridCoord(c, relative);
-            if (!this.canPlace(c.gX, c.gY))
-                return null;
-            return c;
+        occupied: function(c) {
+            return this.tiles.get(c.gX, c.gY) ? true : false;
         },
         findTile: function(tile) {
-            return this.tiles.find(tile);
+            var c;
+            if (!(c = this.tiles.find(tile)))
+                return null;
+            c.x = c.gX*tileImgSize;
+            c.y = c.gY*tileImgSize;
+            return c;
         },
-        rmTile: function(tile) {
+        pickTile: function(tile) {
             var c = this.findTile(tile);
             if (!c)
-                return;
+                return false;
             var gX = c.gX;
             var gY = c.gY;
             this.neighborCnt.applyNeighbor(gX, gY, function(v, d) {                 // all neighbors -1 count
@@ -265,12 +290,14 @@ var Board = (function() {
             });
             this.tiles.erase(gX, gY);
             --this.tilesCnt;
+            tile.fireEvent('picked', [tile, c]);
+            return true;
         },
-        addTile: function(c, tile) {
-            if (!this.canPlace(c.gX, c.gY))
+        putTile: function(c, tile) {
+            if (this.occupied(c))
                 return false;
 
-            this.rmTile(tile);
+            this.pickTile(tile);                                                    // first pick up if not yet
 
             var gX = c.gX;
             var gY = c.gY;
@@ -278,23 +305,58 @@ var Board = (function() {
                 return (v || 0) + 1;
             });
             this.tiles.set(gX, gY, tile);
-            this.checkFit(tile);
             ++this.tilesCnt;
+            tile.fireEvent('put', [tile, c]);
             return true;
         },
-        checkFit: function(tile) {
+        createTile: function(tileIdx, c, opt) {                                     // c should be a grid coord
+            if (this.occupied(c))
+                return null;
+
+            var tile = new Tile(tileIdx, opt);
+            tile.injectAt(this, c);
+            this.putTile(c, tile);
+            return tile;
+        },
+        makeTileDraggable: function(tile) {
             var c = this.findTile(tile);
-            if (!c)
-                return;
+            var board = this;
+
+            function onEnd(el) {
+                board.putTile(c, tile);
+                tile.followShadow();
+            }
+
+            return $(tile).makeDraggable({
+                onStart: function(el){
+                    board.pickTile(tile);
+                },
+                onDrag: function(el, ev) {
+                    var newCoord = board.abs2GridCoord(ev.page);
+                    if (board.occupied(newCoord))
+                        return;
+                    c = newCoord;
+                    tile.showShadowAt(c);
+                },
+                onComplete: onEnd,
+                onCancel: onEnd
+            });
+        },
+        moveTile: function(c, tile) {
+            if (!this.putTile(c, tile))
+                return null;
+            return tile.moveTo(c);
+        },
+        checkBounds: function(c, tile) {
             var fit = true;
             this.tiles.applyNeighbor(c.gX, c.gY, function(t, d) {
                 if (!t)
                     return;
-                if (tile.getBound(d) != t.getBound((d + 2)%4))
+                if (tile.getBound(d) != t.getBound(boundOpposite[d]))
                     fit = false;
             });
 
-            fit ? tile.setFit() : tile.setUnFit();
+            // fit ? tile.setFit() : tile.setUnFit();
             return fit;
         }
     }); 

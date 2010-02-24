@@ -18,12 +18,6 @@
                     return ev.key == 'space' && !ev.alt && !ev.control && !ev.shift;
                 }
             };
-            Element.Events.enterPressed = {
-                base: 'keypress',
-                condition: function(ev) {
-                    return ev.key == 'enter' && !ev.alt && !ev.control && !ev.shift;
-                }
-            };
 
             window.addEvent('domready', function() {
                 board = new Board();
@@ -32,84 +26,71 @@
                 $("width").set("text", window.getSize().x);
                 $("height").set("text", window.getSize().y);
 
+                $("stop").addEvent('click', function() {
+                    if (!tile)
+                        return;
+                    $(tile).retrieve('dragger').detach();
+                    tile.freeze();
+                    $(board).makeDraggable({handle: $(tile)});
+                    tile = null;
+                });
+
                 window.addEvent('click', function(ev) {
                     var coord = board.abs2GridCoord(ev.page);
                     coord['val'] = board.neighborCnt.get(coord.gX, coord.gY);
-                    $("mouse").set("text", "{gX} {gY} {val}".substitute(coord));
+                    $("neighbor").set("text", "{gX} {gY} {val}".substitute(coord));
                 });
 
-                $("addTile").addEvent("click", function() {
+                window.addEvent('dblclick', function(ev) {
+                    var c = board.abs2GridCoord(ev.page);
+                    if (board.occupied(c))
+                        return;
+                    
+                    // handle the last tile
                     if (tile) {
-                        $(tile).retrieve('dragger').detach();
-                        tile.freeze();
-                        $(board).makeDraggable({handle: $(tile)});
+                        board.moveTile(c, tile);
+                        return;
                     }
 
-                    tile = new Tile(Math.floor(Math.random()*24));
-                    tile.inject(board);
+                    // add new one
+                    tile = board.createTile(Math.floor(Math.random()*24), c, {
+                        onPicked : function(t, c) {
+                            t.setFit();
+                        },
+                        onPut: function(t, c) {
+                            if (board.tilesCnt == 1 && !c.gX && !c.gY) {
+                                t.setFit();
+                                return;
+                            }
+                            else if (board.getNeighborCnt(c) == 0 || 
+                                    !board.checkBounds(c, t)) {
+                                t.setUnFit();
+                                return;
+                            }
+                            t.setFit();
+                            return;
+                        },
+                        onRotate: function(t) {
+                            var c = board.findTile(t);
+                            if (!c)
+                                return;
+                            board.checkBounds(c, t) ? t.setFit() : t.setUnFit();
+                        }
+                    });
+                    board.makeTileDraggable(tile);
 
                     $(tile).addEvent('click', function(ev) {
                         var pos = this.getPosition();
                         $("x").set("text", ev.page.x - pos.x);
                         $("y").set("text", ev.page.y - pos.y);
                         $("target").set("text", ev.target.getProperty('title') + ' ' + ev.target.getProperty('terra'));
-                    }).makeDraggable({
-                        onStart: function(el) {
-                            //tile.inject(board);
-                            tile.shadow.setStyles('display', 'block');
-                            tile.setFit();
-                            board.rmTile(tile);
-                        },
-                        onDrag: function(el, ev) {
-                            var coord = board.abs2OpenGridCoord(ev.page);
-                            if (!coord)
-                                return;
-                            tile.shadow.setPosition(coord).store('coord', coord);
-                        },
-                        onComplete: function(el) {
-                            var c = tile.shadow.retrieve('coord');
-                            if (!c)
-                                return;
-                            board.addTile(c, tile);
-                            $(tile).morph({left: c.x, top: c.y});
-                        },
                     });
-                    $each(tile.getAreas(), function(a) {
-                        /*
-                        var tips = new Tips(a, {
-                            'showDelay': 0,
-                            'hideDelay': 0,
-                            'className': 'meeple',
-                            'title': function() {},
-                            'offset': {'x': 16, 'y': -16}
-                        });*/
-                    });
-                    this.blur();
+                    
                 });
-                $("rotate").addEvent("click", function() {
-                    if (tile) {
-                        tile.rotate();
-                        if (tile.board)
-                            tile.board.checkFit(tile);
-                    }
-                    this.blur();
-                });
-                $("stop").addEvent("click", function() {
-                    if (tile) {
-                        $(tile).retrieve('dragger').detach();
-                        tile.freeze();
-                        $(board).makeDraggable({handle: $(tile)});
-                    }
-                });
-                $("bounds").addEvent("click", function() {
-                    if (tile)
-                        alert(tile.getBounds());
-                });
+
                 window.addEvent("spacePressed", function() {
-                    if (tile) {
+                    if (tile)
                         tile.rotate();
-                        board.checkFit(tile);
-                    }
                     return false;
                 });
 
@@ -124,11 +105,8 @@
             <div>x:<span id="x"></span></div>
             <div>y:<span id="y"></span></div>
             <div>target:<span id="target"></span></div>
-            <div>mouse: <span id="mouse"></span></div>
-            <input type="button" id="addTile" name="addTile" value="addTile" />
-            <input type="button" id="rotate" name="rotate" value="rotate" />
+            <div>neighbor: <span id="neighbor"></span></div>
             <input type="button" id="stop" name="stop" value="stop" />
-            <input type="button" id="bounds" name="bounds" value="bounds" />
         </div>
         <div id="cont">
         </div>
