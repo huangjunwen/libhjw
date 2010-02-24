@@ -27,8 +27,7 @@
 
             window.addEvent('domready', function() {
                 board = new Board();
-                $(board).inject($("cont")).makeDraggable({handle: $("dragMe")});
-                $("dragMe").makeDraggable();
+                $(board).inject($("cont"));
 
                 $("width").set("text", window.getSize().x);
                 $("height").set("text", window.getSize().y);
@@ -38,9 +37,17 @@
                     coord['val'] = board.neighborCnt.get(coord.gX, coord.gY);
                     $("mouse").set("text", "{gX} {gY} {val}".substitute(coord));
                 });
+
                 $("addTile").addEvent("click", function() {
+                    if (tile) {
+                        $(tile).retrieve('dragger').detach();
+                        tile.freeze();
+                        $(board).makeDraggable({handle: $(tile)});
+                    }
+
                     tile = new Tile(Math.floor(Math.random()*24));
-                    $(tile).inject(board);
+                    tile.inject(board);
+
                     $(tile).addEvent('click', function(ev) {
                         var pos = this.getPosition();
                         $("x").set("text", ev.page.x - pos.x);
@@ -48,8 +55,7 @@
                         $("target").set("text", ev.target.getProperty('title') + ' ' + ev.target.getProperty('terra'));
                     }).makeDraggable({
                         onStart: function(el) {
-                            tile = el.retrieve('tile');
-                            tile.inject(board);
+                            //tile.inject(board);
                             tile.shadow.setStyles('display', 'block');
                             tile.setFit();
                             board.rmTile(tile);
@@ -123,7 +129,6 @@
             <input type="button" id="rotate" name="rotate" value="rotate" />
             <input type="button" id="stop" name="stop" value="stop" />
             <input type="button" id="bounds" name="bounds" value="bounds" />
-            <div id="dragMe" style="border:solid;width:30px;height:30px">drag</div>
         </div>
         <div id="cont">
         </div>

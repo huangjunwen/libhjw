@@ -222,9 +222,6 @@ var Board = (function() {
         toElement: function() {
             return this.el;
         },
-        findTile: function(tile) {
-            return this.tiles.find(tile);
-        },
         canPlace: function(gX, gY) {
             if (!this.tilesCnt && !gX && !gY)
                 return true;
@@ -253,6 +250,9 @@ var Board = (function() {
             if (!this.canPlace(c.gX, c.gY))
                 return null;
             return c;
+        },
+        findTile: function(tile) {
+            return this.tiles.find(tile);
         },
         rmTile: function(tile) {
             var c = this.findTile(tile);
