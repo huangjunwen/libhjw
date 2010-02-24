@@ -112,11 +112,11 @@ var Tile = (function() {
         freeze: function() {
             this.frozed = true;
             var currMapName = mapName(this.createId, this.rotation);
-            $each(this.el.getElements("map"), function(m) { 
-                if (m.getProperty('name') != currMapName)
-                    m.dispose(); 
+            $each(this.el.getElements("map[name!=" + currMapName + "]"), function(m) { 
+                m.dispose(); 
             });
             this.shadow.dispose();
+            this.shadow = null;
         },
         setFit: function() {
             if (this.frozed)
