@@ -1,0 +1,106 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"> 
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>Chat</title>
+<script type="text/javascript" src="mootools-1.2.4-core.js"></script>
+<script type="text/javascript">
+var idCounter = 0;
+function uniqID() {
+    return idCounter++;
+}
+
+var WSJsonTransport = new Class({
+
+    Implements: [Events, Options],
+
+    options: {
+        /*
+         * onOpen: function()
+         * onClose: function()
+         */
+        callbacks: {}
+    },
+
+    initialize: function(url, opt) {
+        this.setOptions(opt);
+        var inst = this;
+
+        // attr
+        this.status = 0;                                                // 0 not opened; 1 opened; -1 closed
+        this.pendingCalls = [];
+        this.outstandCalls = Hash();                                    // id -> callback
+        this.transport = new WebSocket(url);
+
+        this.transport.onopen = function() {
+            $each(inst.pendingCalls, function(pC) {
+                inst.transport.send(pC);
+            });
+            inst.status = 1;
+            inst.fireEvent('open');
+        };
+        this.transport.onclose = function() {
+            inst.status = -1;
+            inst.fireEvent('close');
+        },
+        this.transport.onmessage = function(ev) {
+            try {
+                var res = JSON.decode(ev.data);
+                if (res.jsonrpc != '2.0')
+                    throw "bad server protocol";
+
+                if (res.method) {                                       // a notify from server
+                    var method = this.options.callbacks.[res.method];
+                    if (!method)
+                        throw "can't find method: {method}".substitute(res);
+                    method.apply(this, res.params);
+                } else {                                                // response
+                    var cb = this.outstandCalls.get(res.id);
+                    if (!cb)
+                        throw "no such call id: {id}".substitute(res);
+                    this.outstandCalls.erase(res.id);
+                    cb(res.id, res.result, res.error);                  // callback prototype
+                }
+            } catch (e) {
+                alert(e);
+                this.transport.close();
+                return;
+            }
+        };
+    },
+    call: function(method, param, cb) {
+        var id = uniqID();
+        this.outstandCalls.set(id, cb || $empty);
+        var c = JSON.encode({'jsonrpc': '2.0', 'method': method, 
+            'params': params, 
+            'id': id
+        };
+        if (this.status == 1)
+            this.transport.send(c);
+        else if (this.status == 0)
+            this.pendingCalls.push(c);
+        else
+            throw "transport closed";
+        return id;
+    }
+});
+
+window.addEvent('domready', function() {
+});
+
+var username = null;
+var chatter = new WSJsonTransport("ws://127.0.0.1:8000/ws/chat", {callbacks: {
+    'askUsername': function() {
+        });
+        $('askUsername').setStyle('display', 'block');
+    },
+
+}});
+</script>
+</head>
+<body>
+    <div id="askUsername">
+        请输入您的名字: <input type="input" id="username" name="username" /> <input type="button" id="inputUsername" name="inputUsername"  value="确定" />
+    </div>
+</body>
+</html>

@@ -40,7 +40,7 @@ class InternalError(JsonRPCErr):
 class WSJsonRPCHandler(WebSocketHandler):
 
     """
-    A simple web socket json RPC handler.
+    A simple json RPC handler over web socket.
 
     Client sends RPC calls to the handler through web socket frames.
 
@@ -49,6 +49,9 @@ class WSJsonRPCHandler(WebSocketHandler):
     These methods can return result or a defer, and can raise(return) Exception on error.
 
     """
+    def __init__(self, transport):
+        WebSocketHandler.__init__(self, transport)
+        #from twisted.internet import reactor
 
     def frameReceived(self, frame):                             # each frame is a RPC call
         call_id = None
