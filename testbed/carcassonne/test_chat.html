@@ -4,6 +4,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
 <title>Chat</title>
 <script type="text/javascript" src="mootools-1.2.4-core.js"></script>
+<script type="text/javascript" src="mootools-1.2.4.4-more.js"></script>
 <script type="text/javascript">
 var idCounter = 0;
 function uniqID() {
@@ -30,7 +31,7 @@ var WSJsonTransport = new Class({
         this.status = 0;                                                // 0 not opened; 1 opened; -1 closed
         this.pendingCalls = [];
         this.outstandCalls = Hash();                                    // id -> callback
-        this.transport = new WebSocket(url);
+        this.transport = new WebSocket(url.toString());
 
         this.transport.onopen = function() {
             $each(inst.pendingCalls, function(pC) {
@@ -50,7 +51,7 @@ var WSJsonTransport = new Class({
                     throw "bad server protocol";
 
                 if (res.method) {                                       // a notify from server
-                    var method = this.options.callbacks.[res.method];
+                    var method = this.options.callbacks[res.method];
                     if (!method)
                         throw "can't find method: {method}".substitute(res);
                     method.apply(this, res.params);
@@ -74,7 +75,7 @@ var WSJsonTransport = new Class({
         var c = JSON.encode({'jsonrpc': '2.0', 'method': method, 
             'params': params, 
             'id': id
-        };
+        });
         if (this.status == 1)
             this.transport.send(c);
         else if (this.status == 0)
@@ -85,22 +86,80 @@ var WSJsonTransport = new Class({
     }
 });
 
+var userName;
+var chatRoom;
+var online = false;
+
 window.addEvent('domready', function() {
+    chatContent = $("chatContent");
+    function addMsg(msg) {
+        chatContent.set("text", chatContent.get("text") + '\n' + msg);
+    }
+
+    function buildChatRoom() {
+        if (chatRoom)
+            return;
+
+        var url = new URI("ws://127.0.0.1:9876/ws/chat");
+        url.setData('username', userName);
+
+        chatRoom = new WSJsonTransport(url, {
+            callbacks: {
+                'refuse': function(reason) {
+                    addMsg("服务器拒绝您的登录, 原因: " + reason);
+                },
+                'msg': function(msg) {
+                    addMsg(msg);
+                }
+            },
+            onClose: function() {
+                addMsg("服务中断.");
+                $("username").removeProperty("disabled");
+                $("inputUsername").removeProperty("disabled");
+                chatRoom = null;
+                online = false;
+            }
+        });
+
+        $("username").setProperty("disabled", "true");
+        $("inputUsername").setProperty("disabled", "true");
+    }
+    $("inputUsername").addEvent("click", function(ev) {
+        userName = $("username").getProperty("value");
+        if (!userName) {
+            alert("请输入用户名");
+            return;
+        }
+        buildChatRoom();
+    });
+    $("chatForm").addEvent("submit", function(ev) {
+        var msg = $("message").get("value");
+        $("message").set("value", '');
+        if (!chatRoom || !online || !msg)
+            return false;
+
+        chatRoom.call("chat", [msg], function(callID, res, err) {
+            if (err) {
+                addMsg("<您的消息 '" + msg + "' 没有发送成功>");
+            }
+        });
+        return false;
+    });
 });
 
-var username = null;
-var chatter = new WSJsonTransport("ws://127.0.0.1:8000/ws/chat", {callbacks: {
-    'askUsername': function() {
-        });
-        $('askUsername').setStyle('display', 'block');
-    },
-
-}});
 </script>
 </head>
 <body>
     <div id="askUsername">
-        请输入您的名字: <input type="input" id="username" name="username" /> <input type="button" id="inputUsername" name="inputUsername"  value="确定" />
+        请输入您的名字: <input type="text" id="username" name="username" /> <input type="button" id="inputUsername" name="inputUsername"  value="确定" />
+    </div>
+    <div>
+        <textarea id="chatContent" rows="20" cols="80" readonly="true"></textarea>
+    </div>
+    <div>
+        <form id="chatForm">
+            <input type="text" id="message" size="80" /> <input type="submit" id="submit" value="发送" />
+        </form>
     </div>
 </body>
 </html>
