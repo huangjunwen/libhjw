@@ -1,6 +1,10 @@
 
 import re
-from simplejson import dumps, loads
+try:
+    from json import dumps, loads
+except ImportError:
+    from simplejson import dumps, loads
+
 from twisted.python import failure, log
 from twisted.internet.defer import Deferred
 from twisted.web.websocket import WebSocketRequest, WebSocketHandler
@@ -51,7 +55,7 @@ class WSJsonRPCHandler(WebSocketHandler):
     These methods can return result or a defer, and can raise(return) Exception on error.
 
     """
-    method_re = re.comile(r"^[_A-z]\w*$").match
+    method_re = re.compile(r"^[_A-z]\w*$").match
 
     def frameReceived(self, frame):                             # each frame is a RPC call
         call_id = None
@@ -71,7 +75,7 @@ class WSJsonRPCHandler(WebSocketHandler):
             
             if version != '2.0':
                 raise InvalidReq()
-            if not isinstance(method, str) or not self.method_re(method):
+            if type(method) not in (unicode, str) or not self.method_re(method):
                 raise InvalidReq()
 
             method = self.dispatch(method)
@@ -109,7 +113,7 @@ class WSJsonRPCHandler(WebSocketHandler):
             val = val.value
         if not isinstance(val, JsonRPCErr):         # convert to JsonRPCErr
             val = InternalError()
-        return self.respErr(val, call_id)
+        return self.respErr(val(), call_id)
         
     def respResult(self, res, call_id):
         self.transport.write(dumps({'jsonrpc': '2.0', 'result': res, 'id': call_id}))

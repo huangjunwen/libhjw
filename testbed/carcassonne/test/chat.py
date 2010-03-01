@@ -1,6 +1,6 @@
 
 import sys, os, re
-sys.path.insert(0, os.path.abspath('.').rsplit('/', 1)[0])
+sys.path.insert(0, os.path.split(os.path.abspath('.'))[0])
 
 from twisted.python import log
 
@@ -15,13 +15,13 @@ class ChatHandler(WSJsonRPCHandler):
     all_users = {}                          # username -> handler
 
     def broadcast(self, msg):
-        for _, h in self.all_users.itervalues():
-            h.notify('msg', [msg,])
+        for h in self.all_users.itervalues():
+            h.notify('msg', msg)
 
     def do_chat(self, msg):
         if not hasattr(self, 'username'):
             return False
-        self.broadcast('%s said: %s' % (username, msg))
+        self.broadcast('%s said: %s' % (self.username, msg))
         return True
 
     USERNAME_re = re.compile(r"^[_A-z]\w{0,19}$").match
@@ -29,7 +29,7 @@ class ChatHandler(WSJsonRPCHandler):
         if hasattr(self, 'username'):
             return False
 
-        if not isinstance(username, str) or not self.USERNAME_re(username):
+        if type(username) not in (unicode, str) or not self.USERNAME_re(username):
             return False
 
         if username in self.all_users:

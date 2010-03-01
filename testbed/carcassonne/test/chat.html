@@ -50,20 +50,20 @@ var WSJsonTransport = new Class({
                     throw "bad server protocol";
 
                 if (res.method) {                                       // a notify from server
-                    var method = this.options.callbacks[res.method];
+                    var method = inst.options.callbacks[res.method];
                     if (!method)
                         throw "can't find method: {method}".substitute(res);
-                    method.apply(this, res.params);
+                    method.apply(inst, res.params);
                 } else {                                                // response
-                    var cb = this.outstandCalls.get(res.id);
+                    var cb = inst.outstandCalls.get(res.id);
                     if (!cb)
                         throw "no such call id: {id}".substitute(res);
-                    this.outstandCalls.erase(res.id);
+                    inst.outstandCalls.erase(res.id);
                     cb(res.id, res.result, res.error);                  // callback prototype
                 }
             } catch (e) {
                 alert(e);
-                this.transport.close();
+                inst.transport.close();
                 return;
             }
         };
