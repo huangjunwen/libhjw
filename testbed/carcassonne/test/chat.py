@@ -14,8 +14,10 @@ class ChatHandler(WSJsonRPCHandler):
 
     all_users = {}                          # username -> handler
 
-    def broadcast(self, msg):
+    def broadcast(self, msg, exceptThis=False):
         for h in self.all_users.itervalues():
+            if h == self and exceptThis:
+                continue
             h.notify('msg', msg)
 
     def do_chat(self, msg):
@@ -37,12 +39,12 @@ class ChatHandler(WSJsonRPCHandler):
 
         self.username = username
         self.all_users[username] = self
-        self.broadcast('%s entered the chatroom' % username)
+        self.broadcast('%s entered the chatroom' % username, exceptThis=True)
         return True
 
     def connectionLost(self, reason):
         if hasattr(self, 'username'):
-            self.broadcast('%s exited the chatroom' % self.username)
+            self.broadcast('%s exited the chatroom' % self.username, exceptThis=True)
 
 
 def main():

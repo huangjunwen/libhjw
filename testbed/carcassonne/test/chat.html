@@ -129,11 +129,16 @@ window.addEvent('domready', function() {
                         chatRoom = null;
                         enableInputUsername();
                     }
+                    else {
+                        addMsg("You have entered the chatroom");
+                        disableInputUsername();
+                    }
                 });
             },
             onClose: function() {
                 addMsg("服务中断.");
                 chatRoom = null;
+                enableInputUsername();
             }
         });
 
