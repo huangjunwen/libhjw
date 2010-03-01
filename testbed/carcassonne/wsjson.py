@@ -52,6 +52,7 @@ def patch():
 patch()
 del patch
 
+
 class WSJsonRPCHandler(WebSocketHandler):
 
     """

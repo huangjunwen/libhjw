@@ -7,7 +7,7 @@ from twisted.python import log
 from twisted.web.websocket import WebSocketSite
 from twisted.web.resource import Resource
 from twisted.web import static
-from json_rpc import *
+from wsjson import *
 
 
 class ChatHandler(WSJsonRPCHandler):
