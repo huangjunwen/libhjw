@@ -301,8 +301,8 @@ class TilePile(type):
         terra 的邻接关系:
             adjacent = [(0, 1), (0, 2)]
 
-        图片上这种 tile 的坐标:
-            spirit_coord = (x, y)
+        Tile 编号
+            tile_idx = 11
 
         是否是第一块 Tile, 默认为 False:
             start = True
@@ -312,17 +312,17 @@ class TilePile(type):
 
     start_tile_cls = None
 
-    spirit_coords = set()
+    tile_idxes = set()
 
     def __new__(mcls, name, base, attr):
         if name != 'Tile':
             return type.__new__(mcls, name, base, attr)
 
         # uniq coord
-        spirit_coord = attr['spirit_coord']
-        assert spirit_coord not in TilePile.spirit_coords
-        name += '_%d_%d' % spirit_coord
-        TilePile.spirit_coords.add(spirit_coord)
+        tile_idx = attr['tile_idx']
+        assert tile_idx not in TilePile.tile_idxes
+        name += '_%d' % tile_idx
+        TilePile.tile_idxes.add(tile_idx)
 
         # add attributes
         assert TilePile._check_terra_order(attr['terra_proto'])
