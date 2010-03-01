@@ -1,7 +1,7 @@
 from simplejson import dumps, loads
 from twisted.python import failure, log
 from twisted.internet.defer import Deferred
-from twisted.web.websocket import WebSocketHandler
+from twisted.web.websocket import WebSocketRequest, WebSocketHandler
 
 # ref: https://groups.google.com/group/json-rpc/web/json-rpc-1-2-proposal?pli=1
 
@@ -37,6 +37,24 @@ class InternalError(JsonRPCErr):
     message = "Internal error."
  
 
+# XXX This is not a nice patch
+# Since i need a chance to check arguments passed in the ws header(http header)
+def patch():
+    _processWebSocket = WebSocketRequest.processWebSocket
+    def processWebSocket(self):
+        _processWebSocket(self)
+        request = self.channel._transferDecoder.request
+        handler = self.channel._transferDecoder.handler
+        handler.requestMade(request)
+    WebSocketRequest.processWebSocket = processWebSocket
+
+    def requestMade(self, request):
+        pass
+    WebSocketHandler.requestMade = requestMade
+patch()
+del patch
+
+
 class WSJsonRPCHandler(WebSocketHandler):
 
     """
@@ -49,10 +67,6 @@ class WSJsonRPCHandler(WebSocketHandler):
     These methods can return result or a defer, and can raise(return) Exception on error.
 
     """
-    def __init__(self, transport):
-        WebSocketHandler.__init__(self, transport)
-        #from twisted.internet import reactor
-
     def frameReceived(self, frame):                             # each frame is a RPC call
         call_id = None
         try:
