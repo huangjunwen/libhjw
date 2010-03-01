@@ -114,7 +114,7 @@ window.addEvent('domready', function() {
         if (chatRoom || !userName)
             return;
 
-        var url = "ws://127.0.0.1:8080/ws/chat";
+        var url = "ws://127.0.0.1:9876/ws/chat";
 
         chatRoom = new WSJsonTransport(url, {
             callbacks: {

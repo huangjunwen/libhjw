@@ -41,7 +41,16 @@ class InvalidParams(JsonRPCErr):
 class InternalError(JsonRPCErr):
     code = -32603
     message = "Internal error."
- 
+
+
+def patch():
+    from twisted.web.websocket import WebSocketTransport
+    def __init__(self, request):
+        self._request = request
+        self._request.notifyFinish().addBoth(self._connectionLost)          # XXX a bug in websocket.py ?
+    WebSocketTransport.__init__ = __init__
+patch()
+del patch
 
 class WSJsonRPCHandler(WebSocketHandler):
 

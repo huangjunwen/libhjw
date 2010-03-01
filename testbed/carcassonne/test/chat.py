@@ -45,6 +45,7 @@ class ChatHandler(WSJsonRPCHandler):
     def connectionLost(self, reason):
         if hasattr(self, 'username'):
             self.broadcast('%s exited the chatroom' % self.username, exceptThis=True)
+            del self.all_users[self.username]
 
 
 def main():
@@ -53,7 +54,7 @@ def main():
     root = static.File('.')
     site = WebSocketSite(root)
     site.addHandler("/ws/chat", ChatHandler)
-    reactor.listenTCP(8080, site)
+    reactor.listenTCP(9876, site)
     reactor.run()
 
 
