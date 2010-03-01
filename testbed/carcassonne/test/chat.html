@@ -4,7 +4,6 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
 <title>Chat</title>
 <script type="text/javascript" src="mootools-1.2.4-core.js"></script>
-<script type="text/javascript" src="mootools-1.2.4.4-more.js"></script>
 <script type="text/javascript">
 var idCounter = 0;
 function uniqID() {
@@ -30,8 +29,8 @@ var WSJsonTransport = new Class({
         // attr
         this.status = 0;                                                // 0 not opened; 1 opened; -1 closed
         this.pendingCalls = [];
-        this.outstandCalls = Hash();                                    // id -> callback
-        this.transport = new WebSocket(url.toString());
+        this.outstandCalls = new Hash();                                // id -> callback
+        this.transport = new WebSocket(url);
 
         this.transport.onopen = function() {
             $each(inst.pendingCalls, function(pC) {
@@ -69,17 +68,23 @@ var WSJsonTransport = new Class({
             }
         };
     },
-    call: function(method, param, cb) {
+    close: function() {
+        if (this.status == 1)
+            this.transport.close();
+    },
+    call: function(method, params, cb) {
         var id = uniqID();
         this.outstandCalls.set(id, cb || $empty);
         var c = JSON.encode({'jsonrpc': '2.0', 'method': method, 
             'params': params, 
             'id': id
         });
-        if (this.status == 1)
+        if (this.status == 1) {
             this.transport.send(c);
-        else if (this.status == 0)
+        }
+        else if (this.status == 0) {
             this.pendingCalls.push(c);
+        }
         else
             throw "transport closed";
         return id;
@@ -88,7 +93,6 @@ var WSJsonTransport = new Class({
 
 var userName;
 var chatRoom;
-var online = false;
 
 window.addEvent('domready', function() {
     chatContent = $("chatContent");
@@ -96,33 +100,43 @@ window.addEvent('domready', function() {
         chatContent.set("text", chatContent.get("text") + '\n' + msg);
     }
 
+    function disableInputUsername() {
+        $("username").setProperty("disabled", "true");
+        $("inputUsername").setProperty("disabled", "true");
+    }
+
+    function enableInputUsername() {
+        $("username").removeProperty("disabled");
+        $("inputUsername").removeProperty("disabled");
+    }
+
     function buildChatRoom() {
-        if (chatRoom)
+        if (chatRoom || !userName)
             return;
 
-        var url = new URI("ws://127.0.0.1:9876/ws/chat");
-        url.setData('username', userName);
+        var url = "ws://127.0.0.1:8080/ws/chat";
 
         chatRoom = new WSJsonTransport(url, {
             callbacks: {
-                'refuse': function(reason) {
-                    addMsg("服务器拒绝您的登录, 原因: " + reason);
-                },
                 'msg': function(msg) {
                     addMsg(msg);
                 }
             },
+            onOpen: function() {
+                chatRoom.call('login', [userName], function(callID, res, err) {
+                    if (err) {
+                        chatRoom.close();
+                        chatRoom = null;
+                        enableInputUsername();
+                    }
+                });
+            },
             onClose: function() {
                 addMsg("服务中断.");
-                $("username").removeProperty("disabled");
-                $("inputUsername").removeProperty("disabled");
                 chatRoom = null;
-                online = false;
             }
         });
 
-        $("username").setProperty("disabled", "true");
-        $("inputUsername").setProperty("disabled", "true");
     }
     $("inputUsername").addEvent("click", function(ev) {
         userName = $("username").getProperty("value");
@@ -135,7 +149,7 @@ window.addEvent('domready', function() {
     $("chatForm").addEvent("submit", function(ev) {
         var msg = $("message").get("value");
         $("message").set("value", '');
-        if (!chatRoom || !online || !msg)
+        if (!chatRoom || !msg)
             return false;
 
         chatRoom.call("chat", [msg], function(callID, res, err) {

@@ -37,24 +37,6 @@ class InternalError(JsonRPCErr):
     message = "Internal error."
  
 
-# XXX This is not a nice patch
-# Since i need a chance to check arguments passed in the ws header(http header)
-def patch():
-    _processWebSocket = WebSocketRequest.processWebSocket
-    def processWebSocket(self):
-        _processWebSocket(self)
-        request = self.channel._transferDecoder.request
-        handler = self.channel._transferDecoder.handler
-        handler.requestMade(request)
-    WebSocketRequest.processWebSocket = processWebSocket
-
-    def requestMade(self, request):
-        pass
-    WebSocketHandler.requestMade = requestMade
-patch()
-del patch
-
-
 class WSJsonRPCHandler(WebSocketHandler):
 
     """
