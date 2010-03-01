@@ -1,3 +1,5 @@
+
+import re
 from simplejson import dumps, loads
 from twisted.python import failure, log
 from twisted.internet.defer import Deferred
@@ -49,6 +51,8 @@ class WSJsonRPCHandler(WebSocketHandler):
     These methods can return result or a defer, and can raise(return) Exception on error.
 
     """
+    method_re = re.comile(r"^[_A-z]\w*$").match
+
     def frameReceived(self, frame):                             # each frame is a RPC call
         call_id = None
         try:
@@ -66,6 +70,8 @@ class WSJsonRPCHandler(WebSocketHandler):
                 raise InvalidReq()
             
             if version != '2.0':
+                raise InvalidReq()
+            if not isinstance(method, str) or not self.method_re(method):
                 raise InvalidReq()
 
             method = self.dispatch(method)
