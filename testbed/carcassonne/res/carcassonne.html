@@ -37,8 +37,17 @@
 
                 window.addEvent('click', function(ev) {
                     var coord = board.abs2GridCoord(ev.page);
-                    coord['val'] = board.neighborCnt.get(coord.gX, coord.gY);
+                    coord['val'] = board.getNeighborCnt(coord);
                     $("neighbor").set("text", "{gX} {gY} {val}".substitute(coord));
+
+                    if (board.occupied(coord))
+                        return;
+
+                    // handle the last tile
+                    if (tile) {
+                        board.moveTile(coord, tile);
+                        return;
+                    }
                 });
 
                 window.addEvent('dblclick', function(ev) {
@@ -46,12 +55,6 @@
                     if (board.occupied(c))
                         return;
                     
-                    // handle the last tile
-                    if (tile) {
-                        board.moveTile(c, tile);
-                        return;
-                    }
-
                     // add new one
                     tile = board.createTile(Math.floor(Math.random()*24), c, {
                         onPicked : function(t, c) {

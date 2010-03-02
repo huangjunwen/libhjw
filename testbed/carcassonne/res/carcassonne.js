@@ -271,6 +271,17 @@ var Board = (function() {
         occupied: function(c) {
             return this.tiles.get(c.gX, c.gY) ? true : false;
         },
+        checkBounds: function(c, tile) {
+            var fit = true;
+            this.tiles.applyNeighbor(c.gX, c.gY, function(t, d) {
+                if (!t)
+                    return;
+                if (tile.getBound(d) != t.getBound(boundOpposite[d]))
+                    fit = false;
+            });
+
+            return fit;
+        },
         findTile: function(tile) {
             var c;
             if (!(c = this.tiles.find(tile)))
@@ -347,17 +358,7 @@ var Board = (function() {
                 return null;
             return tile.moveTo(c);
         },
-        checkBounds: function(c, tile) {
-            var fit = true;
-            this.tiles.applyNeighbor(c.gX, c.gY, function(t, d) {
-                if (!t)
-                    return;
-                if (tile.getBound(d) != t.getBound(boundOpposite[d]))
-                    fit = false;
-            });
-
-            // fit ? tile.setFit() : tile.setUnFit();
-            return fit;
+        freezeTile: function(tile) {
         }
     }); 
 })();
