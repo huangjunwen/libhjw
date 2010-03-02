@@ -99,9 +99,27 @@
 
             });
         </script>
+    <link rel="stylesheet" type="text/css" href="carcassonne.css" />
+    <script type="text/javascript">
+        var playerNum = null;
+        window.addEvent("domready", function() {
+            //$("scoreBoardPanel").makeDraggable();
+            $each($$('.scoreBoard'), function(b) {
+                b.addEvent('click', function() {
+                    if (playerNum) {
+                        $('player' + playerNum).set('text', '');
+                        $('scoreBoard' + playerNum).removeClass('scoreBoardChosen');
+                    }
+                    playerNum = this.getProperty('player');
+                    $('player' + playerNum).set('text', 'jayven');
+                    $('scoreBoard' + playerNum).addClass('scoreBoardChosen');
+                });
+            });
+        });
+    </script>
     </head>
     <body>
-        <div>
+        <div style="position:fixed;left:1000px;">
             <div>!!Work only on chrome 4+</div>
             <div>width:<span id="width"></span></div>
             <div>height:<span id="height"></span></div>
@@ -111,7 +129,47 @@
             <div>neighbor: <span id="neighbor"></span></div>
             <input type="button" id="stop" name="stop" value="stop" />
         </div>
-        <div id="cont">
+        <div id="cont" style="position:absolute;left:1000px;top:500px">
+        </div>
+        <div id="scoreBoardPanel">
+            <table class="scoreBoard roundedBox" id="scoreBoard1" player="1">
+                <tr><td><div class="meepleBase meeple1 meepleOnBoard" /></td><td id="player1"></td></tr>
+                <tr><td class="alignR">meeple: </td><td id="meeple1">7</td></tr>
+                <tr><td class="alignR">score: </td><td id="score1">0</td></tr>
+                <tr><td class="alignR">ready: </td><td id="ready1">No</td></tr>
+            </table>
+            <table class="scoreBoard roundedBox" id="scoreBoard2" player="2">
+                <tr><td><div class="meepleBase meeple2 meepleOnBoard" /></td><td id="player2"></td></tr>
+                <tr><td class="alignR">meeple: </td><td id="meeple2">7</td></tr>
+                <tr><td class="alignR">score: </td><td id="score2">0</td></tr>
+                <tr><td class="alignR">ready: </td><td id="ready2">No</td></tr>
+            </table>
+            <table class="scoreBoard roundedBox" id="scoreBoard3" player="3">
+                <tr><td><div class="meepleBase meeple3 meepleOnBoard" /></td><td id="player3"></td></tr>
+                <tr><td class="alignR">meeple: </td><td id="meeple3">7</td></tr>
+                <tr><td class="alignR">score: </td><td id="score3">0</td></tr>
+                <tr><td class="alignR">ready: </td><td id="ready3">No</td></tr>
+            </table>
+            <table class="scoreBoard roundedBox" id="scoreBoard4" player="4">
+                <tr><td><div class="meepleBase meeple4 meepleOnBoard" /></td><td id="player4"></td></tr>
+                <tr><td class="alignR">meeple: </td><td id="meeple4">7</td></tr>
+                <tr><td class="alignR">score: </td><td id="score4">0</td></tr>
+                <tr><td class="alignR">ready: </td><td id="ready4">No</td></tr>
+            </table>
+            <table class="scoreBoard roundedBox" id="scoreBoard5" player="5">
+                <tr><td><div class="meepleBase meeple5 meepleOnBoard" /></td><td id="player5"></td></tr>
+                <tr><td class="alignR">meeple: </td><td id="meeple5">7</td></tr>
+                <tr><td class="alignR">score: </td><td id="score5">0</td></tr>
+                <tr><td class="alignR">ready: </td><td id="ready5">No</td></tr>
+            </table>
+        </div>
+        <div id="msgPanel" class="alignC roundedBox">
+            <div id="msgHelp" class="roundedBox">请选择您的颜色</div>
+            <div id="msgHistory" class="roundedBox"></div>
+            <form>
+            <input class="roundedBox" size="30" type="text" id="msg" name="msg" />
+            <input class="roundedBox floatR" type="submit" value="send" />
+            </form>
         </div>
     </body>
 </html>

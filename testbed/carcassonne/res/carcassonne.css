@@ -1,0 +1,80 @@
+.roundedBox {
+    -webkit-border-radius: 10px;                    /* XXX css3 */
+    -moz-border-radius: 10px;                       /* XXX css3 */
+    border-radius: 10px;                            /* XXX css3 */
+    border: 4px solid black;
+    opacity: 0.9;
+}
+#scoreBoardPanel {
+    position: fixed;
+    top: 20px;
+    left: 400px;
+}
+.scoreBoard {
+    font-weight: bold;
+    text-align: center;
+    padding: 5px;
+    float: left;
+    margin-right: 10px;
+    background-color: #505050;
+    color: #fff;
+    cursor: pointer;
+}
+.scoreBoard:hover {
+    color: #000;
+    background-color: #fff;
+}
+.scoreBoardChosen {
+    color: #000;
+    background-color: #fff;
+    cursor: default;
+}
+.meepleBase {
+    background-image: url('meeple.png');
+    height: 30px;
+    width: 30px;
+}
+.meepleOnBoard {
+    margin: 0px 15px 0px 15px;
+}
+.meeple1 { background-position: 0px 0px; }
+.meeple2 { background-position: -30px 0px; }
+.meeple3 { background-position: -60px 0px; }
+.meeple4 { background-position: -90px 0px; }
+.meeple5 { background-position: -120px 0px; }
+#msgPanel {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    /*height: 600px;*/
+    width: 350px;
+    border: solid;
+    background-color: #505050;
+    font-weight: bold;
+}
+#msgPanel div,input {
+    margin: 15px;
+    background-color: #fff;
+}
+#msgHelp {
+    height: 20px;
+}
+#msgHistory {
+    height: 500px;
+}
+
+.alignC {
+    text-align: center;
+}
+.alignR {
+    text-align: right;
+}
+.alignL {
+    text-align: left;
+}
+.floatR {
+    float: right;
+}
+.floatL {
+    float: left;
+}
