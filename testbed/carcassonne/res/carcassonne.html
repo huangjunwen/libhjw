@@ -29,14 +29,12 @@
                 $("stop").addEvent('click', function() {
                     if (!tile)
                         return;
-                    $(tile).retrieve('dragger').detach();
                     tile.freeze();
-                    $(board).makeDraggable({handle: $(tile)});
-                    tile = null;
+                    $(board).makeDraggable({handle: tile});
                 });
 
                 window.addEvent('click', function(ev) {
-                    var coord = board.abs2GridCoord(ev.page);
+                    var coord = board.getGridCoord(ev.page);
                     coord['val'] = board.getNeighborCnt(coord);
                     $("neighbor").set("text", "{gX} {gY} {val}".substitute(coord));
 
@@ -45,42 +43,20 @@
 
                     // handle the last tile
                     if (tile) {
-                        board.moveTile(coord, tile);
+                        tile.moveTo(coord);
                         return;
                     }
                 });
 
+                var createdCnt = 0;
                 window.addEvent('dblclick', function(ev) {
-                    var c = board.abs2GridCoord(ev.page);
+                    var c = board.getGridCoord(ev.page);
                     if (board.occupied(c))
                         return;
                     
                     // add new one
-                    tile = board.createTile(Math.floor(Math.random()*24), c, {
-                        onPicked : function(t, c) {
-                            t.setFit();
-                        },
-                        onPut: function(t, c) {
-                            if (board.tilesCnt == 1 && !c.gX && !c.gY) {
-                                t.setFit();
-                                return;
-                            }
-                            else if (board.getNeighborCnt(c) == 0 || 
-                                    !board.checkBounds(c, t)) {
-                                t.setUnFit();
-                                return;
-                            }
-                            t.setFit();
-                            return;
-                        },
-                        onRotate: function(t) {
-                            var c = board.findTile(t);
-                            if (!c)
-                                return;
-                            board.checkBounds(c, t) ? t.setFit() : t.setUnFit();
-                        }
-                    });
-                    board.makeTileDraggable(tile);
+                    tile = board.createTile(createdCnt++, Math.floor(Math.random()*24), c);
+                    tile.makeDraggable();
 
                     $(tile).addEvent('click', function(ev) {
                         var pos = this.getPosition();

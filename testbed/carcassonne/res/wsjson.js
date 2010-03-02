@@ -11,7 +11,7 @@ var WSJson = (function() {
 
 var idCounter = 0;
 function uniqID() {
-    return idCounter++;
+    return idCounter++;                                 // XXX may wrap round
 }
 
 return new Class({
@@ -26,15 +26,20 @@ return new Class({
         callbacks: {}
     },
 
-    initialize: function(url, opt) {
+    initialize: function(opt) {
         this.setOptions(opt);
-        var inst = this;
 
         // attr
         this.status = 0;                                                // 0 not opened; 1 opened; -1 closed
         this.outstandCalls = new Hash();                                // id -> callback
-        this.transport = new WebSocket(url);
+        this.transport = null;
+    },
+    connect: function(url) {
+        if (this.transport)
+            return;
 
+        var inst = this;
+        this.transport = new WebSocket(url);
         this.transport.onopen = function() {
             inst.status = 1;
             inst.fireEvent('open');
