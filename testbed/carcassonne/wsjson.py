@@ -7,7 +7,12 @@ except ImportError:
 
 from twisted.python import failure, log
 from twisted.internet.defer import Deferred
-from twisted.web.websocket import WebSocketRequest, WebSocketHandler
+
+try:
+    from twisted.web.websocket import WebSocketRequest, WebSocketHandler
+except ImportError, e:
+    print 'try to use websocket branch on twisted: svn://svn.twistedmatrix.com/svn/Twisted/branches/websocket-4173-2'
+    raise e
 
 # ref: https://groups.google.com/group/json-rpc/web/json-rpc-1-2-proposal?pli=1
 
