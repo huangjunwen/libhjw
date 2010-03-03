@@ -87,6 +87,7 @@ var Meeple = (function() {
             /*
              * onShow: function(meeple, pos)
              * onHide: function(meeple)
+             * onClick: function(meeple)
              * */
         },
 
@@ -94,26 +95,47 @@ var Meeple = (function() {
             this.parent(id);
             this.setOptions(opt);
 
+            // attr
             this.colorID = colorID;
+            this.hided = true;
+
+            // DOM
             var styles = meepleStyles(colorID);
-            styles["display"] = "none";
-            styles["position"] = "absolute";
+            $extend(styles, {
+                "zIndex": 1000,
+                "display": "none",
+                "position": "absolute",
+                "cursor": "pointer"
+            });
             this.el = new Element('div', {
                 "styles": styles
+            });
+            var inst = this;
+            this.el.addEvent('click', function(ev) {
+                inst.fireEvent('click', [inst]);
+                return false;                                   // do not bubble up
             });
         },
         toElement: function() {
             return this.el;
         },
         hide: function() {
+            if (this.hided)
+                return;
+            this.hided = true;
             this.el.setStyle('display', 'none');
             this.fireEvent('hide', [this]);
         },
         show: function(pos) {
+            this.hide();
+            this.hided = false;
             pos = {x: pos.x - halfMeepleImgSize, y: pos.y - halfMeepleImgSize};
             this.el.setPosition(pos);
             this.el.setStyle('display', 'block');
             this.fireEvent('show', [this, pos]);
+        },
+        stop: function() {
+            this.removeEvents();
         }
     });
 })();
@@ -175,6 +197,7 @@ var Tile = (function() {
             this.rotation = -1;
             this.fit = null;
             this.frozed = false;
+            this.notDragged = true;                                 // XXX a tag to tell between click and drag
 
             // DOM: create container div and the img ( for image map )
             this.el = new Element('div');
@@ -212,7 +235,10 @@ var Tile = (function() {
                         coords: coords
                     });
                     areaEl.addEvent('click', function(ev) {
-                        inst.fireEvent('terraclick', [inst, a.terra, a.title, ev]);
+                        if (inst.notDragged) 
+                            inst.fireEvent('terraclick', [inst, a.terra, a.title, ev]);     // XXX fire click only when no drag
+                        else
+                            inst.notDragged = true;                                         // clear the tag
                     });
                     areaEl.inject(map);
                 });
@@ -271,6 +297,7 @@ var Tile = (function() {
             this.dragger = new Drag.Move($(inst), {
                 onStart: function(el) {
                     inst.fireEvent('picked', [inst]);
+                    inst.notDragged = false;            // XXX
                 },
                 onDrag: function(el, ev) {
                     inst.fireEvent('drag', [inst, ev]);
@@ -310,26 +337,34 @@ var Tile = (function() {
             this.fireEvent('rotate', this);
         },
         freeze: function() {        
-            /* 
-             * freeze actions and release some contents 
-             * */
-            if (this.frozed)
-                return;
+            this.stopDraggable();
             this.frozed = true;
+        },
+        unfreeze: function() {        
+            this.frozed = false;
+            this.makeDraggable();
+        },
+        stop: function() {
+            /* 
+             * stop this tile, remove all events on it
+             * */
+            if (!this.shadow)
+                return;
+            this.freeze();
+            this.removeEvents();
             var currMapName = mapName(this.toID(), this.rotation);
             $each(this.el.getElements("map[name!=" + currMapName + "]"), function(m) { 
                 m.dispose(); 
             });
             this.shadow.dispose();
             this.shadow = null;
-            this.stopDraggable();
         },
         finalize: function() {
             if (this.el)
                 this.el.dispose();
             if (this.shadow)
                 this.shadow.dispose();
-            this.stopDraggable();
+            this.freeze();
             this.parent();
         }
     });

@@ -29,7 +29,8 @@
                 $("stop").addEvent('click', function() {
                     if (!tile)
                         return;
-                    tile.freeze();
+                    tile.meeple.stop();
+                    tile.stop();
                     $(board).makeDraggable({handle: tile});
                 });
 
@@ -55,15 +56,40 @@
                         return;
                     
                     // add new one
-                    tile = board.createTile(createdCnt++, Math.floor(Math.random()*24), c);
+                    var tileID = 'T' + createdCnt;
+                    tile = board.createTile(tileID, Math.floor(Math.random()*24), c);
                     tile.makeDraggable();
-                    tile.addEvent('terraclick', function(t, terra, terraType, ev) {
-                        var pos = $(t).getPosition();
-                        $("x").set("text", ev.page.x - pos.x);
-                        $("y").set("text", ev.page.y - pos.y);
-                        $("target").set("text", terraType + ' ' + terra);
-                    });
 
+                    var meeple = new Meeple('M' + createdCnt, 0, {
+                        onShow: function(m, pos) {
+                            $("meeple1").set("text", $("meeple1").get("text").toInt() - 1);
+                            tile.freeze();
+                        },
+                        onHide: function(m) {
+                            $("meeple1").set("text", $("meeple1").get("text").toInt() + 1);
+                            tile.unfreeze();
+                        },
+                        onClick: function(m) {
+                            m.hide();
+                        }
+                    });
+                    $(meeple).inject(tile);
+                    tile.meeple = meeple;
+
+                    tile.addEvents({
+                        'terraclick': function(t, terra, terraType, ev) {
+                            if (!t.fit) {
+                                meeple.hide();
+                                return;
+                            }
+
+                            var pos = $(t).getPosition();
+                            $(meeple).setProperty('title', terraType);
+                            meeple.show({x: ev.page.x - pos.x, y: ev.page.y - pos.y});
+                        }
+                    });
+                    
+                    ++createdCnt;
                 });
 
                 window.addEvent("spacePressed", function() {
@@ -99,9 +125,6 @@
             <div>!!Work only on chrome 4+</div>
             <div>width:<span id="width"></span></div>
             <div>height:<span id="height"></span></div>
-            <div>x:<span id="x"></span></div>
-            <div>y:<span id="y"></span></div>
-            <div>target:<span id="target"></span></div>
             <div>neighbor: <span id="neighbor"></span></div>
             <input type="button" id="stop" name="stop" value="stop" />
         </div>
