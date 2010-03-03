@@ -8,70 +8,114 @@
  *     Class Tile
  */
 
-/* Organize all items( uniq identified item ) as a tree
- * items will be deleted when its parent is deleted
+/* Organize all uniq identified object as a tree
+ * objs will be deleted when its parent is deleted
  */
-var Item = (function() {
-    var allItems = new Hash();
+var UniqObj = (function() {
+    var allObjs = new Hash();
 
     var ret = new Class({
         initialize: function(id) {
-            var item = allItems.get(id);
-            if (item)
-                throw "item " + id + " already created";
+            var obj = allObjs.get(id);
+            if (obj)
+                throw "obj " + id + " already created";
 
-            this.itemID = id;
-            this.parentItem = null;
-            this.childItems = new Hash();
-            allItems.set(id, this);
+            this.uniqID = id;
+            allObjs.set(id, this);
         },
         toID: function() {
-            return this.itemID;
+            return this.uniqID;
         },
-        addChild: function(item) {
-            if (!item.toID)
-                item = ret.fromID(item);
-            
-            if (!item)
-                throw "bad child";
-
-            if (item.parentItem)
-                throw "item " + item.toID() + " already has parent";
-
-            this.childItems.set(item.toID(), item);
-            item.parentItem = this;
-        },
-        del: function() {               // del will delete all child items as well
-            ret.del(this.toID());
+        finalize: function() {               // finalize will delete all child objs as well
+            ret.finalize(this.toID());
         }
     });
     $extend(ret, {
         fromID: function(id) {
-            return allItems.get(id);
+            return allObjs.get(id);
         },
-        del: function(id) {
-            var item = allItems.get(id);
-            if (!item)
+        finalize: function(id) {
+            var obj = allObjs.get(id);
+            if (!obj)
                 return;
-
-            // remove child/parent link
-            if (item.parentItem)
-                item.parentItem.childItems.erase(item.toID());
-            item.parentItem = null;
-
-            $each(item.childItems.getValues(), function(child) {      // XXX is this copy out necessary? (child.del will modify childItems itself)
-                child.del();
-            });
-
+             
             // remove from global
-            allItems.erase(id);
-            delete item;
+            allObjs.erase(id);
+            delete obj;
         },
         clearAll: function() {
-            allItems = new Hash();
+            allObjs = new Hash();
         }
     });
     return ret;
+})();
+
+
+var Player = new Class({
+
+    Extends: UniqObj,
+
+    initialize: function(id, nickname) {
+        this.parent(id);
+        this.nickname = nickname;
+    }
+});
+
+
+function meepleStyles(colorID) {
+    return {
+        "padding": "0px",
+        "width": meepleImgSize + "px",
+        "height": meepleImgSize + "px",
+        "background-position": "{x}px 0px".substitute({x: -colorID * meepleImgSize}),
+        "background-image": "url('" + meepleImgUrl + "')",
+        "background-repeat": "no-repeat"
+    };
+}
+
+var Meeple = (function() {
+
+    var halfMeepleImgSize = (meepleImgSize/2).toInt();
+        
+    return new Class({
+
+        Extends: UniqObj,
+
+        Implements: [Events, Options],
+
+        options: {
+            /*
+             * onShow: function(meeple, pos)
+             * onHide: function(meeple)
+             * */
+        },
+
+        initialize: function(id, colorID, opt) {
+            this.parent(id);
+            this.setOptions(opt);
+
+            this.colorID = colorID;
+            var styles = meepleStyles(colorID);
+            styles["display"] = "none";
+            styles["position"] = "absolute";
+            this.el = new Element('div', {
+                "styles": styles
+            });
+        },
+        toElement: function() {
+            return this.el;
+        },
+        hide: function() {
+            this.el.setStyle('display', 'none');
+            this.fireEvent('hide', [this]);
+        },
+        show: function(pos) {
+            pos = {x: pos.x - halfMeepleImgSize, y: pos.y - halfMeepleImgSize};
+            this.el.setPosition(pos);
+            this.el.setStyle('display', 'block');
+            this.fireEvent('show', [this, pos]);
+        }
+    });
 })();
 
 
@@ -84,8 +128,8 @@ var Tile = (function() {
         function(x,y){return [y,tileImgSize-x];}
     ];
 
-    var mapName = function(itemID, rotation) {
-        return 'TM' + itemID + '_' + rotation;
+    var mapName = function(uniqID, rotation) {
+        return 'TM' + uniqID + '_' + rotation;
     };
 
     function setTargetPos(pos) {
@@ -105,7 +149,7 @@ var Tile = (function() {
 
     return new Class({
 
-        Extends: Item,
+        Extends: UniqObj,
 
         Implements: [Events, Options],
 
@@ -115,7 +159,7 @@ var Tile = (function() {
              * onDrag: function(tile, ev)
              * onPut: function(tile, pos)
              * onRotate: function(tile)
-             *
+             * onTerraClick: function(tile, terra, terraType, ev)
              * */
         },
 
@@ -162,11 +206,15 @@ var Tile = (function() {
                     coords = coords.join(',');
 
                     // add element to the map
-                    (new Element('area', {shape: a.shape, terra: a.terra, alt: a.title,
+                    var areaEl = new Element('area', {shape: a.shape, terra: a.terra, alt: a.title,
                         title: a.title,
                         nohref: true,
                         coords: coords
-                    })).inject(map);
+                    });
+                    areaEl.addEvent('click', function(ev) {
+                        inst.fireEvent('terraclick', [inst, a.terra, a.title, ev]);
+                    });
+                    areaEl.inject(map);
                 });
                 map.inject(inst.el);
             });
@@ -220,10 +268,6 @@ var Tile = (function() {
                 return;
             }
             var inst = this;
-            function end(el) {
-                inst.fireEvent('put', [inst, inst.targetPos]);
-                morphToTargetPos.call(inst);
-            }
             this.dragger = new Drag.Move($(inst), {
                 onStart: function(el) {
                     inst.fireEvent('picked', [inst]);
@@ -231,8 +275,10 @@ var Tile = (function() {
                 onDrag: function(el, ev) {
                     inst.fireEvent('drag', [inst, ev]);
                 },
-                onComplete: end,
-                onCancel: end
+                onComplete: function(el) {
+                    inst.fireEvent('put', [inst, inst.targetPos]);
+                    morphToTargetPos.call(inst);
+                }
             });
         },
         stopDraggable: function() {
@@ -267,6 +313,8 @@ var Tile = (function() {
             /* 
              * freeze actions and release some contents 
              * */
+            if (this.frozed)
+                return;
             this.frozed = true;
             var currMapName = mapName(this.toID(), this.rotation);
             $each(this.el.getElements("map[name!=" + currMapName + "]"), function(m) { 
@@ -275,6 +323,14 @@ var Tile = (function() {
             this.shadow.dispose();
             this.shadow = null;
             this.stopDraggable();
+        },
+        finalize: function() {
+            if (this.el)
+                this.el.dispose();
+            if (this.shadow)
+                this.shadow.dispose();
+            this.stopDraggable();
+            this.parent();
         }
     });
 })();
@@ -315,6 +371,13 @@ var Board = (function() {
             if (v && v.toID)
                 this.rd.erase(v.toID());
         },
+        each: function(f) {
+            this.d.each(function(v1) {
+                v1.each(function(v) {
+                    f(v);
+                });
+            });
+        },
         apply: function(gX, gY, arg, f) {
             var r = f(this.get(gX, gY), arg);
             if (!$defined(r))
@@ -333,7 +396,7 @@ var Board = (function() {
 
     return new Class({
 
-        Extends: Item,
+        Extends: UniqObj,
 
         initialize: function(id) {
             this.parent(id);
@@ -378,15 +441,20 @@ var Board = (function() {
             return this.tiles.get(c.gX, c.gY) ? true : false;
         },
         checkBounds: function(c, tile) {
+            if (this.tilesCnt == 1 && !c.gX && !c.gY)
+                return true;
+
+            var cnt = 0;
             var fit = true;
             this.tiles.applyNeighbor(c.gX, c.gY, function(t, d) {
                 if (!t)
                     return;
+                ++cnt;
                 if (tile.getBound(d) != t.getBound(boundOpposite[d]))
                     fit = false;
             });
 
-            return fit;
+            return cnt != 0 && fit;
         },
         findTile: function(tile) {
             var c;
@@ -429,17 +497,7 @@ var Board = (function() {
                     ++board.tilesCnt;
                     
                     // check fit
-                    if (board.tilesCnt == 1 && !c.gX && !c.gY) {
-                        t.setFit();
-                        return;
-                    }
-                    else if (board.getNeighborCnt(c) == 0 ||
-                            !board.checkBounds(c, t)) {
-                        t.setUnFit();
-                        return;
-                    }
-                    t.setFit();
-                    return;
+                    board.checkBounds(c, t) ? t.setFit() : t.setUnFit();
                 },
                 onRotate: function(t) {
                     var c = board.findTile(t);
@@ -451,21 +509,29 @@ var Board = (function() {
 
             tile.injectAt(this, c);
             return tile;
+        },
+        finalize: function() {
+            this.tiles.each(function(t) {
+                t.finalize();
+            });
+            if (this.el)
+                this.el.dispose();
+            this.parent();
         }
     }); 
 })();
 
+
 /*
-var Meeple = new Class({
-});
+*/
+
+
+/*
 
 var Carcassonne = new Class({
     initialize: function() {
         this.items = Hash();                                            // item id -> item
     }
-});
-
-var Player = new Class({
 });
 
 var Room = new Class({

@@ -20,7 +20,7 @@
             };
 
             window.addEvent('domready', function() {
-                board = new Board();
+                board = new Board('B0');
                 $(board).inject($("cont"));
 
                 $("width").set("text", window.getSize().x);
@@ -57,14 +57,13 @@
                     // add new one
                     tile = board.createTile(createdCnt++, Math.floor(Math.random()*24), c);
                     tile.makeDraggable();
-
-                    $(tile).addEvent('click', function(ev) {
-                        var pos = this.getPosition();
+                    tile.addEvent('terraclick', function(t, terra, terraType, ev) {
+                        var pos = $(t).getPosition();
                         $("x").set("text", ev.page.x - pos.x);
                         $("y").set("text", ev.page.y - pos.y);
-                        $("target").set("text", ev.target.getProperty('title') + ' ' + ev.target.getProperty('terra'));
+                        $("target").set("text", terraType + ' ' + terra);
                     });
-                    
+
                 });
 
                 window.addEvent("spacePressed", function() {
@@ -89,6 +88,7 @@
                     playerNum = this.getProperty('player');
                     $('player' + playerNum).set('text', 'jayven');
                     $('scoreBoard' + playerNum).addClass('scoreBoardChosen');
+                    return false;
                 });
             });
         });
