@@ -56,12 +56,12 @@ var Item = (function() {
 
             // remove child/parent link
             if (item.parentItem)
-                item.parentItem.erase(item.toID());
+                item.parentItem.childItems.erase(item.toID());
+            item.parentItem = null;
 
-            $each(item.childItems, function(id, child) {
+            $each(item.childItems.getValues(), function(child) {      // XXX is this copy out necessary? (child.del will modify childItems itself)
                 child.del();
             });
-            item.childItems = null;
 
             // remove from global
             allItems.erase(id);
