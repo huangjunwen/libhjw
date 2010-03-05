@@ -546,7 +546,7 @@ var Player = new Class({
     initialize: function(id, nickname) {
         this.parent(id);
         this.nickname = nickname;
-        this.colorID = -1;
+        this.colorID = -1;                          // manipulate by score board
     },
     asSelf: function() {
         $extend(Player, {'self': this});
@@ -586,15 +586,21 @@ var ScoreBoardPanel = (function() {
         resetAll: function() {
             for (var i = 0; i < 5; ++i)
                 this.reset(i);
-            if (Player.self.colorID >= 0)
-                this.makeReadyClickable(Player.self.colorID);
         },
-        makeReadyClickable: function(colorID) {
-            ready(colorID).addEvent('click', function(ev) {
-                readySt(colorID).set('html', '<font color="green">Yes</font>');
-                ready(colorID).removeEvents('click').setStyles({"cursor": "default", "text-decoration": "none"});
-                this.fireEvent('ready', [Player.self, colorID]);
+        ready: function(player) {
+            readySt(player.colorID).set('html', '<font color="green">Yes</font>');
+            this.fireEvent('ready', [player, player.colorID]);
+        },
+        makeReadyClickable: function() {
+            var panel = this;
+            var player = Player.self;
+            if (player.colorID < 0)
+                return false;
+            ready(player.colorID).addEvent('click', function(ev) {
+                ready(player.colorID).removeEvents('click').setStyles({"cursor": "default", "text-decoration": "none"});
+                panel.ready(player);
             }).setStyles({"cursor": "pointer", "text-decoration": "underline"});
+            return true;
         },
         unselectColor: function(player) {                               // can only called by server
             if (player.colorID < 0) 
