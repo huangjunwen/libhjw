@@ -11,7 +11,7 @@
         <script type="text/javascript">
             var board;
             var tile;
-            var scoreBoardPanel;
+            var gamePanel;
 
             /*
             Element.Events.spacePressed = {
@@ -105,23 +105,17 @@
         var playerNum = null;
         window.addEvent("domready", function() {
             (new Player(1, 'jayven')).asSelf();
-            scoreBoardPanel = new ScoreBoardPanel();
-            scoreBoardPanel.selectColor(Player.self, 1);
-            scoreBoardPanel.makeReadyClickable();
+            gamePanel = new GamePanel();
+            gamePanel.selectColor(Player.self, 1);
+            gamePanel.makeReadyClickable();
+            gamePanel.addEvent('ready', function() {
+                $('msgHelp').set('text', '等待其它玩家');
+            });
         });
     </script>
     </head>
     <body>
-        <div style="position:fixed;left:1000px;">
-            <div>!!Work only on chrome 4+</div>
-            <div>width:<span id="width"></span></div>
-            <div>height:<span id="height"></span></div>
-            <div>neighbor: <span id="neighbor"></span></div>
-            <input type="button" id="stop" name="stop" value="stop" />
-        </div>
-        <div id="cont" style="position:absolute;left:1000px;top:500px">
-        </div>
-        <div id="scoreBoardPanel">
+        <div id="gamePanel">
             <table class="scoreBoard roundedBox" id="scoreBoard0" player="0">
                 <tr><td><div class="meepleBase meeple0 meepleOnBoard" /></td><td id="playerName0"></td></tr>
                 <tr><td class="alignR">meeple: </td><td id="meepleCnt0"></td></tr>
@@ -154,7 +148,7 @@
             </table>
         </div>
         <div id="msgPanel" class="alignC roundedBox">
-            <div id="msgHelp" class="roundedBox">请选择您的颜色</div>
+            <div id="msgHelp" class="roundedBox">若已准备好, 请按记分板上的 ready </div>
             <div id="msgHistory" class="roundedBox"></div>
             <form>
             <input class="roundedBox" size="30" type="text" id="msg" name="msg" />

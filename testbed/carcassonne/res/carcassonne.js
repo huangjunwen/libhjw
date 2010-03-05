@@ -4,8 +4,6 @@
 /* required: 
  *     mootool-core.js
  *     res.js
- * provide:
- *     Class Tile
  */
 
 /* Organize all uniq identified object as a tree
@@ -554,7 +552,7 @@ var Player = new Class({
 });
 
 
-var ScoreBoardPanel = (function() {
+var GamePanel = (function() {
     
     function scoreBoard(colorID) { return $('scoreBoard' + colorID); }
     function playerName(colorID) { return $('playerName' + colorID); }
@@ -574,7 +572,7 @@ var ScoreBoardPanel = (function() {
         },
         initialize: function(opt) { 
             this.setOptions(opt);
-            this.el = $('scoreBoardPanel');
+            this.el = $('gamePanel');
             this.players = [null, null, null, null, null];
             this.resetAll();
         },
