@@ -115,37 +115,42 @@
     </script>
     </head>
     <body>
+        <div id="board">
+        </div>
         <div id="gamePanel">
-            <table class="scoreBoard roundedBox" id="scoreBoard0" player="0">
-                <tr><td><div class="meepleBase meeple0 meepleOnBoard" /></td><td id="playerName0"></td></tr>
+            <table class="scoreBoard roundedBox" id="scoreBoard0">
+                <tr><td><div class="meeple meeple0" /></td><td id="playerName0"></td></tr>
                 <tr><td class="alignR">meeple: </td><td id="meepleCnt0"></td></tr>
                 <tr><td class="alignR">score: </td><td id="score0"></td></tr>
                 <tr><td class="alignR"><div id="ready0">ready: </div></td><td id="readySt0"></td></tr>
             </table>
-            <table class="scoreBoard roundedBox" id="scoreBoard1" player="1">
-                <tr><td><div class="meepleBase meeple1 meepleOnBoard" /></td><td id="playerName1"></td></tr>
+            <table class="scoreBoard roundedBox" id="scoreBoard1">
+                <tr><td><div class="meeple meeple1" /></td><td id="playerName1"></td></tr>
                 <tr><td class="alignR">meeple: </td><td id="meepleCnt1"></td></tr>
                 <tr><td class="alignR">score: </td><td id="score1"></td></tr>
                 <tr><td class="alignR"><div id="ready1">ready: </div></td><td id="readySt1"></td></tr>
             </table>
-            <table class="scoreBoard roundedBox" id="scoreBoard2" player="2">
-                <tr><td><div class="meepleBase meeple2 meepleOnBoard" /></td><td id="playerName2"></td></tr>
+            <table class="scoreBoard roundedBox" id="scoreBoard2">
+                <tr><td><div class="meeple meeple2" /></td><td id="playerName2"></td></tr>
                 <tr><td class="alignR">meeple: </td><td id="meepleCnt2"></td></tr>
                 <tr><td class="alignR">score: </td><td id="score2"></td></tr>
                 <tr><td class="alignR"><div id="ready2">ready: </div></td><td id="readySt2"></td></tr>
             </table>
-            <table class="scoreBoard roundedBox" id="scoreBoard3" player="3">
-                <tr><td><div class="meepleBase meeple3 meepleOnBoard" /></td><td id="playerName3"></td></tr>
+            <table class="scoreBoard roundedBox" id="scoreBoard3">
+                <tr><td><div class="meeple meeple3" /></td><td id="playerName3"></td></tr>
                 <tr><td class="alignR">meeple: </td><td id="meepleCnt3"></td></tr>
                 <tr><td class="alignR">score: </td><td id="score3"></td></tr>
                 <tr><td class="alignR"><div id="ready3">ready: </div></td><td id="readySt3"></td></tr>
             </table>
-            <table class="scoreBoard roundedBox" id="scoreBoard4" player="4">
-                <tr><td><div class="meepleBase meeple4 meepleOnBoard" /></td><td id="playerName4"></td></tr>
+            <table class="scoreBoard roundedBox" id="scoreBoard4">
+                <tr><td><div class="meeple meeple4" /></td><td id="playerName4"></td></tr>
                 <tr><td class="alignR">meeple: </td><td id="meepleCnt4"></td></tr>
                 <tr><td class="alignR">score: </td><td id="score4"></td></tr>
                 <tr><td class="alignR"><div id="ready4">ready: </div></td><td id="readySt4"></td></tr>
             </table>
+            <div class="roundedBox" id="gameInfo">剩下 <font id="remainTiles">0</font> 个小块</div>
+            <div class="roundedBox toolBotton" id="mvCenter">居中</div>
+            <div class="roundedBox toolBotton" id="turnEnd">回合结束</div>
         </div>
         <div id="msgPanel" class="alignC roundedBox">
             <div id="msgHelp" class="roundedBox">若已准备好, 请按记分板上的 ready </div>

@@ -568,6 +568,8 @@ var GamePanel = (function() {
         options: {
             /*
              * onReady: function(player, colorID)
+             * onMvCentClick: function()
+             * onTurnEndClick: function()
              * */
         },
         initialize: function(opt) { 
@@ -575,6 +577,17 @@ var GamePanel = (function() {
             this.el = $('gamePanel');
             this.players = [null, null, null, null, null];
             this.resetAll();
+
+            var inst = this;
+            $('mvCenter').addEvent('click', function(ev) {
+                inst.fireEvent('mvcentclick', []);
+            });
+            $('turnEnd').addEvent('click', function(ev) {
+                inst.fireEvent('turnendclick', []);
+            });
+        },
+        toElement: function() {
+            return this.el;
         },
         reset: function(colorID) {
             meepleCnt(colorID).set('text', 7);
@@ -610,7 +623,7 @@ var GamePanel = (function() {
 
             // alter page content
             this.reset(colorID);
-            scoreBoard(colorID).removeClass('scoreBoardSelected');
+            scoreBoard(colorID).removeClass('scoreBoardSelected');      // XXX css
             playerName(colorID).set('text', '');
         },
         selectColor: function(player, colorID) {                        // can only called by server
@@ -627,9 +640,23 @@ var GamePanel = (function() {
     });
 })();
 
+/*
+Element.implement({
+    mvToPageCenter: function(offsetX, offsetY) {
+        offsetX = offsetX || 0;
+        offsetY = offsetY || 0;
+        var coord = window.getCoordinates();
+        var elCoord = this.getCoordinates();
+        this.setPosition({
+            x: ((coord.width - elCoord.width)/2).toInt() + offsetX,
+            y: ((coord.height - elCoord.height)/2).toInt() + offsetY
+        });
+    }
+});
+*/
+
 
 /*
-
 var Carcassonne = new Class({
     initialize: function() {
     }

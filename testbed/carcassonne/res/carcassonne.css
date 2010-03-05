@@ -13,6 +13,9 @@
 .floatL {
     float: left;
 }
+.hide {
+    display: none;
+}
 
 .roundedBox {
     -webkit-border-radius: 10px;                    /* XXX css3 */
@@ -25,14 +28,16 @@
     position: fixed;
     top: 20px;
     left: 400px;
-    z-index: 1001;
+    z-index: 1002;
+    font-weight: bold;
+}
+#gamePanel .roundedBox {
+    float: left;
+    margin: 0px 10px 10px 0px;
 }
 .scoreBoard {
-    font-weight: bold;
     text-align: center;
     padding: 5px;
-    float: left;
-    margin-right: 10px;
     background-color: #505050;
     color: #fff;
 }
@@ -41,12 +46,10 @@
     background-color: #fff;
     cursor: default;
 }
-.meepleBase {
+.meeple {
     background-image: url('meeple.png');
     height: 30px;
     width: 30px;
-}
-.meepleOnBoard {
     margin: 0px 15px 0px 15px;
 }
 .meeple0 { background-position: 0px 0px; }
@@ -54,6 +57,21 @@
 .meeple2 { background-position: -60px 0px; }
 .meeple3 { background-position: -90px 0px; }
 .meeple4 { background-position: -120px 0px; }
+
+.toolBotton {
+    padding: 15px;
+    background-color: #505050;
+    color: #fff;
+    cursor: pointer;
+}
+.toolBotton:hover {
+    color: #000;
+    background-color: #fff;
+}
+#gameInfo {
+    padding: 15px;
+}
+
 #msgPanel {
     position: fixed;
     top: 20px;
@@ -63,7 +81,7 @@
     border: solid;
     background-color: #505050;
     font-weight: bold;
-    z-index: 1001;
+    z-index: 1002;
 }
 #msgPanel div,input {
     margin: 15px;
@@ -75,4 +93,3 @@
 #msgHistory {
     height: 500px;
 }
-
