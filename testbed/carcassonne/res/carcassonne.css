@@ -9,6 +9,7 @@
     position: fixed;
     top: 20px;
     left: 400px;
+    z-index: 1001;
 }
 .scoreBoard {
     font-weight: bold;
@@ -18,13 +19,8 @@
     margin-right: 10px;
     background-color: #505050;
     color: #fff;
-    cursor: pointer;
 }
-.scoreBoard:hover {
-    color: #000;
-    background-color: #fff;
-}
-.scoreBoardChosen {
+.scoreBoardSelected {
     color: #000;
     background-color: #fff;
     cursor: default;
@@ -37,11 +33,11 @@
 .meepleOnBoard {
     margin: 0px 15px 0px 15px;
 }
-.meeple1 { background-position: 0px 0px; }
-.meeple2 { background-position: -30px 0px; }
-.meeple3 { background-position: -60px 0px; }
-.meeple4 { background-position: -90px 0px; }
-.meeple5 { background-position: -120px 0px; }
+.meeple0 { background-position: 0px 0px; }
+.meeple1 { background-position: -30px 0px; }
+.meeple2 { background-position: -60px 0px; }
+.meeple3 { background-position: -90px 0px; }
+.meeple4 { background-position: -120px 0px; }
 #msgPanel {
     position: fixed;
     top: 20px;
@@ -51,6 +47,7 @@
     border: solid;
     background-color: #505050;
     font-weight: bold;
+    z-index: 1001;
 }
 #msgPanel div,input {
     margin: 15px;

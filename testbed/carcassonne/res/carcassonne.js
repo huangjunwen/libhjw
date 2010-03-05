@@ -51,32 +51,10 @@ var UniqObj = (function() {
 })();
 
 
-var Player = new Class({
-
-    Extends: UniqObj,
-
-    initialize: function(id, nickname) {
-        this.parent(id);
-        this.nickname = nickname;
-    }
-});
-
-
-function meepleStyles(colorID) {
-    return {
-        "padding": "0px",
-        "width": meepleImgSize + "px",
-        "height": meepleImgSize + "px",
-        "background-position": "{x}px 0px".substitute({x: -colorID * meepleImgSize}),
-        "background-image": "url('" + meepleImgUrl + "')",
-        "background-repeat": "no-repeat"
-    };
-}
-
 var Meeple = (function() {
 
     var halfMeepleImgSize = (meepleImgSize/2).toInt();
-        
+
     return new Class({
 
         Extends: UniqObj,
@@ -100,15 +78,19 @@ var Meeple = (function() {
             this.hided = true;
 
             // DOM
-            var styles = meepleStyles(colorID);
-            $extend(styles, {
-                "zIndex": 1000,
-                "display": "none",
-                "position": "absolute",
-                "cursor": "pointer"
-            });
             this.el = new Element('div', {
-                "styles": styles
+                "styles": {
+                    "padding": "0px",
+                    "width": meepleImgSize + "px",
+                    "height": meepleImgSize + "px",
+                    "background-position": "{x}px 0px".substitute({x: -colorID * meepleImgSize}),
+                    "background-image": "url('" + meepleImgUrl + "')",
+                    "background-repeat": "no-repeat",
+                    "zIndex": 1000,
+                    "display": "none",
+                    "position": "absolute",
+                    "cursor": "pointer"
+                }
             });
             var inst = this;
             this.el.addEvent('click', function(ev) {
@@ -557,15 +539,95 @@ var Board = (function() {
 })();
 
 
-/*
-*/
+var Player = new Class({
+
+    Extends: UniqObj,
+
+    initialize: function(id, nickname) {
+        this.parent(id);
+        this.nickname = nickname;
+        this.colorID = -1;
+    },
+    asSelf: function() {
+        $extend(Player, {'self': this});
+    }
+});
+
+
+var ScoreBoardPanel = (function() {
+    
+    function scoreBoard(colorID) { return $('scoreBoard' + colorID); }
+    function playerName(colorID) { return $('playerName' + colorID); }
+    function meepleCnt(colorID) { return $('meepleCnt' + colorID); }
+    function score(colorID) { return $('score' + colorID); }
+    function ready(colorID) { return $('ready' + colorID); }
+    function readySt(colorID) { return $('readySt' + colorID); }
+
+    return new Class({
+
+        Implements: [Events, Options],
+
+        options: {
+            /*
+             * onReady: function(player, colorID)
+             * */
+        },
+        initialize: function(opt) { 
+            this.setOptions(opt);
+            this.el = $('scoreBoardPanel');
+            this.players = [null, null, null, null, null];
+            this.resetAll();
+        },
+        reset: function(colorID) {
+            meepleCnt(colorID).set('text', 7);
+            score(colorID).set('text', 0);
+            readySt(colorID).set('html', 'No');
+        },
+        resetAll: function() {
+            for (var i = 0; i < 5; ++i)
+                this.reset(i);
+            if (Player.self.colorID >= 0)
+                this.makeReadyClickable(Player.self.colorID);
+        },
+        makeReadyClickable: function(colorID) {
+            ready(colorID).addEvent('click', function(ev) {
+                readySt(colorID).set('html', '<font color="green">Yes</font>');
+                ready(colorID).removeEvents('click').setStyles({"cursor": "default", "text-decoration": "none"});
+                this.fireEvent('ready', [Player.self, colorID]);
+            }).setStyles({"cursor": "pointer", "text-decoration": "underline"});
+        },
+        unselectColor: function(player) {                               // can only called by server
+            if (player.colorID < 0) 
+                return;
+
+            var colorID = player.colorID;
+            player.colorID = -1;
+            this.players[colorID] = null;
+
+            // alter page content
+            this.reset(colorID);
+            scoreBoard(colorID).removeClass('scoreBoardSelected');
+            playerName(colorID).set('text', '');
+        },
+        selectColor: function(player, colorID) {                        // can only called by server
+            if (this.players[colorID])
+                return;
+
+            player.colorID = colorID;
+            this.players[colorID] = player;
+
+            // alter page content
+            scoreBoard(colorID).addClass('scoreBoardSelected');
+            playerName(colorID).set('text', player.nickname);
+        }
+    });
+})();
 
 
 /*
 
 var Carcassonne = new Class({
     initialize: function() {
-        this.items = Hash();                                            // item id -> item
     }
 });
 
