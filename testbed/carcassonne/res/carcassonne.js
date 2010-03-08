@@ -585,6 +585,17 @@ var GamePanel = (function() {
             $('turnEnd').addEvent('click', function(ev) {
                 inst.fireEvent('turnendclick', []);
             });
+
+            this.el.setStyle("display", "block");
+        },
+        finalize: function() {
+            this.resetAll();
+            var inst = this;
+            $each(this.players, function(p) {
+                inst.unselectColor(p);
+            });
+            this.el.setStyle("display", "none");
+            this.parent();
         },
         toElement: function() {
             return this.el;
@@ -722,6 +733,29 @@ function Carcassonne() {
 
     function _login(username) {
         transport.call('login', [username], function(callID, res) {
+            if (!res.ok)                                            // XXX res {ok: true/false, selfID: x, users: [...]}
+                return;
+
+            // create game panel
+            gamePanel = new GamePanel();
+
+            // XXX res.users [{id: x, nickname: x, colorID: x, ready: true/false}, ...]
+            $each(res.users, function(u) {                                              
+                var p = new Player(u.id, u.nickname);
+                if (u.id == res.selfID)
+                    p.asSelf();
+                gamePanel.selectColor(p, u.colorID);
+                if (u.ready)
+                    gamePanel.ready(p);       
+            });
+
+            gamePanel.addEvent('ready', _ready);
+            gamePanel.makeReadyClickable();
+        });
+    }
+
+    function _ready() {
+        transport.call('ready', [Player.self.toID()], function(callID, res) {
         });
     }
 
