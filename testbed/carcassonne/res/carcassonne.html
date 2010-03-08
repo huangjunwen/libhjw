@@ -7,6 +7,7 @@
         <script type="text/javascript" src="mootools-1.2.4-core.js"></script>
         <script type="text/javascript" src="mootools-1.2.4.4-more.js"></script>
         <script type="text/javascript" src="res.js"></script>
+        <script type="text/javascript" src="wsjson.js"></script>
         <script type="text/javascript" src="carcassonne.js"></script>
         <script type="text/javascript">
             var board;
@@ -102,6 +103,8 @@
         </script>
     <link rel="stylesheet" type="text/css" href="carcassonne.css" />
     <script type="text/javascript">
+        var carcassonne = null;
+        /*
         var playerNum = null;
         window.addEvent("domready", function() {
             (new Player(1, 'jayven')).asSelf();
@@ -111,13 +114,36 @@
             gamePanel.addEvent('ready', function() {
                 $('msgHelp').set('text', '等待其它玩家');
             });
-        });
+        });*/
+        /*
+        window.addEvent("domready", function() {
+            carcassonne = Carcassonne();
+        });*/
     </script>
     </head>
     <body>
-        <div id="board">
+        <div id="loginPanel" class="alignC roundedBox hide">
+            <div id="loginFormCont">
+                <form id="loginForm" name="loginForm">
+                    <table>
+                        <tr>
+                            <td class="alignR">请输入您在游戏中的昵称: </td>
+                            <td><input class="roundedBox" type="text" name="username" id="username" value="" /></td>
+                            <td><input class="roundedBox" type="submit" value="提交" /></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td id="loginErr"></td>
+                            <td></td>
+                        </tr>
+                    </table>
+                </form>
+            </div>
+            <div id="loginWait" class="hide">登录中, 请稍候...</div>
         </div>
-        <div id="gamePanel">
+        <div id="board" class="hide">
+        </div>
+        <div id="gamePanel" class="hide">
             <table class="scoreBoard roundedBox" id="scoreBoard0">
                 <tr><td><div class="meeple meeple0" /></td><td id="playerName0"></td></tr>
                 <tr><td class="alignR">meeple: </td><td id="meepleCnt0"></td></tr>
@@ -152,7 +178,7 @@
             <div class="roundedBox toolBotton" id="mvCenter">居中</div>
             <div class="roundedBox toolBotton" id="turnEnd">回合结束</div>
         </div>
-        <div id="msgPanel" class="alignC roundedBox">
+        <div id="msgPanel" class="hide alignC roundedBox">
             <div id="msgHelp" class="roundedBox">若已准备好, 请按记分板上的 ready </div>
             <div id="msgHistory" class="roundedBox"></div>
             <form>

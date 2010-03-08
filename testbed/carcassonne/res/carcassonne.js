@@ -655,13 +655,96 @@ Element.implement({
 });
 */
 
+var LoginPanel = (function() {
+    return new Class({
+        Implements: [Events, Options],
+
+        options: {
+            //
+            // onSubmit: function(username)
+            //
+        },
+
+        initialize: function(opt) {
+            this.setOptions(opt)
+            this.el = $("loginPanel");
+            var inst = this;
+            $("loginForm").addEvent("submit", function(ev) {
+                var name = $("username").getProperty("value");
+                if (!name) {
+                    inst.showInput("请输入您的昵称");
+                    return false;
+                }
+                if (name.length > 10) {
+                    inst.showInput("您的昵称过长");
+                    return false;
+                }
+                inst.showWait();
+                inst.fireEvent("submit", [name]);
+                return false;
+            });
+        },
+        toElement: function() {
+            return this.el
+        },
+        showInput: function(err) {
+            $("loginErr").set("text", err || "");
+            $("loginWait").setStyle("display", "none");
+            $("loginFormCont").setStyle("display", "block");
+        },
+        showWait: function() {
+            $("loginFormCont").setStyle("display", "none");
+            $("loginWait").setStyle("display", "block");
+        },
+        show: function() {
+            this.showInput();
+            this.el.setStyle("display", "block");
+        },
+        hide: function() {
+            this.el.setStyle("display", "none");
+            this.showInput();
+        }
+    });
+})();
+
+function Carcassonne() {
+    var transport, loginPanel, gamePanel, msgPanel, board;
+
+    function createTransport() {
+        return new WSJson({
+            onClose: function() {
+                transport = null;
+            },
+            callbacks: {
+            }
+        });
+    }
+
+    function _login(username) {
+        transport.call('login', [username], function(callID, res) {
+        });
+    }
+
+    var loginPanel = new LoginPanel({
+        onSubmit: function(username) {
+            if (!transport || transport.getStatus() == WSJsonSt.closed) {
+                transport = createTransport();
+                transport.connect("ws://127.0.0.1:9876/ws/carcassonne");
+            }
+
+            if (transport.getStatus() == WSJsonSt.notOpened) {
+                transport.addEvent('open', function() {
+                });
+            } else {
+            }
+        }
+    });
+    loginPanel.show();
+
+}
+
 
 /*
-var Carcassonne = new Class({
-    initialize: function() {
-    }
-});
-
 var Room = new Class({
     initialize: function() {
     }

@@ -7,6 +7,11 @@
  *     Class WSJson
  */
 
+var WSJsonSt = { notOpened: 0, 
+    opened: 1, 
+    closed: -1 
+};
+
 var WSJson = (function() {
 
 var idCounter = 0;
@@ -30,7 +35,7 @@ return new Class({
         this.setOptions(opt);
 
         // attr
-        this.status = 0;                                                // 0 not opened; 1 opened; -1 closed
+        this.status = WSJsonSt.notOpened;                               // 0 not opened; 1 opened; -1 closed
         this.outstandCalls = new Hash();                                // id -> callback
         this.transport = null;
     },
@@ -41,11 +46,11 @@ return new Class({
         var inst = this;
         this.transport = new WebSocket(url);
         this.transport.onopen = function() {
-            inst.status = 1;
+            inst.status = WSJsonSt.opened;
             inst.fireEvent('open');
         };
         this.transport.onclose = function() {
-            inst.status = -1;
+            inst.status = WSJsonSt.closed;
             inst.fireEvent('close');
         },
         this.transport.onmessage = function(ev) {
@@ -64,7 +69,9 @@ return new Class({
                     if (!cb)
                         throw "no such call id: {id}".substitute(res);
                     inst.outstandCalls.erase(res.id);
-                    cb(res.id, res.result, res.error);                  // callback prototype
+                    if (res.error)
+                        throw res.error.message;
+                    cb(res.id, res.result);                             // callback prototype
                 }
             } catch (e) {
                 alert(e);
@@ -77,7 +84,7 @@ return new Class({
         return this.status;
     },
     close: function() {
-        if (this.status == 1)
+        if (this.status == WSJsonSt.opened)
             this.transport.close();
     },
     call: function(method, params, cb) {
@@ -88,7 +95,7 @@ return new Class({
             'id': id
         });
 
-        if (this.status != 1)
+        if (this.status != WSJsonSt.opened)
             throw "transport not opened";
 
         this.transport.send(c);
@@ -96,5 +103,6 @@ return new Class({
     }
 });
 
-
 })();
+
+
