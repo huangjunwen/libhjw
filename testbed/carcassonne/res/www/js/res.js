@@ -1,6 +1,6 @@
 var tileImgSize = 108;
 
-var tilesImgUrl = 'carcassonne.jpg';
+var tilesImgUrl = '/images/carcassonne.jpg';
 
 var tileTransparentUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGwAAABsCAYAAACPZlfNAAAAAXNSR0IArs4c6QAAAERJREFUeNrtwTEBAAAAwqD1T20IX6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4DbasAAEBrI08AAAAAElFTkSuQmCC';
 
@@ -46,4 +46,4 @@ var tilesBounds = [
 
 var meepleImgSize = 30;
 
-var meepleImgUrl = 'meeple.png';
+var meepleImgUrl = '/images/meeple.png';
