@@ -1,8 +1,11 @@
 
 # twistd -ny game.tac
 
-from twisted.internet import epollreactor
-epollreactor.install()
+try:
+    from twisted.internet import epollreactor
+    epollreactor.install()
+except:
+    pass
 
 from twisted.python import log
 from twisted.application import internet, service
