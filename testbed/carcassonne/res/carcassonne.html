@@ -10,11 +10,11 @@
         <script type="text/javascript" src="wsjson.js"></script>
         <script type="text/javascript" src="carcassonne.js"></script>
         <script type="text/javascript">
+            /*
             var board;
             var tile;
             var gamePanel;
 
-            /*
             Element.Events.spacePressed = {
                 base: 'keypress',
                 condition: function(ev) {
@@ -103,7 +103,6 @@
         </script>
     <link rel="stylesheet" type="text/css" href="carcassonne.css" />
     <script type="text/javascript">
-        var carcassonne = null;
         /*
         var playerNum = null;
         window.addEvent("domready", function() {
@@ -119,6 +118,10 @@
         window.addEvent("domready", function() {
             carcassonne = Carcassonne();
         });*/
+
+        window.addEvent("domready", function() {
+            Carcassonne();
+        });
     </script>
     </head>
     <body>
@@ -181,9 +184,9 @@
         <div id="msgPanel" class="hide alignC roundedBox">
             <div id="msgHelp" class="roundedBox">若已准备好, 请按记分板上的 ready </div>
             <div id="msgHistory" class="roundedBox"></div>
-            <form>
-            <input class="roundedBox" size="30" type="text" id="msg" name="msg" />
-            <input class="roundedBox floatR" type="submit" value="send" />
+            <form id="msgForm" name="msgForm">
+                <input class="roundedBox" size="30" type="text" id="msg" name="msg" />
+                <input class="roundedBox floatR" type="submit" value="send" />
             </form>
         </div>
     </body>

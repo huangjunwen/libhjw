@@ -105,4 +105,10 @@
 }
 #msgHistory {
     height: 500px;
+    overflow: scroll;
+}
+#msgHistory p {
+    text-align: left;
+    font-size: 14px;
+    margin: 0px 0px 2px 5px;
 }

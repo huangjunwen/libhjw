@@ -41,13 +41,26 @@ var UniqObj = (function() {
             allObjs.erase(id);
             delete obj;
         },
-        clearAll: function() {
+        cleanAll: function() {
             allObjs = new Hash();
         }
     });
     return ret;
 })();
 
+var Player = new Class({
+
+    Extends: UniqObj,
+
+    initialize: function(id, nickname) {
+        this.parent(id);
+        this.nickname = nickname;
+        this.colorID = -1;                          // manipulate by score board
+    },
+    asSelf: function() {
+        $extend(Player, {'self': this});
+    }
+});
 
 var Meeple = (function() {
 
@@ -236,6 +249,14 @@ var Tile = (function() {
             // init rotation
             this.rotate();
         },
+        finalize: function() {
+            if (this.el)
+                this.el.dispose();
+            if (this.shadow)
+                this.shadow.dispose();
+            this.freeze();
+            this.parent();
+        },
         // DOMs
         toElement: function() {                         // ref: http://n2.nabble.com/Extends-Element-in-1-2-td796845.html
             return this.el;
@@ -338,14 +359,6 @@ var Tile = (function() {
             });
             this.shadow.dispose();
             this.shadow = null;
-        },
-        finalize: function() {
-            if (this.el)
-                this.el.dispose();
-            if (this.shadow)
-                this.shadow.dispose();
-            this.freeze();
-            this.parent();
         }
     });
 })();
@@ -431,6 +444,14 @@ var Board = (function() {
                     'height': tileImgSize + "px"
                 }
             });
+        },
+        finalize: function() {
+            this.tiles.each(function(t) {
+                t.finalize();
+            });
+            if (this.el)
+                this.el.dispose();
+            this.parent();
         },
         toElement: function() {
             return this.el;
@@ -524,33 +545,31 @@ var Board = (function() {
 
             tile.injectAt(this, c);
             return tile;
-        },
-        finalize: function() {
-            this.tiles.each(function(t) {
-                t.finalize();
-            });
-            if (this.el)
-                this.el.dispose();
-            this.parent();
         }
     }); 
 })();
 
 
-var Player = new Class({
+var Panel = new Class({
 
-    Extends: UniqObj,
+    Implements: [Events, Options],
 
-    initialize: function(id, nickname) {
-        this.parent(id);
-        this.nickname = nickname;
-        this.colorID = -1;                          // manipulate by score board
+    options: {},
+
+    initialize: function(opt) {
+        this.setOptions(opt);
+        this.reset();
     },
-    asSelf: function() {
-        $extend(Player, {'self': this});
+    show: function() {
+        $(this).setStyle("display", "block");
+    },
+    hide: function() {
+        $(this).setStyle("display", "none");
+    },
+    reset: function() {
+        throw "Each panel should has a reset method to restore the init status";
     }
 });
-
 
 var GamePanel = (function() {
     
@@ -563,20 +582,18 @@ var GamePanel = (function() {
 
     return new Class({
 
-        Implements: [Events, Options],
+        Extends: Panel,
 
         options: {
             /*
-             * onReady: function(player, colorID)
+             * onReady: function()
              * onMvCentClick: function()
              * onTurnEndClick: function()
              * */
         },
         initialize: function(opt) { 
-            this.setOptions(opt);
             this.el = $('gamePanel');
             this.players = [null, null, null, null, null];
-            this.resetAll();
 
             var inst = this;
             $('mvCenter').addEvent('click', function(ev) {
@@ -586,32 +603,31 @@ var GamePanel = (function() {
                 inst.fireEvent('turnendclick', []);
             });
 
-            this.el.setStyle("display", "block");
-        },
-        finalize: function() {
-            this.resetAll();
-            var inst = this;
-            $each(this.players, function(p) {
-                inst.unselectColor(p);
-            });
-            this.el.setStyle("display", "none");
             this.parent();
         },
         toElement: function() {
             return this.el;
         },
-        reset: function(colorID) {
+        reset: function() {
+            var inst = this;
+            $each(this.players, function(p) {
+                if (!p)
+                    return;
+                inst.unselectColor(p);
+            });
+            this.resetAllScoreBoards();
+        },
+        resetScoreBoard: function(colorID) {
             meepleCnt(colorID).set('text', 7);
             score(colorID).set('text', 0);
             readySt(colorID).set('html', 'No');
         },
-        resetAll: function() {
+        resetAllScoreBoards: function() {
             for (var i = 0; i < 5; ++i)
-                this.reset(i);
+                this.resetScoreBoard(i);
         },
-        ready: function(player) {
+        becomeReady: function(player) {
             readySt(player.colorID).set('html', '<font color="green">Yes</font>');
-            this.fireEvent('ready', [player, player.colorID]);
         },
         makeReadyClickable: function() {
             var panel = this;
@@ -620,7 +636,8 @@ var GamePanel = (function() {
                 return false;
             ready(player.colorID).addEvent('click', function(ev) {
                 ready(player.colorID).removeEvents('click').setStyles({"cursor": "default", "text-decoration": "none"});
-                panel.ready(player);
+                panel.becomeReady(player);
+                panel.fireEvent('ready');
             }).setStyles({"cursor": "pointer", "text-decoration": "underline"});
             return true;
         },
@@ -633,7 +650,7 @@ var GamePanel = (function() {
             this.players[colorID] = null;
 
             // alter page content
-            this.reset(colorID);
+            this.resetScoreBoard(colorID);
             scoreBoard(colorID).removeClass('scoreBoardSelected');      // XXX css
             playerName(colorID).set('text', '');
         },
@@ -647,6 +664,101 @@ var GamePanel = (function() {
             // alter page content
             scoreBoard(colorID).addClass('scoreBoardSelected');
             playerName(colorID).set('text', player.nickname);
+        }
+    });
+})();
+
+var MsgPanel = (function() {
+    return new Class({
+        Extends: Panel,
+
+        options: {
+            /*
+             * onChat: function(msg)
+             * */
+        },
+        initialize: function() {
+            var inst = this;
+            this.el = $("msgPanel");
+            $("msgForm").addEvent("submit", function(ev) {
+                var msg = $("msg").getProperty("value");
+                if (!msg) {
+                    alert("请不要发送空信息");
+                    return false;
+                }
+                inst.fireEvent('chat', [msg]);
+                inst.chatMsg(msg);
+                return false;
+            });
+            this.parent();
+        },
+        toElement: function() {
+            return this.el;
+        },
+        reset: function() {
+            $("msgHelp").set("text", "");
+            $("msgHistory").set("html", "");
+            $("msg").setProperty("value", "");
+        },
+        chatMsg: function(msg, player) {
+            (new Element("p", {text: (player ? player.nickname : "您") + "说: " + msg
+                })).inject($("msgHistory"));
+            $("msg").set("text", "");
+        },
+        sysMsg: function(msg) {
+            (new Element("p", {text: "系统消息: " + msg, styles: {
+                    color: "red"
+                }
+            })).inject($("msgHistory"));
+        }
+    });
+})();
+
+var LoginPanel = (function() {
+    return new Class({
+        Extends: Panel,
+
+        options: {
+            //
+            // onSubmit: function(username)
+            //
+        },
+
+        initialize: function(opt) {
+            this.el = $("loginPanel");
+            var inst = this;
+            $("loginForm").addEvent("submit", function(ev) {
+                var name = $("username").getProperty("value");
+                if (!name) {
+                    inst.showInput("请输入您的昵称");
+                    return false;
+                }
+                if (name.length > 10) {
+                    inst.showInput("您的昵称过长");
+                    return false;
+                }
+                inst.showWait();
+                inst.fireEvent("submit", [name]);
+                return false;
+            });
+
+            this.parent();
+        },
+        toElement: function() {
+            return this.el
+        },
+        reset: function() {
+            $("username").setProperty("value", "");
+            this.showInput();
+        },
+        showInput: function(err) {
+            $("loginErr").set("text", err || "");
+            $("loginWait").setStyle("display", "none");
+            $("loginFormCont").setStyle("display", "block");
+        },
+        showWait: function() {
+            $("loginFormCont").setStyle("display", "none");
+            $("loginWait").setStyle("display", "block");
         }
     });
 })();
@@ -666,79 +778,42 @@ Element.implement({
 });
 */
 
-var LoginPanel = (function() {
-    return new Class({
-        Implements: [Events, Options],
-
-        options: {
-            //
-            // onSubmit: function(username)
-            //
-        },
-
-        initialize: function(opt) {
-            this.setOptions(opt)
-            this.el = $("loginPanel");
-            var inst = this;
-            $("loginForm").addEvent("submit", function(ev) {
-                var name = $("username").getProperty("value");
-                if (!name) {
-                    inst.showInput("请输入您的昵称");
-                    return false;
-                }
-                if (name.length > 10) {
-                    inst.showInput("您的昵称过长");
-                    return false;
-                }
-                inst.showWait();
-                inst.fireEvent("submit", [name]);
-                return false;
-            });
-        },
-        toElement: function() {
-            return this.el
-        },
-        showInput: function(err) {
-            $("loginErr").set("text", err || "");
-            $("loginWait").setStyle("display", "none");
-            $("loginFormCont").setStyle("display", "block");
-        },
-        showWait: function() {
-            $("loginFormCont").setStyle("display", "none");
-            $("loginWait").setStyle("display", "block");
-        },
-        show: function() {
-            this.showInput();
-            this.el.setStyle("display", "block");
-        },
-        hide: function() {
-            this.el.setStyle("display", "none");
-            this.showInput();
-        }
-    });
-})();
-
 function Carcassonne() {
     var transport, loginPanel, gamePanel, msgPanel, board;
 
-    function createTransport() {
-        return new WSJson({
-            onClose: function() {
-                transport = null;
-            },
-            callbacks: {
-            }
-        });
+    loginPanel = new LoginPanel();
+    gamePanel = new GamePanel();
+    msgPanel = new MsgPanel();
+
+    function reset() {
+        if (board)
+            board.finalize();
+        board = null;
+        gamePanel.hide();
+        gamePanel.reset();
+        msgPanel.hide();
+        msgPanel.reset();
+        loginPanel.reset();
+        loginPanel.show();
+        UniqObj.cleanAll();
     }
+    reset();
 
-    function _login(username) {
-        transport.call('login', [username], function(callID, res) {
-            if (!res.ok)                                            // XXX res {ok: true/false, selfID: x, users: [...]}
+    /************************
+     * RPCs called to server 
+     ************************/
+
+    // called when enter a usernama in login panel and submit
+    function _join(username) {
+        transport.call('join', [username], function(callID, res) {
+            if (!res.ok) {                                          // XXX res {ok: true/false, msg: x, selfID: x, users: [...]}
+                loginPanel.showInput(res.msg);
                 return;
+            }
 
-            // create game panel
-            gamePanel = new GamePanel();
+            loginPanel.hide();
 
+            gamePanel.show();
             // XXX res.users [{id: x, nickname: x, colorID: x, ready: true/false}, ...]
             $each(res.users, function(u) {                                              
                 var p = new Player(u.id, u.nickname);
@@ -748,39 +823,70 @@ function Carcassonne() {
                 if (u.ready)
                     gamePanel.ready(p);       
             });
-
-            gamePanel.addEvent('ready', _ready);
             gamePanel.makeReadyClickable();
+
+            msgPanel.show();
+            msgPanel.sysMsg("您进入游戏房间");
         });
     }
+    loginPanel.addEvent('submit', function(username) {
+        createTransport();
+        transport.addEvent('open', function() {
+            _join(username);
+        });
+        return false;
+    });
 
+    // called when the player click ready
     function _ready() {
         transport.call('ready', [Player.self.toID()], function(callID, res) {
+            if (!res.ok)                                            // XXX res {ok: true/false}
+                throw "ready should return ok";
         });
     }
+    gamePanel.addEvent('ready', _ready);
 
-    var loginPanel = new LoginPanel({
-        onSubmit: function(username) {
-            if (!transport || transport.getStatus() == WSJsonSt.closed) {
-                transport = createTransport();
-                transport.connect("ws://127.0.0.1:9876/ws/carcassonne");
+    // called when the player chat
+    function _chat(msg) {
+        transport.call('chat', [Player.self.toID(), msg], function(callID, res) {
+            if (!res.ok) {
+                msgPanel.sysMsg('"' + msg + '" 没有发送成功');
             }
+        });
+    }
+    msgPanel.addEvent('chat', _chat);
 
-            if (transport.getStatus() == WSJsonSt.notOpened) {
-                transport.addEvent('open', function() {
-                });
-            } else {
-            }
+    /************************
+     * RPCs called by server 
+     ************************/
+
+    // XXX
+    var _callbacks = {
+        join: function(id, nickname, colorID) {
+            gamePanel.selectColor(new Player(id, nickname), colorID);
+            msgPanel.sysMsg(nickname + " 进入房间");
+        },
+        ready: function(id) {
+            gamePanel.becomeReady(UniqObj.fromID(id));
+            msgPanel.sysMsg(nickname + " 准备好了");
+        },
+        chat: function(id, msg) {
+            if (id == Player.self.toID())                                           // filter out
+                return false;
+            msgPanel.chatMsg(msg, UniqObj.fromID(id));
         }
-    });
-    loginPanel.show();
+    };
 
+    /************************
+     * The transport
+     ************************/
+
+    function createTransport() {
+        transport = new WSJson({
+            onClose: reset,
+            callbacks: _callbacks
+        });
+        transport.connect("ws://127.0.0.1:9876/ws/carcassonne");                    // XXX
+    }
 }
 
-
-/*
-var Room = new Class({
-    initialize: function() {
-    }
-});
-*/
