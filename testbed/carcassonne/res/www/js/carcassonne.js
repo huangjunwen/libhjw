@@ -825,7 +825,7 @@ function Carcassonne() {
                     p.asSelf();
                 gamePanel.selectColor(p, u.colorID);
                 if (u.ready)
-                    gamePanel.ready(p);       
+                    gamePanel.becomeReady(p);       
             });
             gamePanel.makeReadyClickable();
 
@@ -907,7 +907,7 @@ function Carcassonne() {
             },
             callbacks: _callbacks
         });
-        transport.connect("ws://192.168.23.70:9876/ws/carcassonne");                // XXX
+        transport.connect("ws://{host}/ws/carcassonne".substitute(location));
     }
 }
 

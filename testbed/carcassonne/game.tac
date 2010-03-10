@@ -8,6 +8,10 @@ try:
 except:
     pass
 
+import sys
+from os.path import abspath
+sys.path.insert(0, abspath('.'))
+
 from twisted.application import internet, service
 from twisted.web.websocket import WebSocketSite
 from twisted.web import static
