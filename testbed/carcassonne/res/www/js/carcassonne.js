@@ -788,7 +788,7 @@ function Carcassonne() {
     gamePanel = new GamePanel();
     msgPanel = new MsgPanel();
 
-    function reset() {
+    function reset(err) {
         if (board)
             board.finalize();
         board = null;
@@ -797,6 +797,7 @@ function Carcassonne() {
         msgPanel.hide();
         msgPanel.reset();
         loginPanel.reset();
+        loginPanel.showInput(err);
         loginPanel.show();
         UniqObj.cleanAll();
     }
@@ -829,9 +830,14 @@ function Carcassonne() {
             gamePanel.makeReadyClickable();
 
             msgPanel.show();
+            msgPanel.sysMsg("您进入房间");
         });
     }
     loginPanel.addEvent('submit', function(nickname, gameID) {
+        if (transport) {
+            _join(nickname, gameID)
+            return false;
+        }
         createTransport();
         transport.addEvent('open', function() {
             _join(nickname, gameID);
@@ -844,6 +850,7 @@ function Carcassonne() {
         transport.call('ready', [], function(callID, res) {
             if (!res.ok)                                            // XXX res {ok: true/false}
                 throw "ready should return ok";
+            msgPanel.sysMsg("您准备好了");
         });
     }
     gamePanel.addEvent('ready', _ready);
@@ -874,8 +881,9 @@ function Carcassonne() {
             msgPanel.sysMsg(p.nickname + " 退出了房间");
         },
         ready: function(id) {
-            gamePanel.becomeReady(UniqObj.fromID(id));
-            msgPanel.sysMsg(nickname + " 准备好了");
+            var player = UniqObj.fromID(id);
+            gamePanel.becomeReady(player);
+            msgPanel.sysMsg(player.nickname + " 准备好了");
         },
         chat: function(id, msg) {
             if (id == Player.self.toID())                                           // filter out
@@ -890,7 +898,13 @@ function Carcassonne() {
 
     function createTransport() {
         transport = new WSJson({
-            onClose: reset,
+            onError: function() {
+                loginPanel.showInput("无法连接.");
+            },
+            onClose: function(){
+                transport = null;
+                reset("服务连接中断.");
+            },
             callbacks: _callbacks
         });
         transport.connect("ws://192.168.23.70:9876/ws/carcassonne");                // XXX

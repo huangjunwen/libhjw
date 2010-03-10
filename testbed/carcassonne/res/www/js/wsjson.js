@@ -27,6 +27,7 @@ return new Class({
         /*
          * onOpen: function()
          * onClose: function()
+         * onError: function()
          */
         callbacks: {}
     },
@@ -50,8 +51,11 @@ return new Class({
             inst.fireEvent('open');
         };
         this.transport.onclose = function() {
+            if (inst.status == WSJsonSt.notOpened)
+                inst.fireEvent('error');
+            else
+                inst.fireEvent('close');
             inst.status = WSJsonSt.closed;
-            inst.fireEvent('close');
         },
         this.transport.onmessage = function(ev) {
             try {
