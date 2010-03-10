@@ -688,6 +688,7 @@ var MsgPanel = (function() {
                 }
                 inst.fireEvent('chat', [msg]);
                 inst.chatMsg(msg);
+                $("msg").setProperty("value", "");
                 return false;
             });
             this.parent();
@@ -720,7 +721,7 @@ var LoginPanel = (function() {
 
         options: {
             //
-            // onSubmit: function(username)
+            // onSubmit: function(nickname, gameID)
             //
         },
 
@@ -728,17 +729,18 @@ var LoginPanel = (function() {
             this.el = $("loginPanel");
             var inst = this;
             $("loginForm").addEvent("submit", function(ev) {
-                var name = $("username").getProperty("value");
-                if (!name) {
+                var nickname = $("nickname").getProperty("value");
+                if (!nickname) {
                     inst.showInput("请输入您的昵称");
                     return false;
                 }
-                if (name.length > 10) {
+                if (nickname.length > 10) {
                     inst.showInput("您的昵称过长");
                     return false;
                 }
+                var gameID = $("gameID").get("value").toInt();
                 inst.showWait();
-                inst.fireEvent("submit", [name]);
+                inst.fireEvent("submit", [nickname, gameID]);
                 return false;
             });
 
@@ -748,7 +750,8 @@ var LoginPanel = (function() {
             return this.el
         },
         reset: function() {
-            $("username").setProperty("value", "");
+            $("nickname").setProperty("value", "");
+            $("gameID").set("value", 0);
             this.showInput();
         },
         showInput: function(err) {
@@ -803,10 +806,10 @@ function Carcassonne() {
      * RPCs called to server 
      ************************/
 
-    // called when enter a usernama in login panel and submit
-    function _join(username) {
-        transport.call('join', [username], function(callID, res) {
-            if (!res.ok) {                                          // XXX res {ok: true/false, msg: x, selfID: x, users: [...]}
+    // called when enter a nickname in login panel and submit
+    function _join(nickname, gameID) {
+        transport.call('join', [nickname, gameID], function(callID, res) {
+            if (!res.ok) {                                          // XXX res {ok: true/false, msg: x, selfID: x, players: [...]}
                 loginPanel.showInput(res.msg);
                 return;
             }
@@ -814,8 +817,8 @@ function Carcassonne() {
             loginPanel.hide();
 
             gamePanel.show();
-            // XXX res.users [{id: x, nickname: x, colorID: x, ready: true/false}, ...]
-            $each(res.users, function(u) {                                              
+            // XXX res.players [{id: x, nickname: x, colorID: x, ready: true/false}, ...]
+            $each(res.players, function(u) {                                              
                 var p = new Player(u.id, u.nickname);
                 if (u.id == res.selfID)
                     p.asSelf();
@@ -826,20 +829,19 @@ function Carcassonne() {
             gamePanel.makeReadyClickable();
 
             msgPanel.show();
-            msgPanel.sysMsg("您进入游戏房间");
         });
     }
-    loginPanel.addEvent('submit', function(username) {
+    loginPanel.addEvent('submit', function(nickname, gameID) {
         createTransport();
         transport.addEvent('open', function() {
-            _join(username);
+            _join(nickname, gameID);
         });
         return false;
     });
 
     // called when the player click ready
     function _ready() {
-        transport.call('ready', [Player.self.toID()], function(callID, res) {
+        transport.call('ready', [], function(callID, res) {
             if (!res.ok)                                            // XXX res {ok: true/false}
                 throw "ready should return ok";
         });
@@ -848,7 +850,7 @@ function Carcassonne() {
 
     // called when the player chat
     function _chat(msg) {
-        transport.call('chat', [Player.self.toID(), msg], function(callID, res) {
+        transport.call('chat', [msg], function(callID, res) {
             if (!res.ok) {
                 msgPanel.sysMsg('"' + msg + '" 没有发送成功');
             }
@@ -865,6 +867,11 @@ function Carcassonne() {
         join: function(id, nickname, colorID) {
             gamePanel.selectColor(new Player(id, nickname), colorID);
             msgPanel.sysMsg(nickname + " 进入房间");
+        },
+        leave: function(id) {
+            var p = UniqObj.fromID(id);
+            gamePanel.unselectColor(p);
+            msgPanel.sysMsg(p.nickname + " 退出了房间");
         },
         ready: function(id) {
             gamePanel.becomeReady(UniqObj.fromID(id));
@@ -886,7 +893,7 @@ function Carcassonne() {
             onClose: reset,
             callbacks: _callbacks
         });
-        transport.connect("ws://127.0.0.1:9876/ws/carcassonne");                    // XXX
+        transport.connect("ws://192.168.23.70:9876/ws/carcassonne");                // XXX
     }
 }
 

@@ -1,3 +1,4 @@
+# -*- encoding=utf-8 -*-
 
 import re
 try:
@@ -69,8 +70,20 @@ class WSJsonRPCHandler(WebSocketHandler):
 
     These methods can return result or a defer, and can raise(return) Exception on error.
 
+    Use self.close() to close the connection.
+
+    And connectionLost will be called when connection is closed.
     """
     method_re = re.compile(r"^[_A-z]\w*$").match
+
+    def __init__(self, transport):
+        super(WSJsonRPCHandler, self).__init__(transport)
+        self.init()
+
+    def init(self):
+        """
+        Override this if you want some init
+        """
 
     def frameReceived(self, frame):                             # each frame is a RPC call
         call_id = None
@@ -140,8 +153,16 @@ class WSJsonRPCHandler(WebSocketHandler):
     def dispatch(self, method):
         return getattr(self, "do_" + method, None)
 
-    def notify(self, method, *params):
+    def notify(self, method, params):
         """
         'Call' to the client, but without response
         """
         self.transport.write(dumps({'jsonrpc': '2.0', 'method': method, 'params': params}))
+
+    def connectionLost(self, reason):
+        """
+        Override it if you want to handle connection lost
+        """
+
+    def close(self):
+        self.transport.loseConnection()
