@@ -173,7 +173,10 @@ games = [Game(i) for i in xrange(10)]
 
 class GameHandler(WSJsonRPCHandler):
 
+    DEBUG = False
+
     def init(self):
+        self._debug = False
         self.player = None
 
     def connectionLost(self, reason):
@@ -206,7 +209,27 @@ class GameHandler(WSJsonRPCHandler):
     def do_chat(self, msg):
         if self.player is None:
             return {'ok': False}
-
+        
+        if self.DEBUG:
+            not_handle = False
+            if msg == '>>>':
+                self._debug = True
+                self.notify('chat', (self.player.id, "<debug mode on>"))
+            elif msg == '<<<':
+                self._debug = False
+                self.notify('chat', (self.player.id, "<debug mode off>"))
+            elif self._debug:
+                try:
+                    ret = eval(msg)
+                except Exception, e:
+                    ret = e
+                self.notify('chat', (self.player.id, repr(ret)))
+            else:
+                not_handle = True
+            
+            if not not_handle:
+                return {'ok': True}
+            
         player = self.player
         player.game.chat(player, msg)
         return {'ok': True}

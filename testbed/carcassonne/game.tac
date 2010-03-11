@@ -20,6 +20,7 @@ from twisted.web.websocket import WebSocketSite
 from twisted.web import static
 from carcassonne import GameHandler
 
+GameHandler.DEBUG = True
 
 wwwRoot = static.File('./res/www')
 wwwRoot.indexNames = ['carcassonne.html']

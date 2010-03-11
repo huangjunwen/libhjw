@@ -886,8 +886,8 @@ function Carcassonne() {
             msgPanel.sysMsg(player.nickname + " 准备好了");
         },
         chat: function(id, msg) {
-            if (id == Player.self.toID())                                           // filter out
-                return false;
+            // if (id == Player.self.toID())                                           // filter out
+            //    return false;
             msgPanel.chatMsg(msg, UniqObj.fromID(id));
         }
     };
