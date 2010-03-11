@@ -2,15 +2,18 @@
 
 # run this for debug: twistd -ny game.tac
 
-try:
-    from twisted.internet import epollreactor
-    epollreactor.install()
-except:
-    pass
-
 import sys
-from os.path import abspath
-sys.path.insert(0, abspath('.'))
+platform = sys.platform
+
+if platform.startswith('win'):
+    from os.path import abspath
+    sys.path.insert(0, abspath('.'))         # i don't know why, but without this won't work under windows
+elif platform.startswith('linux'):
+    try:
+        from twisted.internet import epollreactor
+        epollreactor.install()
+    except:
+        pass
 
 from twisted.application import internet, service
 from twisted.web.websocket import WebSocketSite

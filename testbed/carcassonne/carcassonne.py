@@ -128,8 +128,8 @@ class Game(EventSrc):
 
         
     def _chkGameStart(self):
-        if self.readyCnt >= MIN_PLAYER_PER_GAME and \
-                self.readyCnt != len(self.id2player):
+        if self.readyCnt != len(self.id2player) or \
+                self.readyCnt < MIN_PLAYER_PER_GAME:
             return
         # XXX start game
         log.msg("all players ready")

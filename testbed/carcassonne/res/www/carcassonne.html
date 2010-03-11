@@ -102,27 +102,6 @@
             */
         </script>
     <link rel="stylesheet" type="text/css" href="/styles/carcassonne.css" />
-    <script type="text/javascript">
-        /*
-        var playerNum = null;
-        window.addEvent("domready", function() {
-            (new Player(1, 'jayven')).asSelf();
-            gamePanel = new GamePanel();
-            gamePanel.selectColor(Player.self, 1);
-            gamePanel.makeReadyClickable();
-            gamePanel.addEvent('ready', function() {
-                $('msgHelp').set('text', '等待其它玩家');
-            });
-        });*/
-        /*
-        window.addEvent("domready", function() {
-            carcassonne = Carcassonne();
-        });*/
-
-        window.addEvent("domready", function() {
-            Carcassonne();
-        });
-    </script>
     </head>
     <body>
         <div id="loginPanel" class="alignC roundedBox hide">
@@ -195,7 +174,7 @@
             <div class="roundedBox toolBotton hide" id="turnEnd">回合结束</div>
         </div>
         <div id="msgPanel" class="hide alignC roundedBox">
-            <div id="msgHelp" class="roundedBox">若已准备好, 请按记分板上的 ready </div>
+            <div id="msgHelp" class="roundedBox"></div>
             <div id="msgHistory" class="roundedBox"></div>
             <form id="msgForm" name="msgForm">
                 <input class="roundedBox" size="30" type="text" id="msg" name="msg" />

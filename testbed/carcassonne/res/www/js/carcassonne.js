@@ -830,7 +830,7 @@ function Carcassonne() {
             gamePanel.makeReadyClickable();
 
             msgPanel.show();
-            msgPanel.sysMsg("您进入房间");
+            msgPanel.sysMsg("您进入房间 " + gameID);
         });
     }
     loginPanel.addEvent('submit', function(nickname, gameID) {
@@ -909,5 +909,15 @@ function Carcassonne() {
         });
         transport.connect("ws://{host}/ws/carcassonne".substitute(location));
     }
+
+    window.addEvent('unload', function(ev) {
+        if (transport) {
+            transport.close();
+            transport = null;
+        }
+    });
 }
 
+window.addEvent("domready", function() {
+    Carcassonne();
+});
