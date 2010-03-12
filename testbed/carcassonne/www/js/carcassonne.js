@@ -786,7 +786,6 @@ var LoginPanel = (function() {
     });
 })();
 
-/*
 Element.implement({
     mvToPageCenter: function(offsetX, offsetY) {
         offsetX = offsetX || 0;
@@ -799,7 +798,6 @@ Element.implement({
         });
     }
 });
-*/
 
 function Carcassonne() {
     var transport, loginPanel, gamePanel, msgPanel, board;
@@ -920,7 +918,7 @@ function Carcassonne() {
                 throw "already has board";
 
             board = new Board();
-            $(board).inject($("boardCont"));
+            $(board).inject($("boardCont")).mvToPageCenter();
             var tile = board.createTile(startTileID, startTileIdx, {gX: 0, gY: 0});
             tile.stop();
 
