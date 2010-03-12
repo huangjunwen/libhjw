@@ -95,7 +95,7 @@ terra 有可能闭合或尚未闭合, 通过 tiepoint (每个 tile 每一边共�
 
 """
 
-from random import shuffle
+from random import randint
 
 
 class Meeple(object):
@@ -104,33 +104,33 @@ class Meeple(object):
         self.player = player
 
 
-tpn2tp = {
-    0: lambda x, y: (0, 3*x-1, 2*y+1),
-    1: lambda x, y: (0, 3*x, 2*y+1),
-    2: lambda x, y: (0, 3*x+1, 2*y+1),
-    3: lambda x, y: (1, 2*x+1, 3*y+1),
-    4: lambda x, y: (1, 2*x+1, 3*y),
-    5: lambda x, y: (1, 2*x+1, 3*y-1),
-    6: lambda x, y: (0, 3*x+1, 2*y-1),
-    7: lambda x, y: (0, 3*x, 2*y-1),
-    8: lambda x, y: (0, 3*x-1, 2*y-1),
-    9: lambda x, y: (1, 2*x-1, 3*y-1),
-    10: lambda x, y: (1, 2*x-1, 3*y),
-    11: lambda x, y: (1, 2*x-1, 3*y+1),
-    12: lambda x, y: (2, x, y),
-}
+tpn2tp = [
+    lambda x, y: (0, 3*x-1, 2*y+1),
+    lambda x, y: (0, 3*x, 2*y+1),
+    lambda x, y: (0, 3*x+1, 2*y+1),
+    lambda x, y: (1, 2*x+1, 3*y+1),
+    lambda x, y: (1, 2*x+1, 3*y),
+    lambda x, y: (1, 2*x+1, 3*y-1),
+    lambda x, y: (0, 3*x+1, 2*y-1),
+    lambda x, y: (0, 3*x, 2*y-1),
+    lambda x, y: (0, 3*x-1, 2*y-1),
+    lambda x, y: (1, 2*x-1, 3*y-1),
+    lambda x, y: (1, 2*x-1, 3*y),
+    lambda x, y: (1, 2*x-1, 3*y+1),
+    lambda x, y: (2, x, y),
+]
 
 
 class Board(object):
     """
     Game board
 
-    Public attributes:
+    Attributes:
 
         last_tile (r): last picked up tile
+        tile_pile (r): tiles remain on the pile
         tiles_on_board (r): set of tiles on board
         tiles_discard (r): set of tiles discard by players
-        tiles_on_pile (r): list of tiles on pile. tiles_on_pile[0] is the next pile to be picked up
 
         open_tps (r): dict of open tiepoint -> terra
         all_tps (r): dict of tiepoint -> terra
@@ -150,59 +150,46 @@ class Board(object):
 
         self.last_tile = None
         self.coords = {}                                                        # {coord: tile}
-        self.tiles_on_pile = TilePile.shuffle()
+        self.tile_pile = TilePile()
         self.tiles_on_board = set()
         self.tiles_discard = set()
 
-        first = self.pick_tile()
-        self.put_tile(first, 0, 0)
+        first = self.pickTile()
+        first.setCoord((0, 0))
+        self.putTile(first)
 
-    def pick_tile(self):
+    def pickTile(self):
         """
         Pick up a tile from pile
         """
-        last_tile = self.last_tile
-        # make sure the last one has been handled
-        assert last_tile is None or last_tile in self.tiles_on_board or \
-            last_tile in self.tiles_discard
-        try:
-            self.last_tile = self.tiles_on_pile.pop(0)
-        except IndexError:
-            self.last_tile = None
+        assert self.last_tile is None
+        self.last_tile = self.tile_pile.pick()
         return self.last_tile
 
-    def discard_tile(self, tile):
+    def discardTile(self, tile):
         """
         Discard a tile
         """
-        assert tile is self.last_tile and tile not in self.tiles_on_board
+        assert self.last_tile is not None and tile is self.last_tile
         self.tiles_discard.add(tile)
+        self.last_tile = None
 
-    def put_tile(self, tile, x, y):
+    def putTile(self, tile):
         """
         Put the top tile on the tile pile into the board
         """
-        # check
-        assert tile is self.last_tile and tile not in self.tiles_discard
-        if tile in self.tiles_on_board:
-            return True
+        assert self.last_tile is not None and tile is self.last_tile
 
         # test coord
-        if not self.can_put(tile, x, y):
+        if not self.canPut(tile):
             return False
 
         # add tile to board
-        coord = (x, y)
-        self.coords[coord] = tile
+        self.coords[tile.coord] = tile
         self.tiles_on_board.add(tile)
 
-        # add some attr to tile
-        tile.coord = coord
-        tile.tiepoint = lambda tpn: tpn2tp[tpn](x, y)
-        tile.board = self
-
         # add terras on tile
-        for terra in tile._make_pre_join_terra():
+        for terra in tile._makePreJoinTerra():
             joint_terra = set()
             closed_tps = set()
 
@@ -212,12 +199,12 @@ class Board(object):
                     continue
                 # remove from board's open_tps set and the t's open_tps set
                 t = self.open_tps.pop(tp)
-                t._close_tiepoint(tp)
+                t._closeTiepoint(tp)
                 # collect
                 closed_tps.add(tp)
                 joint_terra.add(t)
             # remove closed_tps in terra
-            terra._close_tiepoint(closed_tps)
+            terra._closeTiepoint(closed_tps)
                 
             # make a big one and place to all_terra
             for t in joint_terra:
@@ -231,31 +218,64 @@ class Board(object):
             for tp in terra.all_tps:
                 self.all_tps[tp] = terra
 
+        self.last_tile = None
         return True
 
-    def can_put(self, tile, x, y):
+    def canPut(self, tile):
         """
-        Can the tile put at (x, y)
+        Can the tile be put
         """
-        if (x, y) in self.coords:                                               # occupied
+        if tile.coord in self.coords:                                           # occupied
             return False
+
+        x, y = tile.coord
 
         # check 4 neighbours and their boundaries
         has_neighbour = False
         neighbour_coords = ((x, y+1), (x+1, y), (x, y-1), (x-1, y))
+        neighbour_bounds = (2, 3, 0, 1)
+
         for i in xrange(4):                                                     
             c = neighbour_coords[i]
             if c not in self.coords:
                 continue
             has_neighbour = True
             t = self.coords[c]
-            if tile.bounds[i] != t.bounds[(i+2) % 4]:                           # check bounds
+            if tile.bounds[i] != t.bounds[neighbour_bounds[i]]:                 # check bounds
                 return False
         
         first = not self.tiles_on_board
         if not first and not has_neighbour:
             return False
         return True
+
+    def unoccupiedTerraIdx(self, tile):
+        """
+        Get unoccupied terra indexes
+        """
+        ret = []
+        for i in xrange(len(tile.terra_proto)):
+            _, tpns, _ = tile.terra_proto[i]
+            occupied = False
+            for tpn in tpns:
+                terra = self.open_tps.get(tile.tiepoint(tpn), None)
+                if not terra:
+                    continue
+
+                if terra.meeples:
+                    occupied = True
+                    break
+            
+            if not occupied:
+                ret.append(i)
+        return ret
+
+    def getTerraByIdx(self, tile, terra_idx):
+        if tile not in self.tiles_on_board:
+            return None
+        
+        _, tpns, _ = tile.terra_proto[terra_idx]
+        return self.all_tps[tile.tiepoint(tpns[0])]
 
     def __getitem__(self, coord):
         """
@@ -266,30 +286,43 @@ class Board(object):
         except KeyError:
             return None
 
-    def get_terra(self, x, y, terra_idx):
-        """
-        Get terra on tile (x, y) and the index (in terra_proto)
-        """
-        tile = self[x, y]
-        if not tile:
+
+class TilePile(object):
+
+    def __init__(self):
+        self.tiles = [t() for t in TileMeta.tile_classes]
+        self.id = 0
+    
+    def pick(self):
+        if self.id == 0:
+            ret = TileMeta.start_tile_cls()
+        elif self.tiles:
+            ret = self.tiles.pop(randint(0, len(self.tiles) - 1))
+        else:
             return None
-        return tile.terra(terra_idx)
+        ret.id = "T%d" % self.id
+        self.id += 1
+        return ret
+
+    def __len__(self):
+        if self.id == 0:
+            return len(self.tiles) + 1
+        return len(self.tiles)
 
 
-
-class TilePile(type):
+class TileMeta(type):
 
     """
-    想要放入 TilePile 的类需要继承 TileBase, 并且类名为 Tile
+    想要放入 TileMeta 的类需要继承 TileBase, 并且类名为 Tile
 
     Tile 子类指定以下类变量, 例如中间一条路, 两旁是农田的 Tile 子类可以这样表达:
 
         terra_proto = [(FIELD, [8,9,10,11,0], None), (ROAD, [1,7], None), 
             (FIELD, [2,3,4,5,6], None)]
 
-    (terra_proto 应该按照 tpn 从小到大排序)
+    (terra_proto 必须按照 tpn 从小到大排序)
 
-    TilePile 根据此变量生成两个个类变量, 如上例子:
+    TileMeta 根据此变量生成一个类变量, 如上例子:
 
         bounds = [ROAD, FIELD, ROAD, FIELD]
 
@@ -308,7 +341,7 @@ class TilePile(type):
             start = True
     """
 
-    tile_cls = []
+    tile_classes = []
 
     start_tile_cls = None
 
@@ -318,32 +351,42 @@ class TilePile(type):
         if name != 'Tile':
             return type.__new__(mcls, name, base, attr)
 
-        # uniq coord
+        # uniq idx
         tile_idx = attr['tile_idx']
-        assert tile_idx not in TilePile.tile_idxes
+        assert tile_idx not in TileMeta.tile_idxes
         name += '_%d' % tile_idx
-        TilePile.tile_idxes.add(tile_idx)
+        TileMeta.tile_idxes.add(tile_idx)
 
         # add attributes
-        assert TilePile._check_terra_order(attr['terra_proto'])
+        t = attr['terra_proto']
+        assert TileMeta._checkTerraOrder(t)
         tpn2tcls = [None] * 13
-        for tcls, tpns, _ in attr['terra_proto']:
+        for tcls, tpns, _ in t:
             for tpn in tpns:
                 tpn2tcls[tpn] = tcls
-        attr['bounds'] = [tpn2tcls[x] for x in (1, 4, 7, 10)]
+        b = [tpn2tcls[x] for x in (1, 4, 7, 10)]
+        
+        # four rotation copy
+        rotate_tpns = lambda tpns, r: [tpn == 12 and 12 or (tpn+3*r)%12 for tpn in tpns]
+        terra_proto, bounds = [], []
+        for r in xrange(4):
+            terra_proto.append([(tcls, rotate_tpns(tpns, r), ex) for tcls, tpns, ex in t])
+            bounds.append(b[-r:] + b[:-r])
+        attr['terra_proto'] = terra_proto
+        attr['bounds'] = bounds
 
-        # make and put to the pile
+        # make it
         ret = type.__new__(mcls, name, base, attr)
         amount = attr['amount']
         if attr.get('start', False):
-            assert TilePile.start_tile_cls is None
+            assert TileMeta.start_tile_cls is None
             amount -= 1
-            TilePile.start_tile_cls = ret
-        TilePile.tile_cls.extend([ret] * amount)
+            TileMeta.start_tile_cls = ret
+        TileMeta.tile_classes.extend([ret] * amount)
         return ret
 
     @staticmethod
-    def _check_terra_order(terra_proto):
+    def _checkTerraOrder(terra_proto):
         min_tpn = -1
         for _, tpns, _ in terra_proto:
             new_min_tpn = min(tpns)
@@ -352,42 +395,26 @@ class TilePile(type):
             min_tpn = new_min_tpn
         return True
 
-    @staticmethod
-    def shuffle():
-        """
-        Shuffle the tile pile
-        Return shuffled tile pile (Tile instances)
-        """
-        shuffle(TilePile.tile_cls)
-
-        ret = [TilePile.start_tile_cls(0)]
-        for i in xrange(len(TilePile.tile_cls)):
-            ret.append(TilePile.tile_cls[i](i+1))
-        return ret
-
-
 
 class TileBase(object):
     """
     Tile contains terra and terra can join together
 
-    Public methods and attributes:
+    attributes:
 
         bounds (r): 4 bound of this tile
         terra_proto (r): meta information of terra
 
-        the following should be called only after this tile has put on board
-
-        tiepoint (x): tiepoint number -> tiepoint
     """
 
-    __metaclass__ = TilePile
+    __metaclass__ = TileMeta
 
-    def __init__(self, idx):
-        self.idx = idx
+    def __init__(self):
+        self.coord = (0, 0)
         self.rotation = 0
-        self.coord = None
-        self.board = None
+        self.bounds = None
+        self.terra_proto = None
+        self.rotate(0)
 
     def __repr__(self):
         ret = "<%s(%d)" % (self.__class__.__name__, self.rotation)
@@ -395,39 +422,30 @@ class TileBase(object):
             ret += " at %r" % (self.coord,)
         return ret + ">"
 
-    def rotate(self, rotation):
+    def tiepoint(self, tpn):
+        x, y = self.coord
+        return tpn2tp[tpn](x, y)
+
+    def setCoord(self, coord):
+        """
+        Set the coord
+        """
+        self.coord = coord
+
+    def rotate(self, rotation=1):
         """
         Rotate the tile
         """
-        rotation %= 4
-        self.rotation = rotation
-
         cls = self.__class__
-        r = 4 - rotation
-        self.bounds = cls.bounds[r:] + cls.bounds[:r]
+        r = self.rotation = (self.rotation + rotation) & 3                  # % 4
+        self.bounds = cls.bounds[r]
+        self.terra_proto = cls.terra_proto[r]
 
-        r = rotation * 3
-        def rotate_tpns(tpns):
-            return [tpn == 12 and 12 or (tpn+r)%12 for tpn in tpns]
-        self.terra_proto = [(tcls, rotate_tpns(tpns), ex) 
-            for tcls, tpns, ex in cls.terra_proto]
-
-    def terra(self, terra_idx):
-        """
-        Get one of terra on thie tile
-        """
-        assert self.coord
-        try:
-            _, tpns, _ = self.terra_proto[terra_idx]
-            return self.board.all_tps[self.tiepoint(tpns[0])]
-        except IndexError:
-            return None
-        
-    def _make_pre_join_terra(self):
+    def _makePreJoinTerra(self):
         # make terra instances on this tile
         pre_join_terra = []
         for tcls, tpns, ex in self.terra_proto:
-            tps = map(self.tiepoint, tpns)
+            tps = [self.tiepoint(tpn) for tpn in tpns]
             pre_join_terra.append(tcls(self, tps, ex))
 
         # add adjacent link
@@ -462,8 +480,6 @@ class Terra(object):
 
     __metaclass__ = TerraMeta
 
-    can_put_meeple = True
-    
     ### !! the following methods should be called by Tile only
 
     def __init__(self, tile, tps, extra):
@@ -477,14 +493,13 @@ class Terra(object):
 
     ### !! the following methods should be called by Board only
 
-    def _close_tiepoint(self, tp):
+    def _closeTiepoint(self, tp):
         if type(tp) is set:
             self.open_tps -= tp
         else:
             self.open_tps.discard(tp)
 
     def _join(self, terra):
-        assert type(self) is type(terra)
         self.open_tps |= terra.open_tps
         self.all_tps |= terra.all_tps
         self.all_tiles |= terra.all_tiles
@@ -496,11 +511,11 @@ class Terra(object):
 
     ### attributes and properties are public
 
-    def put_meeple(self, meeple):
+    def putMeeple(self, meeple):
         """
         Put a meeple on this terra
         """
-        if not self.can_put_meeple or self.meeples:
+        if self.meeples:
             return False
         self.meeples.add(meeple)
         return True
