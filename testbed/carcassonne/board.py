@@ -100,7 +100,11 @@ from random import randint
 
 class Meeple(object):
 
+    create_cnt = 0
+
     def __init__(self, player):
+        self.id = "M%d" % Meeple.create_cnt
+        Meeple.create_cnt += 1
         self.player = player
 
 
@@ -276,6 +280,9 @@ class Board(object):
         
         _, tpns, _ = tile.terra_proto[terra_idx]
         return self.all_tps[tile.tiepoint(tpns[0])]
+
+    def getTerraOnTile(self, tile): 
+        return [self.getTerraByIdx(tile, i) for i in xrange(len(tile.terra_proto))]
 
     def __getitem__(self, coord):
         """

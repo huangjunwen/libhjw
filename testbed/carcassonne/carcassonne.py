@@ -1,9 +1,12 @@
 # -*- encoding=utf-8 -*-
 
 import re
+from itertools import cycle
 from twisted.python import log
 from wsjson import *
 from event import EventSrc
+from board import Board, Meeple
+import tiles
 
 class Player(object):
     
@@ -40,20 +43,26 @@ class Game(EventSrc):
         self.id = id
         self.st = GAME_ST_IDLE 
 
+        # a notifier to broadcast events
+        self.notifier = GameNotifier(self)
+
         # players dict
         self.id2player = {}
         self.nick2player = {}
         self.color2player = {}
 
-        self.readyCnt = 0
+        # game stuff
+        self.ready_cnt = 0
+        self.board = Board()
+        self.curr_player = None
+        self.player_loop = None
 
-        # a notifier to broadcast events
-        self.notifier = GameNotifier(self)
+        self.cleanGame()
 
     def players(self):
         for p in self.id2player.itervalues():
             yield p
-    
+
     def join(self, player):
         if self.st == GAME_ST_GAMING:
             return False, "游戏中, 暂时无法加入"
@@ -88,9 +97,8 @@ class Game(EventSrc):
         if player.id not in self.id2player:
             return False
 
-        # XXX some clean task here
         if self.st == GAME_ST_GAMING:
-            pass                                            
+            self.abortGame("因为下面的原因,　游戏不得不中止")
 
         # remove from game
         p = self.id2player.pop(player.id)
@@ -102,11 +110,13 @@ class Game(EventSrc):
         player.room = None
         player.color = None
         if player.ready:
-            self.readyCnt -= 1
             player.ready = False
+            self.ready_cnt -= 1
+            assert self.ready_cnt >= 0
         self.fireEv('leave', player=player)
 
-        self._chkGameStart()
+        # try to start game
+        self.startGame()
         return True
 
     def chat(self, player, msg):    
@@ -122,27 +132,62 @@ class Game(EventSrc):
             return False
 
         player.ready = True
-        self.readyCnt += 1
+        self.ready_cnt += 1
         self.fireEv('ready', player=player)
-        self._chkGameStart()
+        self.startGame()
+        return True
 
-        
-    def _chkGameStart(self):
-        if self.readyCnt != len(self.id2player) or \
-                self.readyCnt < MIN_PLAYER_PER_GAME:
-            return
-        # XXX start game
-        log.msg("all players ready")
+    def cleanGame(self):
+        self.st = GAME_ST_IDLE 
+
+        for p in self.players():
+            p.ready = False
+        self.ready_cnt = 0
+
+        self.curr_player = None
+        self.player_loop = None
+
+        self.board.reset()
+        self.fireEv('cleanGame')
+
+    def abortGame(self, reason):
+        self.cleanGame()
+        self.fireEv('sysMsg', msg=reason)
+
+    def startGame(self):    
+        if self.st != GAME_ST_IDLE:
+            return False
+
+        if self.ready_cnt != len(self.id2player) or \
+                self.ready_cnt < MIN_PLAYER_PER_GAME:
+            return False
+
+        self.st = GAME_ST_GAMING
+
+        # create player_loop
+        players = list(self.players())
+        players.sort(lambda x, y: cmp(x.id, y.id))
+        def create_player_loop():
+            for p in cycle(players):
+                self.curr_player = p
+                yield p
+        self.player_loop = create_player_loop()
+        self.player_loop.next()
+
+        self.fireEv('startGame', start_player=self.curr_player, 
+            start_tile=self.board[0, 0])
+        return True
+
 
 
 class GameNotifier(object):
     
     def __init__(self, game):
         self.game = game
-        game.addEvListener('join', self.onJoin)
-        game.addEvListener('leave', self.onLeave)
-        game.addEvListener('chat', self.onChat)
-        game.addEvListener('ready', self.onReady)
+        for ev_name in ('join', 'leave', 'chat', 'sysMsg', 'ready', 'startGame',
+            'cleanGame'):
+            game.addEvListener(ev_name, getattr(self, 
+                'on' + ev_name[0].upper() + ev_name[1:]))
 
     def notifyAll(self, method, *params):
         for p in self.game.players():
@@ -164,9 +209,18 @@ class GameNotifier(object):
     def onChat(self, ev):   
         self.notifyAllExcept(ev.player, 'chat', ev.player.id, ev.msg)
 
+    def onSysMsg(self, ev):   
+        self.notifyAll('sysMsg', ev.msg)
+
     def onReady(self, ev):  
         self.notifyAllExcept(ev.player, 'ready', ev.player.id)
 
+    def onStartGame(self, ev):
+        self.notifyAll('startGame', ev.start_player.id, ev.start_tile.id, ev.start_tile.tile_idx)
+
+    def onCleanGame(self, ev):
+        self.notifyAll('cleanGame')
+        
 
 games = [Game(i) for i in xrange(10)]
 

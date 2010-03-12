@@ -59,6 +59,9 @@
     background-color: #fff;
     cursor: default;
 }
+.scoreBoardOnTurn {
+    background-color: pink;
+}
 .meeple {
     background-image: url('/images/meeple.png');
     height: 30px;

@@ -424,11 +424,7 @@ var Board = (function() {
 
     return new Class({
 
-        Extends: UniqObj,
-
-        initialize: function(id) {
-            this.parent(id);
-
+        initialize: function() {
             // attr
             this.neighborCnt = new Grid();                      // (x, y) -> neighbor count
             this.tiles = new Grid();                            // (x, y) -> tile
@@ -451,7 +447,6 @@ var Board = (function() {
             });
             if (this.el)
                 this.el.dispose();
-            this.parent();
         },
         toElement: function() {
             return this.el;
@@ -472,6 +467,20 @@ var Board = (function() {
             gX = (x/tileImgSize).toInt();
             gY = - (y/tileImgSize).toInt();
             return {'x': x, 'y': y, 'gX': gX, 'gY': gY};
+        },
+        ensureGridCoord: function(c) {
+            if (!$chk(c.x)) {
+                if (!$chk(c.gX))
+                    throw "bad arg";
+                c.x = c.gX * tileImgSize;
+                c.y = c.gY * tileImgSize;
+            }
+            else if (!$chk(c.gX)) {
+                if (!$chk(c.x))
+                    throw "bad arg";
+                c.gX = (c.x/tileImgSize).toInt();
+                c.gY = (c.y/tileImgSize).toInt();
+            }
         },
         occupied: function(c) {
             return this.tiles.get(c.gX, c.gY) ? true : false;
@@ -501,6 +510,8 @@ var Board = (function() {
             return c;
         },
         createTile: function(id, tileIdx, c) {                                      // c should be a grid coord
+            this.ensureGridCoord(c);
+
             if (this.occupied(c))
                 return null;
 
@@ -594,6 +605,7 @@ var GamePanel = (function() {
         initialize: function(opt) { 
             this.el = $('gamePanel');
             this.players = [null, null, null, null, null];
+            this.currPlayer = null;
 
             var inst = this;
             $('mvCenter').addEvent('click', function(ev) {
@@ -616,8 +628,10 @@ var GamePanel = (function() {
                 inst.unselectColor(p);
             });
             this.resetAllScoreBoards();
+            this.currPlayer = null;
         },
         resetScoreBoard: function(colorID) {
+            scoreBoard(colorID).removeClass('scoreBoardOnTurn');
             meepleCnt(colorID).set('text', 7);
             score(colorID).set('text', 0);
             readySt(colorID).set('html', 'No');
@@ -664,6 +678,12 @@ var GamePanel = (function() {
             // alter page content
             scoreBoard(colorID).addClass('scoreBoardSelected');
             playerName(colorID).set('text', player.nickname);
+        },
+        takeTurn: function(player) {
+            if (this.currPlayer)
+                scoreBoard(this.currPlayer.colorID).removeClass('scoreBoardOnTurn');
+            scoreBoard(player.colorID).addClass('scoreBoardOnTurn');
+            this.currPlayer = player;
         }
     });
 })();
@@ -702,12 +722,12 @@ var MsgPanel = (function() {
             $("msg").setProperty("value", "");
         },
         chatMsg: function(msg, player) {
-            (new Element("p", {text: (player ? player.nickname : "您") + "说: " + msg
+            (new Element("p", {text: (player ? player.nickname : "您") + ": " + msg
                 })).inject($("msgHistory"));
             $("msg").set("text", "");
         },
         sysMsg: function(msg) {
-            (new Element("p", {text: "系统消息: " + msg, styles: {
+            (new Element("p", {text: "系统: " + msg, styles: {
                     color: "red"
                 }
             })).inject($("msgHistory"));
@@ -848,18 +868,20 @@ function Carcassonne() {
     // called when the player click ready
     function _ready() {
         transport.call('ready', [], function(callID, res) {
-            if (!res.ok)                                            // XXX res {ok: true/false}
+            if (!res.ok)
                 throw "ready should return ok";
-            msgPanel.sysMsg("您准备好了");
         });
     }
-    gamePanel.addEvent('ready', _ready);
+    gamePanel.addEvent('ready', function() {
+        _ready();
+        msgPanel.sysMsg("您准备好了");
+    });
 
     // called when the player chat
     function _chat(msg) {
         transport.call('chat', [msg], function(callID, res) {
             if (!res.ok) {
-                msgPanel.sysMsg('"' + msg + '" 没有发送成功');
+                throw "chat should return ok";
             }
         });
     }
@@ -889,6 +911,31 @@ function Carcassonne() {
             // if (id == Player.self.toID())                                           // filter out
             //    return false;
             msgPanel.chatMsg(msg, UniqObj.fromID(id));
+        },
+        sysMsg: function(msg) {
+            msgPanel.sysMsg(msg);
+        },
+        startGame: function(startPlayerID, startTileID, startTileIdx) {                 // XXX
+            if (board)
+                throw "already has board";
+
+            board = new Board();
+            $(board).inject($("boardCont"));
+            var tile = board.createTile(startTileID, startTileIdx, {gX: 0, gY: 0});
+            tile.stop();
+
+            var player = UniqObj.fromID(startPlayerID);
+            gamePanel.takeTurn(player);
+
+            msgPanel.sysMsg("游戏开始!! 请 " + player.nickname + "行动");
+        },
+        cleanGame: function() {
+            if (board) {
+                board.finalize();
+                board = null;
+            }
+            gamePanel.resetAllScoreBoards();
+            gamePanel.makeReadyClickable();
         }
     };
 
