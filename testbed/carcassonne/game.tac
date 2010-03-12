@@ -22,7 +22,7 @@ from carcassonne import GameHandler
 
 GameHandler.DEBUG = True
 
-wwwRoot = static.File('./res/www')
+wwwRoot = static.File('www')
 wwwRoot.indexNames = ['carcassonne.html']
 site = WebSocketSite(wwwRoot)
 site.addHandler("/ws/carcassonne", GameHandler)
