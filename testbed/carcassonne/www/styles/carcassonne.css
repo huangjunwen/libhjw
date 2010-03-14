@@ -92,26 +92,30 @@
     position: fixed;
     top: 20px;
     left: 20px;
-    /*height: 600px;*/
     width: 350px;
     border: solid;
     background-color: #505050;
     font-weight: bold;
     z-index: 1002;
 }
-#msgPanel div,input {
+#msgHelp {
     margin: 15px;
+    height: 20px;
     background-color: #fff;
 }
-#msgHelp {
-    height: 20px;
-}
 #msgHistory {
-    height: 500px;
-    overflow: scroll;
+    margin: 15px;
+    overflow: auto;
+    background-color: #fff;
 }
 #msgHistory p {
     text-align: left;
     font-size: 14px;
     margin: 0px 0px 2px 5px;
+}
+#msgContent {
+    margin: 0px 0px 15px 15px;
+}
+#msgSubmit {
+    margin: 0px 15px 15px 0px;
 }

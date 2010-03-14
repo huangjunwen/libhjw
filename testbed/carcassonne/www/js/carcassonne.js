@@ -615,6 +615,13 @@ var GamePanel = (function() {
                 inst.fireEvent('turnendclick', []);
             });
 
+            function onResize() {
+                var winH = window.getSize().y;
+                $("msgHistory").setStyle('height', (winH - 180) + 'px');
+            };
+            onResize();
+            window.addEvent('resize', onResize);
+
             this.parent();
         },
         toElement: function() {
@@ -628,7 +635,6 @@ var GamePanel = (function() {
                 inst.unselectColor(p);
             });
             this.resetAllScoreBoards();
-            this.currPlayer = null;
         },
         resetScoreBoard: function(colorID) {
             scoreBoard(colorID).removeClass('scoreBoardOnTurn');
@@ -639,6 +645,7 @@ var GamePanel = (function() {
         resetAllScoreBoards: function() {
             for (var i = 0; i < 5; ++i)
                 this.resetScoreBoard(i);
+            this.currPlayer = null;
         },
         becomeReady: function(player) {
             readySt(player.colorID).set('html', '<font color="green">Yes</font>');
@@ -666,18 +673,21 @@ var GamePanel = (function() {
             // alter page content
             this.resetScoreBoard(colorID);
             scoreBoard(colorID).removeClass('scoreBoardSelected');      // XXX css
-            playerName(colorID).set('text', '');
+            playerName(colorID).set('html', '');
         },
         selectColor: function(player, colorID) {                        // can only called by server
             if (this.players[colorID])
-                return;
+                throw "select a selected color";
 
             player.colorID = colorID;
             this.players[colorID] = player;
 
             // alter page content
             scoreBoard(colorID).addClass('scoreBoardSelected');
-            playerName(colorID).set('text', player.nickname);
+            if (player == Player.self)
+                playerName(colorID).set('html', '<font color=red>' + player.nickname + '</font>');
+            else
+                playerName(colorID).set('text', player.nickname);
         },
         takeTurn: function(player) {
             if (this.currPlayer)
@@ -689,6 +699,15 @@ var GamePanel = (function() {
 })();
 
 var MsgPanel = (function() {
+    
+    function showMsgEl(el) {
+        var history = $("msgHistory");
+        el.inject(history);
+        var historyH = history.getSize().y;
+        var historyScrollH = history.getScrollSize().y;
+        history.scrollTo(0, historyScrollH - historyH + 30);
+    }
+
     return new Class({
         Extends: Panel,
 
@@ -701,14 +720,14 @@ var MsgPanel = (function() {
             var inst = this;
             this.el = $("msgPanel");
             $("msgForm").addEvent("submit", function(ev) {
-                var msg = $("msg").getProperty("value");
+                var msg = $("msgContent").getProperty("value");
                 if (!msg) {
                     alert("请不要发送空信息");
                     return false;
                 }
                 inst.fireEvent('chat', [msg]);
                 inst.chatMsg(msg);
-                $("msg").setProperty("value", "");
+                $("msgContent").setProperty("value", "");
                 return false;
             });
             this.parent();
@@ -719,18 +738,19 @@ var MsgPanel = (function() {
         reset: function() {
             $("msgHelp").set("text", "");
             $("msgHistory").set("html", "");
-            $("msg").setProperty("value", "");
+            $("msgContent").setProperty("value", "");
         },
         chatMsg: function(msg, player) {
-            (new Element("p", {text: (player ? player.nickname : "您") + ": " + msg
-                })).inject($("msgHistory"));
-            $("msg").set("text", "");
+            showMsgEl(new Element("p", {"text": (player ? player.nickname : "您") + ": " + msg
+                }));
+            $("msgContent").set("text", "");
         },
         sysMsg: function(msg) {
-            (new Element("p", {text: "系统: " + msg, styles: {
+            showMsgEl(new Element("p", {"text": "系统: " + msg, 
+                "styles": {
                     color: "red"
                 }
-            })).inject($("msgHistory"));
+            }));
         }
     });
 })();
