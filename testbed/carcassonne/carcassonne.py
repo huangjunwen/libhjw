@@ -1,7 +1,7 @@
 # -*- encoding=utf-8 -*-
 
 import re
-from itertools import cycle
+from itertools import cycle, chain
 from twisted.python import log
 from wsjson import *
 from event import EventSrc
@@ -35,6 +35,8 @@ MIN_PLAYER_PER_GAME = 2
 
 MAX_PLAYER_PER_GAME = 5
 
+MEEPLE_PER_PLAYER = 7
+
 
 class Game(EventSrc):
 
@@ -42,9 +44,6 @@ class Game(EventSrc):
         super(Game, self).__init__()
         self.id = id
         self.st = GAME_ST_IDLE 
-
-        # a notifier to broadcast events
-        self.notifier = GameNotifier(self)
 
         # players dict
         self.id2player = {}
@@ -54,10 +53,17 @@ class Game(EventSrc):
         # game stuff
         self.ready_cnt = 0
         self.board = Board()
+        self.meeples = dict([(color, [Meeple(color) for i in xrange(MEEPLE_PER_PLAYER)]) 
+            for color in xrange(MAX_PLAYER_PER_GAME)])
         self.curr_player = None
+        self.curr_meeple = None
         self.player_loop = None
 
         self.cleanGame()
+
+        # a notifier to broadcast events
+        self.notifier = GameNotifier(self)
+
 
     def players(self):
         for p in self.id2player.itervalues():
@@ -90,6 +96,7 @@ class Game(EventSrc):
         player.game = self
         player.color = color
         player.ready = False
+
         self.fireEv('join', player=player)
         return True, ""
 
@@ -107,6 +114,7 @@ class Game(EventSrc):
         assert p == player
         p = self.color2player.pop(player.color)
         assert p == player
+
         player.room = None
         player.color = None
         if player.ready:
@@ -145,6 +153,7 @@ class Game(EventSrc):
         self.ready_cnt = 0
 
         self.curr_player = None
+        self.curr_meeple = None
         self.player_loop = None
 
         self.board.reset()
@@ -170,14 +179,51 @@ class Game(EventSrc):
         def create_player_loop():
             for p in cycle(players):
                 self.curr_player = p
-                yield p
+                self.curr_meeple = None
+                for m in self.meeples[p.color]:
+                    if not m.used:
+                        self.curr_meeple = m
+                        break
+                yield
         self.player_loop = create_player_loop()
         self.player_loop.next()
 
         self.fireEv('startGame', start_player=self.curr_player, 
-            start_tile=self.board[0, 0])
+            start_tile=self.board[0, 0], 
+            meeple=self.curr_meeple,
+            remain=len(self.board.tile_pile))
         return True
 
+    def putMeeple(self, player, terra_idx, pos):
+        if self.st != GAME_ST_GAMING or player != self.curr_player or \
+                self.curr_meeple is None:
+            return False
+
+        meeple = self.curr_meeple
+        tile = self.board.last_tile
+
+        if not self.board.canPut(tile):
+            return False
+
+        if terra_idx not in self.board.unoccupiedTerraIdx(tile):
+            return False
+        
+        self.curr_meeple.put(tile, terra_idx, pos)
+        self.fireEv('putMeeple', player=player, meeple=meeple, tile=tile, 
+            terra_idx=terra_idx, pos=pos)
+        return True
+
+    def pickMeeple(self, player):
+        if self.st != GAME_ST_GAMING or player != self.curr_player or \
+                self.curr_meeple is None:
+            return False
+        
+        if not self.curr_meeple.used:
+            return True
+        
+        self.curr_meeple.pick()
+        self.fireEv('pickMeeple', player=player, meeple=self.curr_meeple)
+        return True
 
 
 class GameNotifier(object):
@@ -185,7 +231,9 @@ class GameNotifier(object):
     def __init__(self, game):
         self.game = game
         for ev_name in ('join', 'leave', 'chat', 'sysMsg', 'ready', 'startGame',
-            'cleanGame'):
+            'cleanGame',
+            'pickMeeple',
+            'putMeeple'):
             game.addEvListener(ev_name, getattr(self, 
                 'on' + ev_name[0].upper() + ev_name[1:]))
 
@@ -216,11 +264,17 @@ class GameNotifier(object):
         self.notifyAllExcept(ev.player, 'ready', ev.player.id)
 
     def onStartGame(self, ev):
-        self.notifyAll('startGame', ev.start_player.id, ev.start_tile.id, ev.start_tile.tile_idx)
+        self.notifyAll('startGame', ev.start_player.id, ev.start_tile.id, ev.start_tile.tile_idx,
+            ev.meeple.id, ev.remain)
 
     def onCleanGame(self, ev):
         self.notifyAll('cleanGame')
+
+    def onPutMeeple(self, ev):
+        self.notifyAllExcept(ev.player, 'putMeeple', ev.tile.id, ev.meeple.id, ev.pos)
         
+    def onPickMeeple(self, ev):
+        self.notifyAllExcept(ev.player, 'pickMeeple', ev.meeple.id)
 
 games = [Game(i) for i in xrange(10)]
 
@@ -253,11 +307,14 @@ class GameHandler(WSJsonRPCHandler):
 
         if not ok:
             return {'ok': ok, 'msg': msg}
+
         # set attr
         self.player = player
         return {'ok': ok, 'msg': msg, 'selfID': player.id, 
             'players': [ {'id': p.id, 'nickname': p.nickname, 'colorID': p.color, 
-                'ready': p.ready} for p in game.players()]
+                'ready': p.ready} for p in game.players()],
+            'meeples': [ {'id': m.id, 'colorID': m.color} 
+                for m in chain(*(x for x in game.meeples.itervalues())) ]
         }
 
     def do_chat(self, msg):
@@ -288,10 +345,28 @@ class GameHandler(WSJsonRPCHandler):
         player.game.chat(player, msg)
         return {'ok': True}
     
-    def  do_ready(self):
+    def do_ready(self):
         if self.player is None:
             return {'ok': False}
         
         player = self.player
         player.game.ready(player)
+        return {'ok': True}
+
+    def do_putMeeple(self, terra_idx, pos):
+        if self.player is None:
+            return {'ok': False}
+        
+        player = self.player
+        if not player.game.putMeeple(player, terra_idx, pos):
+            return {'ok': False}
+        return {'ok': True}
+
+    def do_pickMeeple(self):
+        if self.player is None:
+            return {'ok': False}
+
+        player = self.player
+        if not player.game.pickMeeple(player):
+            return {'ok': False}
         return {'ok': True}

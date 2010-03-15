@@ -102,10 +102,26 @@ class Meeple(object):
 
     create_cnt = 0
 
-    def __init__(self, player):
+    def __init__(self, color):
         self.id = "M%d" % Meeple.create_cnt
         Meeple.create_cnt += 1
-        self.player = player
+        self.color = color
+        self.pick()
+    
+    def put(self, tile, terra_idx, pos):
+        self.tile = tile
+        self.terra_idx = terra_idx
+        self.pos = pos
+
+    def pick(self):
+        self.tile = None
+        self.terra_idx = None
+        self.pos = None                               # XXX 
+
+    @property
+    def used(self):
+        return self.tile is not None
+    
 
 
 tpn2tp = [
@@ -153,6 +169,7 @@ class Board(object):
         self.all_terra = set()                                                  # set([terra,])
 
         self.last_tile = None
+        self.last_tile_handled = True
         self.coords = {}                                                        # {coord: tile}
         self.tile_pile = TilePile()
         self.tiles_on_board = set()
@@ -166,23 +183,25 @@ class Board(object):
         """
         Pick up a tile from pile
         """
-        assert self.last_tile is None
+        assert self.last_tile_handled
         self.last_tile = self.tile_pile.pick()
+        if self.last_tile:
+            self.last_tile_handled = False
         return self.last_tile
 
     def discardTile(self, tile):
         """
         Discard a tile
         """
-        assert self.last_tile is not None and tile is self.last_tile
+        assert not self.last_tile_handled and tile is self.last_tile
         self.tiles_discard.add(tile)
-        self.last_tile = None
+        self.last_tile_handled = True
 
     def putTile(self, tile):
         """
         Put the top tile on the tile pile into the board
         """
-        assert self.last_tile is not None and tile is self.last_tile
+        assert not self.last_tile_handled and tile is self.last_tile
 
         # test coord
         if not self.canPut(tile):
@@ -222,14 +241,16 @@ class Board(object):
             for tp in terra.all_tps:
                 self.all_tps[tp] = terra
 
-        self.last_tile = None
+        self.last_tile_handled = True
         return True
 
     def canPut(self, tile):
         """
         Can the tile be put
         """
-        if tile.coord in self.coords:                                           # occupied
+        if tile.coord in self.coords:
+            if tile is self[tile.coord]:
+                return True
             return False
 
         x, y = tile.coord
