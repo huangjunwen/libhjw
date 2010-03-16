@@ -271,7 +271,7 @@ class GameNotifier(object):
         self.notifyAll('cleanGame')
 
     def onPutMeeple(self, ev):
-        self.notifyAll('putMeeple', ev.tile.id, ev.meeple.id, ev.meeple.color, ev.pos)
+        self.notifyAll('putMeeple', ev.meeple.id, ev.meeple.color, ev.tile.id, ev.pos)
         
     def onPickMeeple(self, ev):
         self.notifyAll('pickMeeple', ev.meeple.id)

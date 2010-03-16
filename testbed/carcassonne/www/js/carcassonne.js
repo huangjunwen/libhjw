@@ -79,7 +79,7 @@ var Meeple = (function() {
              * */
         },
 
-        initialize: function(tile, id, colorID, pos, opt) {
+        initialize: function(id, colorID, tile, showPos, opt) {
             this.setOptions(opt);
 
             // attr
@@ -88,6 +88,8 @@ var Meeple = (function() {
             this.tile = tile;
             tile.meeple = this;
             this.colorID = colorID;
+
+            this.tile.freeze();
 
             // DOM
             this.el = new Element('div', {
@@ -105,12 +107,13 @@ var Meeple = (function() {
                 }
             });
             this.el.inject(tile);
-            this.show(pos);
+            this.show(showPos);
             this.parent(id);
             this.fireEvent('put', [this]);
         },
         finalize: function() {
             this.tile.meeple = null;
+            this.tile.unfreeze();
             this.tile = null;
             this.el.dispose();
             this.parent();
@@ -187,8 +190,26 @@ var Tile = (function() {
             this.notDragged = true;                                 // XXX a tag to tell between click and drag
             this.meeple = null;
 
+            // shadow (shadow is used for positioning)
+            this.shadow = new Element('div', {
+                "border": "0",
+                "styles": {
+                    "padding": "0px",
+                    "background-image": "url('" + tilesImgUrl + "')",
+                    "background-repeat": "no-repeat",
+                    "width": tileImgSize + "px",
+                    "height": tileImgSize + "px",
+                    "position": "absolute",
+                    "opacity": 0.5
+                }
+            });
+
             // DOM: create container div and the img ( for image map )
-            this.el = new Element('div');
+            this.el = new Element('div', {
+                "styles": {
+                    "position": "absolute"                          // import otherwise z-index not work
+                }
+            });
             this.el.store('tile', this);
             this.el.set('morph', {duration: 'short', transition: Fx.Transitions.Sine.easeOut});
             this.img = new Element('img', {
@@ -196,7 +217,6 @@ var Tile = (function() {
                 "src": tileTransparentUrl,                          // FF needs a src, otherwise image map will not work
                 "styles": {
                     "padding": "0px",
-                    "display": "block",
                     "background-image": "url('" + tilesImgUrl + "')",
                     "background-repeat": "no-repeat",
                     "width": tileImgSize + "px",
@@ -233,13 +253,8 @@ var Tile = (function() {
                 map.inject(inst.el);
             });
 
-            // shadow (shadow is used for positioning)
-            this.shadow = this.img.clone(false);
-            this.shadow.setStyles({
-                'display': 'block',
-                'position': 'absolute',
-                'opacity': 0.5
-            });
+            this.el.setStyle("zIndex", 900);
+            this.shadow.setStyle("zIndex", 800);
 
             // init rotation
             this.rotate();
@@ -343,12 +358,11 @@ var Tile = (function() {
             this.makeDraggable();
         },
         stop: function() {
-            /* 
-             * stop this tile, remove all events on it
-             * */
             if (!this.shadow)
                 return;
+
             this.freeze();
+            this.unfreeze = this.freeze = $empty;               // permanently freeze
             this.removeEvents();
             var currMapName = mapName(this.toID(), this.rotation);
             $each(this.el.getElements("map[name!=" + currMapName + "]"), function(m) { 
@@ -426,6 +440,7 @@ var Board = (function() {
             this.neighborCnt = new Grid();                      // (x, y) -> neighbor count
             this.tiles = new Grid();                            // (x, y) -> tile
             this.tilesCnt = 0;
+            this.currTile = null;
 
             // DOM
             this.el = new Element('div', {
@@ -439,6 +454,7 @@ var Board = (function() {
             });
         },
         finalize: function() {
+            this.currTile = null;
             this.tiles.each(function(t) {
                 t.finalize();
             });
@@ -483,6 +499,8 @@ var Board = (function() {
             return this.tiles.get(c.gX, c.gY) ? true : false;
         },
         checkBounds: function(c, tile) {
+            tile = tile || this.currTile;
+
             if (this.tilesCnt == 1 && !c.gX && !c.gY)
                 return true;
 
@@ -499,6 +517,7 @@ var Board = (function() {
             return cnt != 0 && fit;
         },
         findTile: function(tile) {
+            tile = tile || this.currTile;
             var c;
             if (!(c = this.tiles.find(tile)))
                 return null;
@@ -552,9 +571,11 @@ var Board = (function() {
             });
 
             tile.injectAt(this, c);
+            this.currTile = tile;
             return tile;
         },
         settleTile: function(tile) {                                    // tile settle down
+            tile = tile || this.currTile;
             tile.stop();
             this.el.makeDraggable({'handle': $(tile)});
         }
@@ -851,6 +872,13 @@ Element.implement({
     }
 });
 
+Element.Events.spacePressed = {
+    base: 'keyup',
+    condition: function(ev) {
+        return ev.key == 'space' && !ev.alt && !ev.control && !ev.shift;
+    }
+};
+
 function Carcassonne() {
     var transport, loginPanel, gamePanel, msgPanel, board;
 
@@ -876,6 +904,15 @@ function Carcassonne() {
         UniqObj.cleanAll();
     }
     reset();
+
+    function stopCurrTile() {
+        var tile = board.currTile;
+        tile.removeEvents();
+        if (tile.meeple)
+            $(meeple).removeEvents();
+        window.removeEvents('click');
+        window.removeEvents('spacePressed');
+    }
 
     /************************
      * RPCs called to server 
@@ -988,18 +1025,18 @@ function Carcassonne() {
             board = new Board();
             $(board).inject($("boardCont")).mvToPageCenter();
 
-            // create tile
-            var tile = board.createTile(startTileID, startTileIdx, {gX: 0, gY: 0});
-            tile.stop();
-
             // take turn
             var player = UniqObj.fromID(startPlayerID);
             gamePanel.startGame(remainTiles, player);
+
+            // put the first tile
+            var tile = board.createTile(startTileID, startTileIdx, {gX: 0, gY: 0});
+            tile.stop();
             if (gamePanel.isSelfTurn()) {
                 tile.addEvent('terraclick', function(t, terra, terraType, ev) {
                     if (!tile.fit)
                         return;
-
+                    
                     var pos = $(tile).getPosition();
                     pos.x = ev.page.x - pos.x;
                     pos.y = ev.page.y - pos.y;
@@ -1010,27 +1047,28 @@ function Carcassonne() {
             // msg
             msgPanel.sysMsg("游戏开始!! 请 " + player.nickname + "行动");
         },
-        putMeeple: function(tileID, meepleID, colorID, pos) {
-            var tile = UniqObj.fromID(tileID);
+        putMeeple: function(meepleID, colorID, tileID, showPos) {
             var meeple = UniqObj.fromID(meepleID);
-            if (meeple)
-                meeple.show(pos);
-            else {
-                meeple = new Meeple(tile, meepleID, colorID, pos, {
-                    onPut: function(m) {
-                        gamePanel.addMeepleCnt(colorID, -1);
-                    },
-                    onPick: function(m) {
-                        gamePanel.addMeepleCnt(colorID, 1);
-                    }
-                });
-
-                if (gamePanel.isSelfTurn())
-                    $(meeple).addEvent('click', function(ev) {
-                        _pickMeeple();
-                    });
+            if (meeple) {
+                meeple.show(showPos);
+                return;
             }
 
+            var tile = UniqObj.fromID(tileID);
+            meeple = new Meeple(meepleID, colorID, tile, showPos, {
+                onPut: function() {
+                    gamePanel.addMeepleCnt(colorID, -1);
+                },
+                onPick: function() {
+                    gamePanel.addMeepleCnt(colorID, 1);
+                }
+            });
+
+            if (gamePanel.isSelfTurn()) {
+                $(meeple).addEvent('click', function(ev) {
+                    _pickMeeple();
+                });
+            }
         },
         pickMeeple: function(meepleID) {
             UniqObj.fromID(meepleID).finalize();
