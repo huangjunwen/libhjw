@@ -190,7 +190,6 @@ class Game(EventSrc):
 
         self.fireEv('startGame', start_player=self.curr_player, 
             start_tile=self.board[0, 0], 
-            meeple=self.curr_meeple,
             remain=len(self.board.tile_pile))
         return True
 
@@ -264,17 +263,18 @@ class GameNotifier(object):
         self.notifyAllExcept(ev.player, 'ready', ev.player.id)
 
     def onStartGame(self, ev):
-        self.notifyAll('startGame', ev.start_player.id, ev.start_tile.id, ev.start_tile.tile_idx,
-            ev.meeple.id, ev.remain)
+        self.notifyAll('startGame', ev.start_player.id, ev.start_tile.id, 
+            ev.start_tile.tile_idx,
+            ev.remain)
 
     def onCleanGame(self, ev):
         self.notifyAll('cleanGame')
 
     def onPutMeeple(self, ev):
-        self.notifyAllExcept(ev.player, 'putMeeple', ev.tile.id, ev.meeple.id, ev.pos)
+        self.notifyAll('putMeeple', ev.tile.id, ev.meeple.id, ev.meeple.color, ev.pos)
         
     def onPickMeeple(self, ev):
-        self.notifyAllExcept(ev.player, 'pickMeeple', ev.meeple.id)
+        self.notifyAll('pickMeeple', ev.meeple.id)
 
 games = [Game(i) for i in xrange(10)]
 

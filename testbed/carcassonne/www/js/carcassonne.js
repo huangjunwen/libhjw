@@ -70,7 +70,18 @@ var Meeple = (function() {
 
         Extends: UniqObj,
 
-        initialize: function(tile, id, colorID) {
+        Implements: [Events, Options],
+
+        options: {
+            /*
+             * onPut: function(meeple)
+             * onPick: function(meeple)
+             * */
+        },
+
+        initialize: function(tile, id, colorID, pos, opt) {
+            this.setOptions(opt);
+
             // attr
             if (tile.meeple)
                 tile.meeple.finalize();
@@ -94,14 +105,16 @@ var Meeple = (function() {
                 }
             });
             this.el.inject(tile);
-
+            this.show(pos);
             this.parent(id);
+            this.fireEvent('put', [this]);
         },
         finalize: function() {
             this.tile.meeple = null;
             this.tile = null;
             this.el.dispose();
             this.parent();
+            this.fireEvent('pick', [this]);
         },
         toElement: function() {
             return this.el;
@@ -702,7 +715,7 @@ var GamePanel = (function() {
             }
             scoreBoard(player.colorID).addClass('scoreBoardOnTurn');
             this.currPlayer = player;
-            if (this.currPlayer == Player.self)
+            if (this.isSelfTurn())
                 $("turnEnd").show();
         },
         isSelfTurn: function() {
@@ -864,25 +877,6 @@ function Carcassonne() {
     }
     reset();
 
-    // self turn action
-    function selfTurnStart(tile) {
-        tile.addEvent('terraclick', function(t, terra, terraType, ev) {
-            if (!tile.fit)
-                return;
-
-            var pos = $(tile).getPosition();
-            pos.x = ev.page.x - pos.x;
-            pos.y = ev.page.y - pos.y;
-            _putMeeple(terra, pos);
-        });
-    }
-
-    function selfTurnMeeplePut(meeple) {
-        $(meeple).addEvent('click', function(ev) {
-            _pickMeeple();
-        });
-    }
-
     /************************
      * RPCs called to server 
      ************************/
@@ -1000,24 +994,46 @@ function Carcassonne() {
 
             // take turn
             var player = UniqObj.fromID(startPlayerID);
-            gamePanel.startGame(player);
-            if (gamePanel.isSelfTurn())
-                selfTurnStart(tile);
+            gamePanel.startGame(remainTiles, player);
+            if (gamePanel.isSelfTurn()) {
+                tile.addEvent('terraclick', function(t, terra, terraType, ev) {
+                    if (!tile.fit)
+                        return;
+
+                    var pos = $(tile).getPosition();
+                    pos.x = ev.page.x - pos.x;
+                    pos.y = ev.page.y - pos.y;
+                    _putMeeple(terra, pos);
+                });
+            }
 
             // msg
             msgPanel.sysMsg("游戏开始!! 请 " + player.nickname + "行动");
         },
         putMeeple: function(tileID, meepleID, colorID, pos) {
             var tile = UniqObj.fromID(tileID);
-            var meeple = new Meeple(tile, meepleID, colorID);
-            meeple.show(pos);
-            gamePanel.addMeepleCnt(colorID, -1);
-            if (gamePanel.isSelfTurn())
-                selfTurnMeeplePut(meeple);
+            var meeple = UniqObj.fromID(meepleID);
+            if (meeple)
+                meeple.show(pos);
+            else {
+                meeple = new Meeple(tile, meepleID, colorID, pos, {
+                    onPut: function(m) {
+                        gamePanel.addMeepleCnt(colorID, -1);
+                    },
+                    onPick: function(m) {
+                        gamePanel.addMeepleCnt(colorID, 1);
+                    }
+                });
+
+                if (gamePanel.isSelfTurn())
+                    $(meeple).addEvent('click', function(ev) {
+                        _pickMeeple();
+                    });
+            }
+
         },
         pickMeeple: function(meepleID) {
             UniqObj.fromID(meepleID).finalize();
-            gamePanel.addMeepleCnt(colorID, 1);
         },
         cleanGame: function() {
             if (board) {
