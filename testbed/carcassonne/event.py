@@ -19,7 +19,7 @@ class EventSrc(object):
     def __init__(self):
         self.eventListeners = {}            # ev_type -> [listeners]
         self._pendingCalls = []             # avoid modifing the list when traversing
-        self.firing = False
+        self._firingEv = False
 
     def _callPendings(self):
         for name, args, kw in self._pendingCalls:
@@ -27,7 +27,7 @@ class EventSrc(object):
         self._pendingCalls = []
 
     def addEvListener(self, ev_type, listener):
-        if self.firing:
+        if self._firingEv:
             self._pendingCalls.append(('addEvListener', (ev_type, listener), {}))
             return
 
@@ -35,7 +35,7 @@ class EventSrc(object):
         listeners.append(listener)
 
     def rmEvListener(self, ev_type=None, listener=None):
-        if self.firing:
+        if self._firingEv:
             self._pendingCalls.append(('rmEvListener', (ev_type, listener), {}))
             return
 
@@ -58,10 +58,10 @@ class EventSrc(object):
 
     def fireEv(self, ev_type, **args):
         ev = EventObject(ev_type, self, args)
-        self.firing = True
+        self._firingEv = True
         for l in self.eventListeners.get(ev_type, []):
             l(ev)                                       # listener prototype
-        self.firing = False
+        self._firingEv = False
         self._callPendings()
 
 

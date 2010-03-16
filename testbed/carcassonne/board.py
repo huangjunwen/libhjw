@@ -96,6 +96,7 @@ terra 有可能闭合或尚未闭合, 通过 tiepoint (每个 tile 每一边共�
 """
 
 from random import randint
+from event import EventSrc
 
 
 class Meeple(object):
@@ -141,7 +142,7 @@ tpn2tp = [
 ]
 
 
-class Board(object):
+class Board(EventSrc):
     """
     Game board
 
@@ -155,9 +156,13 @@ class Board(object):
         open_tps (r): dict of open tiepoint -> terra
         all_tps (r): dict of tiepoint -> terra
         all_terra (r): all terra on the board
+
+    Events:
+        terraComplete
     """
 
     def __init__(self):
+        super(Board, self).__init__()
         self.reset()
 
     def reset(self):
@@ -240,8 +245,32 @@ class Board(object):
                 self.open_tps[tp] = terra
             for tp in terra.all_tps:
                 self.all_tps[tp] = terra
-
         self.last_tile_handled = True
+
+        # fire events
+        cloister = None
+        for terra in self.terraOnTile(tile):
+            if not terra.closed:
+                continue
+            if isinstance(terra, CLOISTER):
+                cloister = terra
+                continue
+            self.fireEv('terraComplete', terra=terra)
+    
+        neighbour_cnt = 0
+        for n in self.neighbours(tile):
+            if n is None:
+                continue
+            neighbour_cnt += 1
+            n.neighbour_cnt += 1
+            if n.neighbour_cnt >= 8:
+                terra = self.terraOnTileByIdx(n, -1)                # XXX CLOISTER always the last one
+                if isinstance(terra, CLOISTER):
+                    self.fireEv('terraComplete', terra=terra)
+        tile.neighbour_cnt = neighbour_cnt
+        if neighbour_cnt >= 8 and cloister:
+            self.fireEv('terraComplete', terra=cloister)
+
         return True
 
     def canPut(self, tile):
@@ -295,24 +324,33 @@ class Board(object):
                 ret.append(i)
         return ret
 
-    def getTerraByIdx(self, tile, terra_idx):
+    def terraOnTileByIdx(self, tile, terra_idx):
         if tile not in self.tiles_on_board:
             return None
         
         _, tpns, _ = tile.terra_proto[terra_idx]
         return self.all_tps[tile.tiepoint(tpns[0])]
 
-    def getTerraOnTile(self, tile): 
-        return [self.getTerraByIdx(tile, i) for i in xrange(len(tile.terra_proto))]
+    def terraOnTile(self, tile): 
+        return [self.terraOnTileByIdx(tile, i) for i in xrange(len(tile.terra_proto))]
+
+    def neighbours(self, tile):
+        assert tile in self.tiles_on_board
+        x, y = tile.coord
+        yield self[x - 1, y + 1]
+        yield self[x, y + 1]
+        yield self[x + 1, y + 1]
+        yield self[x + 1, y]
+        yield self[x + 1, y - 1]
+        yield self[x, y - 1]
+        yield self[x - 1, y - 1]
+        yield self[x - 1, y]
 
     def __getitem__(self, coord):
         """
         Get the tile on coord
         """
-        try:
-            return self.coords[coord]
-        except KeyError:
-            return None
+        return self.coords.get(coord, None)
 
 
 class TilePile(object):
@@ -442,6 +480,7 @@ class TileBase(object):
         self.rotation = 0
         self.bounds = None
         self.terra_proto = None
+        self.neighbour_cnt = 0
         self.rotate(0)
 
     def __repr__(self):
@@ -547,6 +586,13 @@ class Terra(object):
             return False
         self.meeples.add(meeple)
         return True
+
+    def pickMeeples(self):  
+        ret = self.meeples
+        for m in ret:
+            m.pick()
+        self.meeples = set()
+        return ret
 
     @property
     def closed(self):

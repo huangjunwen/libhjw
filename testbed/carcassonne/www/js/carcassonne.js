@@ -499,8 +499,6 @@ var Board = (function() {
             return this.tiles.get(c.gX, c.gY) ? true : false;
         },
         checkBounds: function(c, tile) {
-            tile = tile || this.currTile;
-
             if (this.tilesCnt == 1 && !c.gX && !c.gY)
                 return true;
 
@@ -517,7 +515,6 @@ var Board = (function() {
             return cnt != 0 && fit;
         },
         findTile: function(tile) {
-            tile = tile || this.currTile;
             var c;
             if (!(c = this.tiles.find(tile)))
                 return null;
@@ -575,9 +572,11 @@ var Board = (function() {
             return tile;
         },
         settleTile: function(tile) {                                    // tile settle down
-            tile = tile || this.currTile;
             tile.stop();
             this.el.makeDraggable({'handle': $(tile)});
+        },
+        takeTurn: function() {
+            this.currTile = null;
         }
     }); 
 })();
@@ -906,13 +905,21 @@ function Carcassonne() {
     reset();
 
     function stopCurrTile() {
+        if (!board.currTile || !board.currTile.fit)
+            return false;
         var tile = board.currTile;
         tile.removeEvents();
         if (tile.meeple)
-            $(meeple).removeEvents();
+            $(tile.meeple).removeEvents();
         window.removeEvents('click');
         window.removeEvents('spacePressed');
+        return true;
     }
+    gamePanel.addEvent('turnendclick', function() {
+        if (!stopCurrTile())
+            return;
+        _turnEnd();
+    });
 
     /************************
      * RPCs called to server 
@@ -989,6 +996,10 @@ function Carcassonne() {
         transport.call('pickMeeple', []);
     }
 
+    function _turnEnd() {
+        transport.call('turnEnd', []);
+    }
+
     /************************
      * RPCs called by server 
      ************************/
@@ -1021,13 +1032,13 @@ function Carcassonne() {
             if (board)
                 throw "already has board";
 
-            // create board
-            board = new Board();
-            $(board).inject($("boardCont")).mvToPageCenter();
-
             // take turn
             var player = UniqObj.fromID(startPlayerID);
             gamePanel.startGame(remainTiles, player);
+
+            // create board
+            board = new Board();
+            $(board).inject($("boardCont")).mvToPageCenter();
 
             // put the first tile
             var tile = board.createTile(startTileID, startTileIdx, {gX: 0, gY: 0});
@@ -1072,6 +1083,10 @@ function Carcassonne() {
         },
         pickMeeple: function(meepleID) {
             UniqObj.fromID(meepleID).finalize();
+        },
+        takeTurn: function(playerID) {
+            board.takeTurn();
+            gamePanel.takeTurn(UniqObj.fromID(playerID));
         },
         cleanGame: function() {
             if (board) {

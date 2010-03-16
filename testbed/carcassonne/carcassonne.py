@@ -51,19 +51,19 @@ class Game(EventSrc):
         self.color2player = {}
 
         # game stuff
-        self.ready_cnt = 0
         self.board = Board()
+        self.completedTerra = set()
+        self.board.addEvListener('terraComplete', 
+            lambda ev: self.completedTerra.add(ev.terra))
         self.meeples = dict([(color, [Meeple(color) for i in xrange(MEEPLE_PER_PLAYER)]) 
             for color in xrange(MAX_PLAYER_PER_GAME)])
-        self.curr_player = None
-        self.curr_meeple = None
-        self.player_loop = None
 
+        # before game
+        self.ready_cnt = 0
         self.cleanGame()
 
         # a notifier to broadcast events
         self.notifier = GameNotifier(self)
-
 
     def players(self):
         for p in self.id2player.itervalues():
@@ -152,11 +152,13 @@ class Game(EventSrc):
             p.ready = False
         self.ready_cnt = 0
 
+        self.board.reset()
+        self.scores = [0 for i in xrange(MAX_PLAYER_PER_GAME)]
         self.curr_player = None
+        self.curr_tile = None
         self.curr_meeple = None
         self.player_loop = None
 
-        self.board.reset()
         self.fireEv('cleanGame')
 
     def abortGame(self, reason):
@@ -187,9 +189,10 @@ class Game(EventSrc):
                 yield
         self.player_loop = create_player_loop()
         self.player_loop.next()
+        self.curr_tile = self.board[0, 0]
 
         self.fireEv('startGame', start_player=self.curr_player, 
-            start_tile=self.board[0, 0], 
+            start_tile=self.curr_tile, 
             remain=len(self.board.tile_pile))
         return True
 
@@ -199,7 +202,7 @@ class Game(EventSrc):
             return False
 
         meeple = self.curr_meeple
-        tile = self.board.last_tile
+        tile = self.curr_tile
 
         if not self.board.canPut(tile):
             return False
@@ -223,6 +226,34 @@ class Game(EventSrc):
         self.curr_meeple.pick()
         self.fireEv('pickMeeple', player=player, meeple=self.curr_meeple)
         return True
+
+    def turnEnd(self, player):
+        if self.st != GAME_ST_GAMING or player != self.curr_player:
+            return False
+
+        # not yet pick up a tile
+        if not self.curr_tile:
+            return False
+
+        # put tile
+        tile = self.curr_tile
+        if self.board[tile.coord] is not tile:
+            if not self.board.putTile(tile):
+                return False
+        
+        # put meeple
+        meeple = self.curr_meeple
+        if meeple and meeple.used:
+            terra = self.board.terraOnTileByIdx(tile, meeple.terra_idx)
+            res = terra.putMeeple(meeple)
+            assert res
+
+        # ok, now we calculate the scores
+        self.calcScore()
+
+    def calcScore(self, last=False):
+        score = {}                                      # {meeple: score}
+        # XXX here!!
 
 
 class GameNotifier(object):
@@ -368,5 +399,13 @@ class GameHandler(WSJsonRPCHandler):
 
         player = self.player
         if not player.game.pickMeeple(player):
+            return {'ok': False}
+        return {'ok': True}
+
+    def do_turnEnd(self):
+        if self.player is None:
+            return {'ok': False}
+        player = self.player
+        if not player.game.turnEnd(player):
             return {'ok': False}
         return {'ok': True}
