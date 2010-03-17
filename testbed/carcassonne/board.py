@@ -96,7 +96,6 @@ terra 有可能闭合或尚未闭合, 通过 tiepoint (每个 tile 每一边共�
 """
 
 from random import randint
-from itertools import ifilter
 from event import EventSrc
 
 
@@ -624,7 +623,7 @@ class FIELD(Terra):
     terra_type = 1
 
     def getScore(self):
-        return len(ifilter(lambda t: isinstance(t, CITY) and t.closed, 
+        return len(filter(lambda t: isinstance(t, CITY) and t.closed, 
             self.adjacent)) * 3
 
 
