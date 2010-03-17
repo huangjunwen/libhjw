@@ -55,8 +55,6 @@ class Game(EventSrc):
         self.completedTerra = set()
         self.board.addEvListener('terraComplete', 
             lambda ev: self.completedTerra.add(ev.terra))
-        self.meeples = dict([(color, [Meeple(color) for i in xrange(MEEPLE_PER_PLAYER)]) 
-            for color in xrange(MAX_PLAYER_PER_GAME)])
 
         # before game
         self.ready_cnt = 0
@@ -153,6 +151,9 @@ class Game(EventSrc):
         self.ready_cnt = 0
 
         self.board.reset()
+        self.meeples = dict([(color, [Meeple(color) for i in xrange(MEEPLE_PER_PLAYER)]) 
+            for color in xrange(MAX_PLAYER_PER_GAME)])
+
         self.scores = [0 for i in xrange(MAX_PLAYER_PER_GAME)]
         self.curr_player = None
         self.curr_tile = None
@@ -204,6 +205,9 @@ class Game(EventSrc):
         meeple = self.curr_meeple
         tile = self.curr_tile
 
+        if not tile.onBoard:
+            return False
+
         if not self.board.canPut(tile):
             return False
 
@@ -224,15 +228,15 @@ class Game(EventSrc):
             return True
         
         self.curr_meeple.pick()
-        self.fireEv('pickMeeple', player=player, meeple=self.curr_meeple)
+        self.fireEv('pickMeeple', meeple=self.curr_meeple)
         return True
 
     def turnEnd(self, player):
         if self.st != GAME_ST_GAMING or player != self.curr_player:
             return False
 
-        # not yet pick up a tile
-        if not self.curr_tile:
+        # not yet put on board
+        if not self.curr_tile.onBoard:
             return False
 
         # put tile
@@ -251,10 +255,56 @@ class Game(EventSrc):
         # ok, now we calculate the scores
         self.calcScore()
 
-    def calcScore(self, last=False):
-        score = {}                                      # {meeple: score}
-        # XXX here!!
+        # take turn
+        self.player_loop.next()
+        self.curr_tile = self.board.pickTile()
+        self.fireEv('takeTurn', player=self.curr_player)
+        return True
 
+    def calcScore(self, last=False):
+        for terra in self.completedTerra:
+            # XXX pickMeeple and add score
+            pass
+        self.completedTerra = set()
+
+    def putTile(self, player, x, y):
+        if self.st != GAME_ST_GAMING or player != self.curr_player:
+            return False
+        
+        tile = self.curr_tile
+        coord = (x, y)
+        if self.board[coord] is not None:
+            return False
+        
+        tile.setCoord(coord)
+        self.fireEv('putTile', tile=tile, coord=coord)
+        return True
+
+    def moveTile(self, player, x, y):
+        if self.st != GAME_ST_GAMING or player != self.curr_player:
+            return False
+        
+        tile = self.curr_tile
+        coord = (x, y)
+        if self.board[coord] is not None:
+            return False
+        
+        tile.setCoord(coord)
+        self.fireEv('moveTile', player=player, coord=coord)
+        return True
+
+    def rotateTile(self, player, rotation):
+        if self.st != GAME_ST_GAMING or player != self.curr_player:
+            return False
+        
+        tile = self.curr_tile
+        if not tile.onBoard:
+            return False
+
+        tile.rotate(rotation)
+        self.fireEv('rotateTile', player=player, rotation=tile.rotation)
+        return True
+        
 
 class GameNotifier(object):
     
@@ -263,7 +313,11 @@ class GameNotifier(object):
         for ev_name in ('join', 'leave', 'chat', 'sysMsg', 'ready', 'startGame',
             'cleanGame',
             'pickMeeple',
-            'putMeeple'):
+            'putMeeple',
+            'putTile',
+            'moveTile',
+            'rotateTile',
+            'takeTurn'):
             game.addEvListener(ev_name, getattr(self, 
                 'on' + ev_name[0].upper() + ev_name[1:]))
 
@@ -305,14 +359,30 @@ class GameNotifier(object):
         self.notifyAll('putMeeple', ev.meeple.id, ev.meeple.color, ev.tile.id, ev.pos)
         
     def onPickMeeple(self, ev):
-        self.notifyAll('pickMeeple', ev.meeple.id)
+        if ev.score:
+            self.notifyAll('pickMeeple', ev.meeple.id, ev.score)
+        else:
+            self.notifyAll('pickMeeple', ev.meeple.id)
+    
+    def onPutTile(self, ev):
+        self.notifyAll('putTile', ev.tile.id, ev.tile.tile_idx, 
+            {'gX': ev.coord[0], 'gY': ev.coord[1]})
+
+    def onMoveTile(self, ev):
+        self.notifyAllExcept(ev.player, 'moveTile', 
+            {'gX': ev.coord[0], 'gY': ev.coord[1]})
+
+    def onRotateTile(self, ev):
+        self.notifyAllExcept(ev.player, 'rotateTile', ev.rotation)
+
+    def onTakeTurn(self, ev):   
+        self.notifyAll('takeTurn', ev.player.id)
+
 
 games = [Game(i) for i in xrange(10)]
 
 
 class GameHandler(WSJsonRPCHandler):
-
-    DEBUG = False
 
     def init(self):
         self._debug = False
@@ -405,7 +475,35 @@ class GameHandler(WSJsonRPCHandler):
     def do_turnEnd(self):
         if self.player is None:
             return {'ok': False}
+
         player = self.player
         if not player.game.turnEnd(player):
+            return {'ok': False}
+        return {'ok': True}
+
+    def do_putTile(self, x, y):
+        if self.player is None:
+            return {'ok': False}
+
+        player = self.player
+        if not player.game.putTile(player, x, y):
+            return {'ok': False}
+        return {'ok': True}
+
+    def do_moveTile(self, x, y):
+        if self.player is None:
+            return {'ok': False}
+
+        player = self.player
+        if not player.game.moveTile(player, x, y):
+            return {'ok': False}
+        return {'ok': True}
+
+    def do_rotateTile(self, rotation):
+        if self.player is None:
+            return {'ok': False}
+
+        player = self.player
+        if not player.game.rotateTile(player, rotation):
             return {'ok': False}
         return {'ok': True}

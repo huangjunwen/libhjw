@@ -126,6 +126,7 @@ var Meeple = (function() {
             pos = {x: pos.x - halfMeepleImgSize, y: pos.y - halfMeepleImgSize};
             this.el.setPosition(pos);
             this.el.setStyle('display', 'block');
+            this.pos = pos;
         }
     });
 })();
@@ -336,9 +337,9 @@ var Tile = (function() {
         rotate: function(r) {
             if (this.frozed)
                 return;
-            r = r || 1;
+            r = r || 0;
             // update rotation
-            this.rotation = (this.rotation + r) % 4;
+            this.rotation = r % 4;
 
             // update background image
             var bgPos = "{x}px {y}px".substitute({ x: -this.tileIdx * tileImgSize, y: -this.rotation * tileImgSize })
@@ -347,7 +348,7 @@ var Tile = (function() {
 
             // update map
             this.img.setProperty('usemap', '#' + mapName(this.toID(), this.rotation));
-            this.fireEvent('rotate', this);
+            this.fireEvent('rotate', [this, this.rotation]);
         },
         freeze: function() {        
             this.stopDraggable();
@@ -357,19 +358,29 @@ var Tile = (function() {
             this.frozed = false;
             this.makeDraggable();
         },
-        stop: function() {
-            if (!this.shadow)
-                return;
-
+        permanentFreeze: function(keepAreaClickable) {
             this.freeze();
             this.unfreeze = this.freeze = $empty;               // permanently freeze
-            this.removeEvents();
+
+            // remove unused parts
             var currMapName = mapName(this.toID(), this.rotation);
             $each(this.el.getElements("map[name!=" + currMapName + "]"), function(m) { 
                 m.dispose(); 
             });
-            this.shadow.dispose();
-            this.shadow = null;
+            if (this.shadow) {
+                this.shadow.dispose();
+                this.shadow = null;
+            }
+
+            // remove events
+            if (this.meeple)
+                $(this.meeple).removeEvents();
+            this.removeEvents();
+            if (!keepAreaClickable) {
+                this.getAreas().each(function(a) {
+                    a.removeEvents();
+                });
+            }
         }
     });
 })();
@@ -486,13 +497,13 @@ var Board = (function() {
                 if (!$chk(c.gX))
                     throw "bad arg";
                 c.x = c.gX * tileImgSize;
-                c.y = c.gY * tileImgSize;
+                c.y = - c.gY * tileImgSize;
             }
             else if (!$chk(c.gX)) {
                 if (!$chk(c.x))
                     throw "bad arg";
                 c.gX = (c.x/tileImgSize).toInt();
-                c.gY = (c.y/tileImgSize).toInt();
+                c.gY = - (c.y/tileImgSize).toInt();
             }
         },
         occupied: function(c) {
@@ -570,10 +581,6 @@ var Board = (function() {
             tile.injectAt(this, c);
             this.currTile = tile;
             return tile;
-        },
-        settleTile: function(tile) {                                    // tile settle down
-            tile.stop();
-            this.el.makeDraggable({'handle': $(tile)});
         },
         takeTurn: function() {
             this.currTile = null;
@@ -660,6 +667,10 @@ var GamePanel = (function() {
         addMeepleCnt: function(colorID, delta) {
             var mc = meepleCnt(colorID);
             mc.set('text', mc.get('text').toInt() + delta);
+        },
+        addScore: function(colorID, delta) {
+            var sc = score(colorID);
+            sc.set('text', sc.get('text').toInt() + delta);
         },
         becomeReady: function(player) {
             readySt(player.colorID).set('html', '<font color="green">Yes</font>');
@@ -852,6 +863,37 @@ var LoginPanel = (function() {
     });
 })();
 
+function ephemeralText(cont, pos, text, color) {
+    var el = new Element('div', {
+        'styles': {
+            'position': 'absolute',
+            'font-weight': 'bolder',
+            'font-family': 'sans-serif',
+            'zIndex': 1100,
+            'color': color 
+        },
+        'text': text,
+        'morph': {
+            'duration': 'long',
+            'onComplete': function() {
+                el.dispose();
+            }
+        }
+    });
+    el.inject(cont);
+    el.setPosition(pos);
+
+    var startSz = 30, endSz = 40;
+    var mvX = ((endSz - startSz) * text.length / 2).toInt();
+    var mvY = ((endSz - startSz) / 2).toInt();
+    el.morph({
+        'left': pos.x - mvX,
+        'top': pos.y - mvY,
+        'font-size': [startSz, endSz],
+        'opacity': [1, 0]
+    });
+}
+
 Element.implement({
     mvToPageCenter: function(offsetX, offsetY) {
         offsetX = offsetX || 0;
@@ -875,6 +917,13 @@ Element.Events.spacePressed = {
     base: 'keyup',
     condition: function(ev) {
         return ev.key == 'space' && !ev.alt && !ev.control && !ev.shift;
+    }
+};
+
+Element.Events.cntrlClick = {
+    base: 'click',
+    condition: function(ev) {
+        return ev.control;
     }
 };
 
@@ -903,23 +952,6 @@ function Carcassonne() {
         UniqObj.cleanAll();
     }
     reset();
-
-    function stopCurrTile() {
-        if (!board.currTile || !board.currTile.fit)
-            return false;
-        var tile = board.currTile;
-        tile.removeEvents();
-        if (tile.meeple)
-            $(tile.meeple).removeEvents();
-        window.removeEvents('click');
-        window.removeEvents('spacePressed');
-        return true;
-    }
-    gamePanel.addEvent('turnendclick', function() {
-        if (!stopCurrTile())
-            return;
-        _turnEnd();
-    });
 
     /************************
      * RPCs called to server 
@@ -999,6 +1031,35 @@ function Carcassonne() {
     function _turnEnd() {
         transport.call('turnEnd', []);
     }
+    gamePanel.addEvent('turnendclick', function() {
+        if (!board.currTile) {
+            alert("这一回合还没放下方块");
+            return;
+        }
+        
+        if (!board.currTile.fit) {
+            alert("方块的位置/方向不适合");
+            return;
+        }
+
+        // stop further actions here immediately 
+        board.currTile.permanentFreeze();
+        window.removeEvents('spacePressed');
+        window.removeEvents('cntrlClick');
+        _turnEnd();
+    });
+
+    function _putTile(coord) {
+        transport.call('putTile', [coord.gX, coord.gY]);
+    }
+
+    function _moveTile(coord) {
+        transport.call('moveTile', [coord.gX, coord.gY]);
+    }
+
+    function _rotateTile(rotation) {
+        transport.call('rotateTile', [rotation]);
+    }
 
     /************************
      * RPCs called by server 
@@ -1042,7 +1103,7 @@ function Carcassonne() {
 
             // put the first tile
             var tile = board.createTile(startTileID, startTileIdx, {gX: 0, gY: 0});
-            tile.stop();
+            tile.permanentFreeze(true);
             if (gamePanel.isSelfTurn()) {
                 tile.addEvent('terraclick', function(t, terra, terraType, ev) {
                     if (!tile.fit)
@@ -1081,12 +1142,83 @@ function Carcassonne() {
                 });
             }
         },
-        pickMeeple: function(meepleID) {
-            UniqObj.fromID(meepleID).finalize();
+        pickMeeple: function(meepleID, score) {
+            var meeple = UniqObj.fromID(meepleID);
+            if (score) {
+                ephemeralText(meeple.tile, meeple.pos, '+' + score, 
+                    colorName[meeple.colorID]);
+                gamePanel.addScore(meeple.colorID, score);
+            }
+            meeple.finalize();
         },
         takeTurn: function(playerID) {
+            // some clean actions
+            if (board.currTile) {
+                // XXX freeze again for the curr player but no harms
+                board.currTile.permanentFreeze();                  
+                $(board).makeDraggable({'handle': $(board.currTile)});
+            }
+
+            // new turn
+            var player = UniqObj.fromID(playerID);
             board.takeTurn();
-            gamePanel.takeTurn(UniqObj.fromID(playerID));
+            gamePanel.takeTurn(player);
+            msgPanel.sysMsg("新回合, 请 " + player.nickname + " 行动");
+
+            if (gamePanel.isSelfTurn()) {
+                window.addEvent('cntrlClick', function(ev) {
+                    var coord = board.getGridCoord(ev.page);
+                    if (board.occupied(coord))
+                        return;
+
+                    if (board.currTile) {
+                        board.currTile.moveTo(coord);
+                        return;
+                    }
+                    
+                    _putTile(coord);
+                });
+                window.addEvent('spacePressed', function() {
+                    if (board.currTile)
+                        board.currTile.rotate(board.currTile.rotation + 1);
+                });
+            }
+        },
+        putTile: function(tileID, tileIdx, coord) {
+            board.ensureGridCoord(coord);
+            var tile = board.createTile(tileID, tileIdx, coord);
+
+            if (gamePanel.isSelfTurn()) {
+                tile.addEvent('terraclick', function(t, terra, terraType, ev) {
+                    if (!tile.fit)
+                        return;
+                    
+                    var pos = $(tile).getPosition();
+                    pos.x = ev.page.x - pos.x;
+                    pos.y = ev.page.y - pos.y;
+                    _putMeeple(terra, pos);
+                });
+                tile.addEvent('put', function(t, coord) {
+                    _moveTile(coord);
+                });
+                tile.addEvent('rotate', function(t, rotation) {
+                    _rotateTile(rotation);
+                });
+                tile.makeDraggable();
+            }
+        },
+        moveTile: function(coord) {
+            if (!board.currTile)
+                throw "no current tile";
+
+            board.ensureGridCoord(coord);
+            board.currTile.moveTo(coord);
+        },
+        rotateTile: function(rotation) {
+            if (!board.currTile)
+                throw "no current tile";
+
+            board.currTile.rotate(rotation);
         },
         cleanGame: function() {
             if (board) {

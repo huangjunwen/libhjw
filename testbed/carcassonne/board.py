@@ -357,21 +357,21 @@ class TilePile(object):
 
     def __init__(self):
         self.tiles = [t() for t in TileMeta.tile_classes]
-        self.id = 0
+        self.tid = 0
     
     def pick(self):
-        if self.id == 0:
+        if self.tid == 0:
             ret = TileMeta.start_tile_cls()
         elif self.tiles:
             ret = self.tiles.pop(randint(0, len(self.tiles) - 1))
         else:
             return None
-        ret.id = "T%d" % self.id
-        self.id += 1
+        ret.id = "T%d" % self.tid
+        self.tid += 1
         return ret
 
     def __len__(self):
-        if self.id == 0:
+        if self.tid == 0:
             return len(self.tiles) + 1
         return len(self.tiles)
 
@@ -427,9 +427,13 @@ class TileMeta(type):
         t = attr['terra_proto']
         assert TileMeta._checkTerraOrder(t)
         tpn2tcls = [None] * 13
+        tpn_cnt = 0 
         for tcls, tpns, _ in t:
+            tpn_cnt += len(tpns)
             for tpn in tpns:
+                assert tpn2tcls[tpn] is None
                 tpn2tcls[tpn] = tcls
+        assert tpn_cnt >= 12
         b = [tpn2tcls[x] for x in (1, 4, 7, 10)]
         
         # four rotation copy
@@ -476,7 +480,7 @@ class TileBase(object):
     __metaclass__ = TileMeta
 
     def __init__(self):
-        self.coord = (0, 0)
+        self.coord = None
         self.rotation = 0
         self.bounds = None
         self.terra_proto = None
@@ -489,6 +493,10 @@ class TileBase(object):
             ret += " at %r" % (self.coord,)
         return ret + ">"
 
+    @property
+    def onBoard(self):
+        return self.coord is not None
+
     def tiepoint(self, tpn):
         x, y = self.coord
         return tpn2tp[tpn](x, y)
@@ -499,12 +507,12 @@ class TileBase(object):
         """
         self.coord = coord
 
-    def rotate(self, rotation=1):
+    def rotate(self, r=0):
         """
         Rotate the tile
         """
         cls = self.__class__
-        r = self.rotation = (self.rotation + rotation) & 3                  # % 4
+        r = self.rotation = r & 3                                    # % 4
         self.bounds = cls.bounds[r]
         self.terra_proto = cls.terra_proto[r]
 

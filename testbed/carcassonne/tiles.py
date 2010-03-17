@@ -81,7 +81,7 @@ class Tile(TileBase):
 
 class Tile(TileBase):
     tile_idx = 9
-    terra_proto = [(FIELD, [8, 9, 10, 11, 0], {}), (ROAD, [2, 7], {}), (FIELD, range(3, 8), {})]
+    terra_proto = [(FIELD, [8, 9, 10, 11, 0], {}), (ROAD, [1, 7], {}), (FIELD, range(2, 7), {})]
     adjacent = [(0, 1), (1, 2)]
     amount = 8
 

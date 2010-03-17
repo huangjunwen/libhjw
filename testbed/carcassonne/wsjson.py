@@ -76,6 +76,8 @@ class WSJsonRPCHandler(WebSocketHandler):
     """
     method_re = re.compile(r"^[_A-z]\w*$").match
 
+    DEBUG = False
+
     def __init__(self, transport):
         super(WSJsonRPCHandler, self).__init__(transport)
         self.init()
@@ -105,6 +107,9 @@ class WSJsonRPCHandler(WebSocketHandler):
                 raise InvalidReq()
             if type(method) not in (unicode, str) or not self.method_re(method):
                 raise InvalidReq()
+
+            if self.DEBUG:
+                log.msg("m: %s, p: %r" % (method, params))
 
             method = self.dispatch(method)
             if method is None:
@@ -136,7 +141,12 @@ class WSJsonRPCHandler(WebSocketHandler):
         if not isinstance(val, failure.Failure) and not isinstance(val, Exception):
             return self.respResult(val, call_id)
 
-        log.err(val)
+        if isinstance(val, failure.Failure):
+            log.err(val)
+        else:
+            from traceback import format_exc
+            log.msg(format_exc())
+
         if isinstance(val, failure.Failure):
             val = val.value
         if not isinstance(val, JsonRPCErr):         # convert to JsonRPCErr
