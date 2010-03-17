@@ -63,6 +63,25 @@ class Game(EventSrc):
         # a notifier to broadcast events
         self.notifier = GameNotifier(self)
 
+    def cleanGame(self):
+        self.st = GAME_ST_IDLE 
+
+        for p in self.players():
+            p.ready = False
+        self.ready_cnt = 0
+
+        self.board.reset()
+        self.meeples = dict([(color, [Meeple(color) for i in xrange(MEEPLE_PER_PLAYER)]) 
+            for color in xrange(MAX_PLAYER_PER_GAME)])
+
+        self.scores = [0 for i in xrange(MAX_PLAYER_PER_GAME)]
+        self.curr_player = None
+        self.curr_tile = None
+        self.curr_meeple = None
+        self.player_loop = None
+
+        self.fireEv('cleanGame')
+
     def players(self):
         for p in self.id2player.itervalues():
             yield p
@@ -142,25 +161,6 @@ class Game(EventSrc):
         self.fireEv('ready', player=player)
         self.startGame()
         return True
-
-    def cleanGame(self):
-        self.st = GAME_ST_IDLE 
-
-        for p in self.players():
-            p.ready = False
-        self.ready_cnt = 0
-
-        self.board.reset()
-        self.meeples = dict([(color, [Meeple(color) for i in xrange(MEEPLE_PER_PLAYER)]) 
-            for color in xrange(MAX_PLAYER_PER_GAME)])
-
-        self.scores = [0 for i in xrange(MAX_PLAYER_PER_GAME)]
-        self.curr_player = None
-        self.curr_tile = None
-        self.curr_meeple = None
-        self.player_loop = None
-
-        self.fireEv('cleanGame')
 
     def abortGame(self, reason):
         self.cleanGame()
@@ -252,20 +252,67 @@ class Game(EventSrc):
             res = terra.putMeeple(meeple)
             assert res
 
+        # game end
+        if not len(self.board.tile_pile):
+            self.calcScore(last=True)
+
+            highest, winer = 0, []
+            for i in len(self.scores):
+                s = self.scores[i]
+                if s > highest:
+                    highest = s
+                    winer = []
+                if s == highest:
+                    winer.append(self.color2player[i])
+            self.fireEv('gameEndResult', winer=winer)
+            self.cleanGame()
+            return True
+            
         # ok, now we calculate the scores
         self.calcScore()
 
         # take turn
         self.player_loop.next()
         self.curr_tile = self.board.pickTile()
+
         self.fireEv('takeTurn', player=self.curr_player)
         return True
+    
+    def _getScoredColor(self, meeples):
+        meeple_cnt = {}                                     # color -> cnt
+        max_cnt = 0
+        for m in meeples:
+            meeple_cnt.setdefault(m.color, 0)
+            meeple_cnt[m.color] += 1
+            if meeple_cnt[m.color] >= max_cnt:
+                max_cnt = meeple_cnt[m.color]
+        
+        return set((color for color, cnt in meeple_cnt.iteritems() 
+            if cnt == max_cnt))
 
     def calcScore(self, last=False):
         for terra in self.completedTerra:
-            # XXX pickMeeple and add score
-            pass
+            meeples = terra.pickMeeples()
+
+            score_colors = self._getScoredColor(meeples)
+            if not score_colors:
+                continue
+            
+            score = terra.getScore()
+            for m in meeples:
+                if m.color in score_colors:
+                    self.fireEv('pickMeeple', meeple=m, score=score)
+                    score_colors.discard(m.color)
+                else:
+                    self.fireEv('pickMeeple', meeple=m)
+            assert not score_colors
+
         self.completedTerra = set()
+
+        if not last:
+            return
+
+        # XXX end game calc score here
 
     def putTile(self, player, x, y):
         if self.st != GAME_ST_GAMING or player != self.curr_player:
@@ -317,7 +364,8 @@ class GameNotifier(object):
             'putTile',
             'moveTile',
             'rotateTile',
-            'takeTurn'):
+            'takeTurn',
+            'gameEndResult'):
             game.addEvListener(ev_name, getattr(self, 
                 'on' + ev_name[0].upper() + ev_name[1:]))
 
@@ -377,6 +425,9 @@ class GameNotifier(object):
 
     def onTakeTurn(self, ev):   
         self.notifyAll('takeTurn', ev.player.id)
+
+    def onGameEndResult(self, ev):   
+        self.notifyAll('gameEndResult', [p.id for p in ev.winer])
 
 
 games = [Game(i) for i in xrange(10)]

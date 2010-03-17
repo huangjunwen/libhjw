@@ -96,6 +96,7 @@ terra 有可能闭合或尚未闭合, 通过 tiepoint (每个 tile 每一边共�
 """
 
 from random import randint
+from itertools import ifilter
 from event import EventSrc
 
 
@@ -583,6 +584,13 @@ class Terra(object):
         for t in terra.adjacent:
             t.adjacent.remove(terra)
             t.adjacent.add(self)
+        self.joinExtra(terra)
+    
+    def joinExtra(self, terra):
+        pass
+
+    def getScore(self):
+        return 0
 
     ### attributes and properties are public
 
@@ -615,20 +623,52 @@ class Terra(object):
 class FIELD(Terra):
     terra_type = 1
 
+    def getScore(self):
+        return len(ifilter(lambda t: isinstance(t, CITY) and t.closed, 
+            self.adjacent)) * 3
+
 
 class ROAD(Terra): 
     terra_type = 2
+
+    def getScore(self):
+        return len(self.all_tiles)
 
 
 class CITY(Terra):
     terra_type = 3
 
+    def joinExtra(self, terra):
+        self.extra.setdefault('shield', 0)
+        self.extra['shield'] += terra.shieldCnt
+
+    @property
+    def shieldCnt(self):
+        return self.extra.get('shield', 0)
+
+    def getScore(self):
+        if not self.closed:
+            return len(self.all_tiles) + self.shieldCnt
+        
+        if len(self.all_tiles) == 2:
+            return 2
+        
+        return (len(self.all_tiles) + self.shieldCnt) * 2
+
 
 class CLOISTER(Terra):
     terra_type = 4
+
     def __init__(self, *args):
         Terra.__init__(self, *args)
         self.open_tps.clear()
+
+    def getScore(self):
+        assert len(self.all_tiles) == 1
+        tile = list(self.all_tiles)[0]
+        if tile.neighbour_cnt == 8:
+            return 9
+        return tile.neighbour_cnt
 
 
 # class RIVER(Terra):

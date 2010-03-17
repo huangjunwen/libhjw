@@ -1104,6 +1104,7 @@ function Carcassonne() {
             // put the first tile
             var tile = board.createTile(startTileID, startTileIdx, {gX: 0, gY: 0});
             tile.permanentFreeze(true);
+
             if (gamePanel.isSelfTurn()) {
                 tile.addEvent('terraclick', function(t, terra, terraType, ev) {
                     if (!tile.fit)
