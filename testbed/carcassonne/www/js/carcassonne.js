@@ -115,7 +115,7 @@ var Meeple = (function() {
             this.tile.meeple = null;
             this.tile.unfreeze();
             this.tile = null;
-            this.el.dispose();
+            this.el.destroy();
             this.parent();
             this.fireEvent('pick', [this]);
         },
@@ -173,6 +173,7 @@ var Tile = (function() {
              * onPut: function(tile, pos)
              * onRotate: function(tile)
              * onTerraClick: function(tile, terra, terraType, ev)
+             * onMeepleCreated: function(meeple)
              * */
         },
 
@@ -188,6 +189,7 @@ var Tile = (function() {
             this.rotation = -1;
             this.fit = null;
             this.frozed = false;
+            this.permanent = false;
             this.notDragged = true;                                 // XXX a tag to tell between click and drag
             this.meeple = null;
 
@@ -264,10 +266,9 @@ var Tile = (function() {
             if (this.meeple)
                 this.meeple.finalize();
             if (this.el)
-                this.el.dispose();
+                this.el.destroy();
             if (this.shadow)
-                this.shadow.dispose();
-            this.freeze();
+                this.shadow.destroy();
             this.parent();
         },
         // DOMs
@@ -350,37 +351,46 @@ var Tile = (function() {
             this.img.setProperty('usemap', '#' + mapName(this.toID(), this.rotation));
             this.fireEvent('rotate', [this, this.rotation]);
         },
+        createMeeple: function(meepleID, colorID, showPos, opt) {
+            var meeple = new Meeple(meepleID, colorID, this, showPos, opt);
+            this.fireEvent('meeplecreated', [meeple]);
+        },
         freeze: function() {        
             this.stopDraggable();
             this.frozed = true;
         },
         unfreeze: function() {        
+            if (this.permanent)
+                return;
             this.frozed = false;
             this.makeDraggable();
         },
-        permanentFreeze: function(keepAreaClickable) {
+        permanentFreeze: function() {
             this.freeze();
-            this.unfreeze = this.freeze = $empty;               // permanently freeze
-
+            this.permanent = true;
+        },
+        strip: function() {
             // remove unused parts
-            var currMapName = mapName(this.toID(), this.rotation);
-            $each(this.el.getElements("map[name!=" + currMapName + "]"), function(m) { 
-                m.dispose(); 
+            this.el.getElements('map').each(function(m) {
+                m.destroy();
             });
+            this.img.removeProperty('usemap');
+
             if (this.shadow) {
-                this.shadow.dispose();
+                this.shadow.destroy();
                 this.shadow = null;
             }
+        },
+        stop: function() {
+            this.permanentFreeze();
+            this.strip();
 
-            // remove events
+            if (this.dragger)
+                this.dragger.stop();
+            this.removeEvents();
+
             if (this.meeple)
                 $(this.meeple).removeEvents();
-            this.removeEvents();
-            if (!keepAreaClickable) {
-                this.getAreas().each(function(a) {
-                    a.removeEvents();
-                });
-            }
         }
     });
 })();
@@ -446,6 +456,14 @@ var Board = (function() {
 
     return new Class({
 
+        Implements: [Events, Options],
+
+        options: {
+            /*
+             * onTileCreated: function(tile)
+             * */
+        },
+
         initialize: function() {
             // attr
             this.neighborCnt = new Grid();                      // (x, y) -> neighbor count
@@ -470,7 +488,7 @@ var Board = (function() {
                 t.finalize();
             });
             if (this.el)
-                this.el.dispose();
+                this.el.destroy();
         },
         toElement: function() {
             return this.el;
@@ -580,7 +598,13 @@ var Board = (function() {
 
             tile.injectAt(this, c);
             this.currTile = tile;
+            this.fireEvent('tilecreated', [tile]);
             return tile;
+        },
+        stopCurrTile: function() {
+            if (!this.currTile)
+                return;
+            this.currTile.stop();
         },
         takeTurn: function() {
             this.currTile = null;
@@ -672,6 +696,11 @@ var GamePanel = (function() {
             var sc = score(colorID);
             sc.set('text', sc.get('text').toInt() + delta);
         },
+        decRemainTiles: function(delta) {
+            delta = delta || 1;
+            var rt = $('remainTiles');
+            rt.set('text', rt.get('text').toInt() - delta);
+        },
         becomeReady: function(player) {
             readySt(player.colorID).set('html', '<font color="green">Yes</font>');
         },
@@ -730,7 +759,6 @@ var GamePanel = (function() {
             $("remainTiles").set("text", remainTiles);
             $("gameInfo").show();
             $("mvCenter").show();
-            this.takeTurn(startPlayer);
         },
         endGame: function() {
             $("remainTiles").set("text", 0);
@@ -876,7 +904,7 @@ function ephemeralText(cont, pos, text, color) {
         'morph': {
             'duration': 'long',
             'onComplete': function() {
-                el.dispose();
+                el.destroy();
             }
         }
     });
@@ -928,7 +956,7 @@ Element.Events.cntrlClick = {
 };
 
 function Carcassonne() {
-    var transport, loginPanel, gamePanel, msgPanel, board;
+    var loginPanel, gamePanel, msgPanel, board, transport;
 
     loginPanel = new LoginPanel();
     gamePanel = new GamePanel();
@@ -939,9 +967,10 @@ function Carcassonne() {
      ************************/
 
     function reset(err) {
-        if (board)
+        if (board) {
             board.finalize();
-        board = null;
+            board = null;
+        }
         gamePanel.hide();
         gamePanel.reset();
         msgPanel.hide();
@@ -953,13 +982,78 @@ function Carcassonne() {
     }
     reset();
 
+    var takeCntrl, handOverCntrl;
+
+    (function() {
+        function __onTileCreated(tile) {
+            tile.addEvent('put', function(t, coord) {
+                _moveTile(coord);
+            });
+            tile.addEvent('rotate', function(t, rotation) {
+                _rotateTile(rotation);
+            });
+            tile.addEvent('terraclick', function(t, terra, terraType, ev) {
+                if (!t.fit)
+                    return;
+                
+                var pos = $(t).getPosition();
+                pos.x = ev.page.x - pos.x;
+                pos.y = ev.page.y - pos.y;
+                _putMeeple(terra, pos);
+            });
+            tile.addEvent('meeplecreated', function(m) {
+                $(m).addEvent('click', function(ev) {
+                    _pickMeeple();
+                });
+            });
+            tile.makeDraggable();
+        }
+        function __onCntrlClick(ev) {
+            var coord = board.getGridCoord(ev.page);
+            if (board.occupied(coord))
+                return;
+
+            if (board.currTile) {
+                board.currTile.moveTo(coord);
+                return;
+            }
+            
+            _putTile(coord);
+        }
+        function __onSpacePressed() {
+            if (board.currTile)
+                board.currTile.rotate(board.currTile.rotation + 1);
+        }
+
+        takeCntrl = function() {
+            board.addEvent('tilecreated', __onTileCreated);
+            window.addEvent('cntrlClick', __onCntrlClick);
+            window.addEvent('spacePressed', __onSpacePressed);
+        };
+
+        handOverCntrl = function() {
+            board.stopCurrTile();
+            board.removeEvent('tilecreated', __onTileCreated);
+            window.removeEvent('cntrlClick', __onCntrlClick);
+            window.removeEvent('spacePressed', __onSpacePressed);
+        };
+    })();
+
+
     /************************
      * RPCs called to server 
      ************************/
 
+    function assertOK(fnName) {
+        return function(res) {
+            if (!res.ok)
+                throw "result not ok: " + fnName;
+        }
+    }
+
     // called when enter a nickname in login panel and submit
     function _join(nickname, gameID) {
-        transport.call('join', [nickname, gameID], function(callID, res) {
+        transport.call('join', [nickname, gameID], function(res) {
             // res {ok: true/false, msg: x, selfID: x, players: [...]}
             if (!res.ok) {                                          
                 loginPanel.showInput(res.msg);
@@ -996,40 +1090,47 @@ function Carcassonne() {
         return false;
     });
 
-    // called when the player click ready
     function _ready() {
-        transport.call('ready', [], function(callID, res) {
-            if (!res.ok)
-                throw "ready should return ok";
-        });
+        transport.call('ready', [], assertOK('ready'));
     }
     gamePanel.addEvent('ready', function() {
+        // ready for the next game so destroy the last
+        if (board) {
+            board.finalize();
+            board = null;
+        }
+
         _ready();
         msgPanel.sysMsg("您准备好了");
     });
 
-    // called when the player chat
     function _chat(msg) {
-        transport.call('chat', [msg], function(callID, res) {
-            if (!res.ok) {
-                throw "chat should return ok";
-            }
-        });
+        transport.call('chat', [msg], assertOK('chat'));
     }
     msgPanel.addEvent('chat', _chat);
 
-    // put meeple
+    function _putTile(coord) {
+        transport.call('putTile', [coord.gX, coord.gY], assertOK('putTile'));
+    }
+
+    function _moveTile(coord) {
+        transport.call('moveTile', [coord.gX, coord.gY], assertOK('moveTile'));
+    }
+
+    function _rotateTile(rotation) {
+        transport.call('rotateTile', [rotation], assertOK('rotateTile'));
+    }
+
     function _putMeeple(terra, pos) {
         transport.call('putMeeple', [terra, pos]);
     }
 
-    // pick meeple
     function _pickMeeple() {
-        transport.call('pickMeeple', []);
+        transport.call('pickMeeple', [], assertOK('pickMeeple'));
     }
 
     function _turnEnd() {
-        transport.call('turnEnd', []);
+        transport.call('turnEnd', [], assertOK('turnEnd'));
     }
     gamePanel.addEvent('turnendclick', function() {
         if (!board.currTile) {
@@ -1043,23 +1144,10 @@ function Carcassonne() {
         }
 
         // stop further actions here immediately 
-        board.currTile.permanentFreeze();
-        window.removeEvents('spacePressed');
-        window.removeEvents('cntrlClick');
+        handOverCntrl();
         _turnEnd();
     });
 
-    function _putTile(coord) {
-        transport.call('putTile', [coord.gX, coord.gY]);
-    }
-
-    function _moveTile(coord) {
-        transport.call('moveTile', [coord.gX, coord.gY]);
-    }
-
-    function _rotateTile(rotation) {
-        transport.call('rotateTile', [rotation]);
-    }
 
     /************************
      * RPCs called by server 
@@ -1075,6 +1163,7 @@ function Carcassonne() {
             var p = UniqObj.fromID(id);
             gamePanel.unselectColor(p);
             msgPanel.sysMsg(p.nickname + " 退出了房间");
+            p.finalize();
         },
         ready: function(id) {
             var player = UniqObj.fromID(id);
@@ -1082,81 +1171,27 @@ function Carcassonne() {
             msgPanel.sysMsg(player.nickname + " 准备好了");
         },
         chat: function(id, msg) {
-            // if (id == Player.self.toID())                                           // filter out
+            // if (id == Player.self.toID())                                                // filter out
             //    return false;
             msgPanel.chatMsg(msg, UniqObj.fromID(id));
         },
         sysMsg: function(msg) {
             msgPanel.sysMsg(msg);
         },
-        startGame: function(startPlayerID, startTileID, startTileIdx, remainTiles) {       // XXX
-            if (board)
-                throw "already has board";
-
-            // take turn
-            var player = UniqObj.fromID(startPlayerID);
-            gamePanel.startGame(remainTiles, player);
-
+        startGame: function(remainTiles) {                                                  // XXX
             // create board
             board = new Board();
-            $(board).inject($("boardCont")).mvToPageCenter();
-
-            // put the first tile
-            var tile = board.createTile(startTileID, startTileIdx, {gX: 0, gY: 0});
-            tile.permanentFreeze(true);
-
-            if (gamePanel.isSelfTurn()) {
-                tile.addEvent('terraclick', function(t, terra, terraType, ev) {
-                    if (!tile.fit)
-                        return;
-                    
-                    var pos = $(tile).getPosition();
-                    pos.x = ev.page.x - pos.x;
-                    pos.y = ev.page.y - pos.y;
-                    _putMeeple(terra, pos);
-                });
-            }
-
-            // msg
-            msgPanel.sysMsg("游戏开始!! 请 " + player.nickname + "行动");
-        },
-        putMeeple: function(meepleID, colorID, tileID, showPos) {
-            var meeple = UniqObj.fromID(meepleID);
-            if (meeple) {
-                meeple.show(showPos);
-                return;
-            }
-
-            var tile = UniqObj.fromID(tileID);
-            meeple = new Meeple(meepleID, colorID, tile, showPos, {
-                onPut: function() {
-                    gamePanel.addMeepleCnt(colorID, -1);
-                },
-                onPick: function() {
-                    gamePanel.addMeepleCnt(colorID, 1);
-                }
+            board.addEvent('tilecreated', function() {
+                gamePanel.decRemainTiles();
             });
-
-            if (gamePanel.isSelfTurn()) {
-                $(meeple).addEvent('click', function(ev) {
-                    _pickMeeple();
-                });
-            }
-        },
-        pickMeeple: function(meepleID, score) {
-            var meeple = UniqObj.fromID(meepleID);
-            if (score) {
-                ephemeralText(meeple.tile, meeple.pos, '+' + score, 
-                    colorName[meeple.colorID]);
-                gamePanel.addScore(meeple.colorID, score);
-            }
-            meeple.finalize();
+            $(board).inject($("boardCont")).mvToPageCenter();
+            gamePanel.startGame(remainTiles);
+            msgPanel.sysMsg("游戏开始!! ");
         },
         takeTurn: function(playerID) {
-            // some clean actions
+            // some clean for the prev turn
             if (board.currTile) {
-                // XXX freeze again for the curr player but no harms
-                board.currTile.permanentFreeze();                  
+                gamePanel.isSelfTurn() ? handOverCntrl() : board.stopCurrTile();
                 $(board).makeDraggable({'handle': $(board.currTile)});
             }
 
@@ -1164,49 +1199,19 @@ function Carcassonne() {
             var player = UniqObj.fromID(playerID);
             board.takeTurn();
             gamePanel.takeTurn(player);
+            if (gamePanel.isSelfTurn())
+                takeCntrl()
+
             msgPanel.sysMsg("新回合, 请 " + player.nickname + " 行动");
-
-            if (gamePanel.isSelfTurn()) {
-                window.addEvent('cntrlClick', function(ev) {
-                    var coord = board.getGridCoord(ev.page);
-                    if (board.occupied(coord))
-                        return;
-
-                    if (board.currTile) {
-                        board.currTile.moveTo(coord);
-                        return;
-                    }
-                    
-                    _putTile(coord);
-                });
-                window.addEvent('spacePressed', function() {
-                    if (board.currTile)
-                        board.currTile.rotate(board.currTile.rotation + 1);
-                });
-            }
         },
         putTile: function(tileID, tileIdx, coord) {
+            if (board.currTile)
+                throw "there is a tile not handled";
+
             board.ensureGridCoord(coord);
             var tile = board.createTile(tileID, tileIdx, coord);
-
-            if (gamePanel.isSelfTurn()) {
-                tile.addEvent('terraclick', function(t, terra, terraType, ev) {
-                    if (!tile.fit)
-                        return;
-                    
-                    var pos = $(tile).getPosition();
-                    pos.x = ev.page.x - pos.x;
-                    pos.y = ev.page.y - pos.y;
-                    _putMeeple(terra, pos);
-                });
-                tile.addEvent('put', function(t, coord) {
-                    _moveTile(coord);
-                });
-                tile.addEvent('rotate', function(t, rotation) {
-                    _rotateTile(rotation);
-                });
-                tile.makeDraggable();
-            }
+            if (!coord.x && !coord.y)
+                tile.permanentFreeze();
         },
         moveTile: function(coord) {
             if (!board.currTile)
@@ -1221,11 +1226,36 @@ function Carcassonne() {
 
             board.currTile.rotate(rotation);
         },
-        cleanGame: function() {
-            if (board) {
-                board.finalize();
-                board = null;
+        putMeeple: function(meepleID, colorID, tileID, showPos) {                           // XXX lack meeple name
+            var meeple = UniqObj.fromID(meepleID);
+            if (meeple) {
+                meeple.show(showPos);
+                return;
             }
+
+            UniqObj.fromID(tileID).createMeeple(meepleID, colorID, showPos, {
+                onPut: function() {
+                    gamePanel.addMeepleCnt(colorID, -1);
+                },
+                onPick: function() {
+                    gamePanel.addMeepleCnt(colorID, 1);
+                }
+            });
+        },
+        pickMeeple: function(meepleID, score) {
+            var meeple = UniqObj.fromID(meepleID);
+            if (score) {
+                ephemeralText(meeple.tile, meeple.pos, '+' + score, 
+                    colorName[meeple.colorID]);
+                gamePanel.addScore(meeple.colorID, score);
+            }
+            meeple.finalize();
+        },
+        gameEndResult: function(winers) {
+        },
+        cleanGame: function() {
+            if (gamePanel.isSelfTurn())
+                handOverCntrl();
             gamePanel.resetGame();
             gamePanel.makeReadyClickable();
         }

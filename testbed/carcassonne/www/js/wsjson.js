@@ -75,7 +75,7 @@ return new Class({
                     inst.outstandCalls.erase(res.id);
                     if (res.error)
                         throw res.error.message;
-                    cb(res.id, res.result);                             // callback prototype
+                    cb(res.result);                                     // callback prototype
                 }
             } catch (e) {
                 alert(e);

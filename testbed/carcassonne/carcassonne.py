@@ -192,9 +192,9 @@ class Game(EventSrc):
         self.player_loop.next()
         self.curr_tile = self.board[0, 0]
 
-        self.fireEv('startGame', start_player=self.curr_player, 
-            start_tile=self.curr_tile, 
-            remain=len(self.board.tile_pile))
+        self.fireEv('startGame', remain=len(self.board.tile_pile))
+        self.fireEv('takeTurn', player=self.curr_player)
+        self.fireEv('putTile', tile=self.curr_tile, coord=(0, 0))
         return True
 
     def putMeeple(self, player, terra_idx, pos):
@@ -396,9 +396,7 @@ class GameNotifier(object):
         self.notifyAllExcept(ev.player, 'ready', ev.player.id)
 
     def onStartGame(self, ev):
-        self.notifyAll('startGame', ev.start_player.id, ev.start_tile.id, 
-            ev.start_tile.tile_idx,
-            ev.remain)
+        self.notifyAll('startGame', ev.remain)
 
     def onCleanGame(self, ev):
         self.notifyAll('cleanGame')
