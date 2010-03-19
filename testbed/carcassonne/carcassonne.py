@@ -166,6 +166,12 @@ class Game(EventSrc):
         self.cleanGame()
         self.fireEv('sysMsg', msg=reason)
 
+    def takeTurn(self):
+        self.player_loop.next()
+        self.curr_tile = self.board.pickTile()
+        assert self.curr_tile
+        self.fireEv('takeTurn', player=self.curr_player)
+
     def startGame(self):    
         if self.st != GAME_ST_IDLE:
             return False
@@ -175,6 +181,7 @@ class Game(EventSrc):
             return False
 
         self.st = GAME_ST_GAMING
+        self.fireEv('startGame', tile_cnt=len(self.board.tile_pile))
 
         # create player_loop
         players = list(self.players())
@@ -189,12 +196,9 @@ class Game(EventSrc):
                         break
                 yield
         self.player_loop = create_player_loop()
-        self.player_loop.next()
-        self.curr_tile = self.board[0, 0]
 
-        self.fireEv('startGame', remain=len(self.board.tile_pile))
-        self.fireEv('takeTurn', player=self.curr_player)
-        self.fireEv('putTile', tile=self.curr_tile, coord=(0, 0))
+        # first turn
+        self.takeTurn()
         return True
 
     def putMeeple(self, player, terra_idx, pos):
@@ -252,7 +256,7 @@ class Game(EventSrc):
             res = terra.putMeeple(meeple)
             assert res
 
-        # game end
+        # no more tile so game end
         if not len(self.board.tile_pile):
             self.calcScore(last=True)
 
@@ -272,10 +276,7 @@ class Game(EventSrc):
         self.calcScore()
 
         # take turn
-        self.player_loop.next()
-        self.curr_tile = self.board.pickTile()
-
-        self.fireEv('takeTurn', player=self.curr_player)
+        self.takeTurn()
         return True
     
     def _getScoredColor(self, meeples):
@@ -396,7 +397,7 @@ class GameNotifier(object):
         self.notifyAllExcept(ev.player, 'ready', ev.player.id)
 
     def onStartGame(self, ev):
-        self.notifyAll('startGame', ev.remain)
+        self.notifyAll('startGame', ev.tile_cnt)
 
     def onCleanGame(self, ev):
         self.notifyAll('cleanGame')

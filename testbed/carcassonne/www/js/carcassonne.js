@@ -745,7 +745,7 @@ var GamePanel = (function() {
         },
         resetScoreBoard: function(colorID) {
             scoreBoard(colorID).removeClass('scoreBoardOnTurn');
-            meepleCnt(colorID).set('text', 7);
+            // meepleCnt(colorID).set('text', 7);
             score(colorID).set('text', 0);
             readySt(colorID).set('html', 'No');
         },
@@ -755,8 +755,8 @@ var GamePanel = (function() {
                 this.resetScoreBoard(i);
             this.currPlayer = null;
         },
-        startGame: function(remainTiles, startPlayer) {
-            $("remainTiles").set("text", remainTiles);
+        startGame: function(tileCnt) {
+            $("remainTiles").set("text", tileCnt);
             $("gameInfo").show();
             $("mvCenter").show();
         },
@@ -1178,14 +1178,14 @@ function Carcassonne() {
         sysMsg: function(msg) {
             msgPanel.sysMsg(msg);
         },
-        startGame: function(remainTiles) {                                                  // XXX
+        startGame: function(tileCnt) {
             // create board
             board = new Board();
             board.addEvent('tilecreated', function() {
                 gamePanel.decRemainTiles();
             });
             $(board).inject($("boardCont")).mvToPageCenter();
-            gamePanel.startGame(remainTiles);
+            gamePanel.startGame(tileCnt);
             msgPanel.sysMsg("游戏开始!! ");
         },
         takeTurn: function(playerID) {
@@ -1210,8 +1210,6 @@ function Carcassonne() {
 
             board.ensureGridCoord(coord);
             var tile = board.createTile(tileID, tileIdx, coord);
-            if (!coord.x && !coord.y)
-                tile.permanentFreeze();
         },
         moveTile: function(coord) {
             if (!board.currTile)

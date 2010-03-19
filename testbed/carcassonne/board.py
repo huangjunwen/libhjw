@@ -180,9 +180,9 @@ class Board(EventSrc):
         self.tiles_on_board = set()
         self.tiles_discard = set()
 
-        first = self.pickTile()
-        first.setCoord((0, 0))
-        self.putTile(first)
+        #first = self.pickTile()
+        #first.setCoord((0, 0))
+        #self.putTile(first)
 
     def pickTile(self):
         """
@@ -278,11 +278,13 @@ class Board(EventSrc):
         Can the tile be put
         """
         if tile.coord in self.coords:
-            if tile is self[tile.coord]:
-                return True
             return False
 
         x, y = tile.coord
+        if not self.tiles_on_board:                                 # first tile
+            if x or y:
+                return False
+            return True
 
         # check 4 neighbours and their boundaries
         has_neighbour = False
@@ -295,13 +297,10 @@ class Board(EventSrc):
                 continue
             has_neighbour = True
             t = self.coords[c]
-            if tile.bounds[i] != t.bounds[neighbour_bounds[i]]:                 # check bounds
+            if tile.bounds[i] != t.bounds[neighbour_bounds[i]]:     # check bounds
                 return False
         
-        first = not self.tiles_on_board
-        if not first and not has_neighbour:
-            return False
-        return True
+        return has_neighbour
 
     def unoccupiedTerraIdx(self, tile):
         """
