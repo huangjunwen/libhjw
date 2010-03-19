@@ -355,9 +355,13 @@ var Tile = (function() {
             var meeple = new Meeple(meepleID, colorID, this, showPos, opt);
             this.fireEvent('meeplecreated', [meeple]);
         },
-        freeze: function() {        
+        freeze: function(permanent) {        
+            if (this.permanent)
+                return;
             this.stopDraggable();
             this.frozed = true;
+            if (permanent)
+                this.permanent = true;
         },
         unfreeze: function() {        
             if (this.permanent)
@@ -365,11 +369,9 @@ var Tile = (function() {
             this.frozed = false;
             this.makeDraggable();
         },
-        permanentFreeze: function() {
-            this.freeze();
-            this.permanent = true;
-        },
-        strip: function() {
+        stop: function() {
+            this.freeze(true);
+
             // remove unused parts
             this.el.getElements('map').each(function(m) {
                 m.destroy();
@@ -380,17 +382,17 @@ var Tile = (function() {
                 this.shadow.destroy();
                 this.shadow = null;
             }
-        },
-        stop: function() {
-            this.permanentFreeze();
-            this.strip();
 
-            if (this.dragger)
+            // remove events
+            if (this.dragger) {
                 this.dragger.stop();
+                this.dragger = null;
+            }
             this.removeEvents();
 
-            if (this.meeple)
+            if (this.meeple) {
                 $(this.meeple).removeEvents();
+            }
         }
     });
 })();

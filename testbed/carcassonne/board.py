@@ -98,7 +98,6 @@ terra 有可能闭合或尚未闭合, 通过 tiepoint (每个 tile 每一边共�
 from random import randint
 from event import EventSrc
 
-
 class Meeple(object):
 
     create_cnt = 0
@@ -355,22 +354,22 @@ class Board(EventSrc):
 class TilePile(object):
 
     def __init__(self):
+        self.first = True
+        self.start_tile = TileMeta.start_tile_cls()
         self.tiles = [t() for t in TileMeta.tile_classes]
-        self.tid = 0
     
     def pick(self):
-        if self.tid == 0:
-            ret = TileMeta.start_tile_cls()
+        if self.first:
+            ret = self.start_tile
+            self.first = False
         elif self.tiles:
             ret = self.tiles.pop(randint(0, len(self.tiles) - 1))
         else:
             return None
-        ret.id = "T%d" % self.tid
-        self.tid += 1
         return ret
 
     def __len__(self):
-        if self.tid == 0:
+        if self.first:
             return len(self.tiles) + 1
         return len(self.tiles)
 
@@ -478,7 +477,12 @@ class TileBase(object):
 
     __metaclass__ = TileMeta
 
+    create_cnt = 0
+
     def __init__(self):
+        self.id = "T%d" % TileBase.create_cnt
+        TileBase.create_cnt += 1
+
         self.coord = None
         self.rotation = 0
         self.bounds = None

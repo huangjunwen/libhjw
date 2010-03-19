@@ -12,7 +12,9 @@ from twisted.internet.defer import Deferred
 try:
     from twisted.web.websocket import WebSocketRequest, WebSocketHandler
 except ImportError, e:
-    print 'try to use websocket branch on twisted: svn://svn.twistedmatrix.com/svn/Twisted/branches/websocket-4173-2'
+    print 'try to use websocket branch'
+    print '\tsrc: svn://svn.twistedmatrix.com/svn/Twisted/branches/websocket-4173-2'
+    print '\tbrowse: http://twistedmatrix.com/trac/browser/branches/websocket-4173-2'
     raise e
 
 # ref: https://groups.google.com/group/json-rpc/web/json-rpc-1-2-proposal?pli=1
