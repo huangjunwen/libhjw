@@ -9,6 +9,48 @@
 /* Organize all uniq identified object as a tree
  * objs will be deleted when its parent is deleted
  */
+Element.implement({
+    mvToPageCenter: function(offsetX, offsetY) {
+        offsetX = offsetX || 0;
+        offsetY = offsetY || 0;
+        var coord = window.getCoordinates();
+        var elCoord = this.getCoordinates();
+        this.setPosition({
+            x: ((coord.width - elCoord.width)/2).toInt() + offsetX,
+            y: ((coord.height - elCoord.height)/2).toInt() + offsetY
+        });
+        return this;
+    },
+    show: function() {
+        this.setStyle('display', 'block');
+        return this;
+    },
+    hide: function() {
+        this.setStyle('display', 'none');
+        return this;
+    }
+});
+
+Element.Events.spacePressed = {
+    base: 'keyup',
+    condition: function(ev) {
+        return ev.key == 'space' && !ev.alt && !ev.control && !ev.shift;
+    }
+};
+
+Element.Events.cntrlClick = {
+    base: 'click',
+    condition: function(ev) {
+        return ev.control;
+    }
+};
+
+if (!window.WebSocket) {
+    window.addEvent('domready', function() {
+        $("browserNotSupport").show();
+    });
+} else {
+
 var UniqObj = (function() {
     var allObjs = new Hash();
 
@@ -922,42 +964,6 @@ function ephemeralText(cont, pos, text, color) {
     });
 }
 
-Element.implement({
-    mvToPageCenter: function(offsetX, offsetY) {
-        offsetX = offsetX || 0;
-        offsetY = offsetY || 0;
-        var coord = window.getCoordinates();
-        var elCoord = this.getCoordinates();
-        this.setPosition({
-            x: ((coord.width - elCoord.width)/2).toInt() + offsetX,
-            y: ((coord.height - elCoord.height)/2).toInt() + offsetY
-        });
-        return this;
-    },
-    show: function() {
-        this.setStyle('display', 'block');
-        return this;
-    },
-    hide: function() {
-        this.setStyle('display', 'none');
-        return this;
-    }
-});
-
-Element.Events.spacePressed = {
-    base: 'keyup',
-    condition: function(ev) {
-        return ev.key == 'space' && !ev.alt && !ev.control && !ev.shift;
-    }
-};
-
-Element.Events.cntrlClick = {
-    base: 'click',
-    condition: function(ev) {
-        return ev.control;
-    }
-};
-
 function Carcassonne() {
     var loginPanel, gamePanel, msgPanel, board, transport;
 
@@ -1315,3 +1321,5 @@ function Carcassonne() {
 window.addEvent("domready", function() {
     Carcassonne();
 });
+
+}
