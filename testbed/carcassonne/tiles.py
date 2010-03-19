@@ -194,5 +194,3 @@ class Tile(TileBase):
     adjacent = [(0, 1), (1, 2), (2, 3)]
     amount = 4
     start = True
-
-b = Board()

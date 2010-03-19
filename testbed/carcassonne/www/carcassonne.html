@@ -9,7 +9,7 @@
         <script type="text/javascript" src="/js/wsjson.js"></script>
         <script type="text/javascript" src="/js/res.js"></script>
         <script type="text/javascript" src="/js/carcassonne.js"></script>
-    <link rel="stylesheet" type="text/css" href="/styles/carcassonne.css" />
+        <link rel="stylesheet" type="text/css" href="/styles/carcassonne.css" />
     </head>
     <body>
         <div id="loginPanel" class="alignC roundedBox hide">
@@ -88,6 +88,16 @@
                     <input class="roundedBox floatL" size="30" type="text" id="msgContent" name="msgContent" />
                     <input class="roundedBox floatR" type="submit" id="msgSubmit" value="send" />
                 </form>
+        </div>
+        <div class="roundedBox resultBox hide" id="youWin">
+            <a href="#" class="closeResultBox">×</a>
+            <h1>YOU WIN</h1>
+            <h2>(づ￣ 3￣)づ</h2>
+        </div>
+        <div class="roundedBox resultBox hide" id="youLose">
+            <a href="#" class="closeResultBox">×</a>
+            <h1>YOU LOSE</h1>
+            <h2>&gt;_&lt;</h2>
         </div>
     </body>
 </html>

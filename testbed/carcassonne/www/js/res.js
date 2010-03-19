@@ -48,4 +48,4 @@ var meepleImgSize = 30;
 
 var meepleImgUrl = '/images/meeple.png';
 
-var colorName = ['red', 'green', 'blue', 'gold', 'black'];
+var colorName = ['OrangeRed', 'LawnGreen', 'LightSkyBlue', 'Khaki', 'Black'];

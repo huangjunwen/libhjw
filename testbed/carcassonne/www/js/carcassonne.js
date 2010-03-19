@@ -79,7 +79,7 @@ var Meeple = (function() {
              * */
         },
 
-        initialize: function(id, colorID, tile, showPos, opt) {
+        initialize: function(id, colorID, tile, meepleType, showPos, opt) {
             this.setOptions(opt);
 
             // attr
@@ -107,7 +107,7 @@ var Meeple = (function() {
                 }
             });
             this.el.inject(tile);
-            this.show(showPos);
+            this.show(meepleType, showPos);
             this.parent(id);
             this.fireEvent('put', [this]);
         },
@@ -122,11 +122,12 @@ var Meeple = (function() {
         toElement: function() {
             return this.el;
         },
-        show: function(pos) {
+        show: function(meepleType, pos) {
             pos = {x: pos.x - halfMeepleImgSize, y: pos.y - halfMeepleImgSize};
             this.el.setPosition(pos);
             this.el.setStyle('display', 'block');
             this.pos = pos;
+            this.el.setProperty('title', meepleType);
         }
     });
 })();
@@ -351,8 +352,9 @@ var Tile = (function() {
             this.img.setProperty('usemap', '#' + mapName(this.toID(), this.rotation));
             this.fireEvent('rotate', [this, this.rotation]);
         },
-        createMeeple: function(meepleID, colorID, showPos, opt) {
-            var meeple = new Meeple(meepleID, colorID, this, showPos, opt);
+        createMeeple: function(meepleID, colorID, meepleType, showPos, opt) {
+            var meeple = new Meeple(meepleID, colorID, this, 
+                meepleType, showPos, opt);
             this.fireEvent('meeplecreated', [meeple]);
         },
         freeze: function(permanent) {        
@@ -391,7 +393,7 @@ var Tile = (function() {
             this.removeEvents();
 
             if (this.meeple) {
-                $(this.meeple).removeEvents();
+                $(this.meeple).removeEvents('click');
             }
         }
     });
@@ -899,12 +901,14 @@ function ephemeralText(cont, pos, text, color) {
             'position': 'absolute',
             'font-weight': 'bolder',
             'font-family': 'sans-serif',
+            'font-size': '30px',
             'zIndex': 1100,
-            'color': color 
+            'color': color
         },
         'text': text,
         'morph': {
-            'duration': 'long',
+            'duration': 2000,
+            'transition': 'pow:in:out',
             'onComplete': function() {
                 el.destroy();
             }
@@ -913,13 +917,7 @@ function ephemeralText(cont, pos, text, color) {
     el.inject(cont);
     el.setPosition(pos);
 
-    var startSz = 30, endSz = 40;
-    var mvX = ((endSz - startSz) * text.length / 2).toInt();
-    var mvY = ((endSz - startSz) / 2).toInt();
     el.morph({
-        'left': pos.x - mvX,
-        'top': pos.y - mvY,
-        'font-size': [startSz, endSz],
         'opacity': [1, 0]
     });
 }
@@ -934,12 +932,15 @@ Element.implement({
             x: ((coord.width - elCoord.width)/2).toInt() + offsetX,
             y: ((coord.height - elCoord.height)/2).toInt() + offsetY
         });
+        return this;
     },
     show: function() {
         this.setStyle('display', 'block');
+        return this;
     },
     hide: function() {
         this.setStyle('display', 'none');
+        return this;
     }
 });
 
@@ -973,6 +974,7 @@ function Carcassonne() {
             board.finalize();
             board = null;
         }
+        hideResut();
         gamePanel.hide();
         gamePanel.reset();
         msgPanel.hide();
@@ -1041,6 +1043,22 @@ function Carcassonne() {
         };
     })();
 
+    document.getElements('.closeResultBox').each(function(c) {
+        c.addEvent('click', function(ev) {
+            c.getParent().hide();
+        });
+    });
+
+    function youWin() {
+        $("youWin").show().mvToPageCenter();
+    }
+    function youLose() {
+        $("youLose").show().mvToPageCenter();
+    };
+    function hideResut() {
+        $("youWin").hide();
+        $("youLose").hide();
+    };
 
     /************************
      * RPCs called to server 
@@ -1101,6 +1119,7 @@ function Carcassonne() {
             board.finalize();
             board = null;
         }
+        hideResut();
 
         _ready();
         msgPanel.sysMsg("您准备好了");
@@ -1226,14 +1245,15 @@ function Carcassonne() {
 
             board.currTile.rotate(rotation);
         },
-        putMeeple: function(meepleID, colorID, tileID, showPos) {                           // XXX lack meeple name
+        putMeeple: function(meepleID, colorID, tileID, meepleType, showPos) {
             var meeple = UniqObj.fromID(meepleID);
             if (meeple) {
-                meeple.show(showPos);
+                meeple.show(meepleType, showPos);
                 return;
             }
 
-            UniqObj.fromID(tileID).createMeeple(meepleID, colorID, showPos, {
+            UniqObj.fromID(tileID).createMeeple(meepleID, colorID, meepleType, 
+                    showPos, {
                 onPut: function() {
                     gamePanel.addMeepleCnt(colorID, -1);
                 },
@@ -1252,6 +1272,11 @@ function Carcassonne() {
             meeple.finalize();
         },
         gameEndResult: function(winers) {
+            winers.contains(Player.self.toID()) ? youWin() : youLose();
+            var winerNames = winers.map(function(wid) {
+                return UniqObj.fromID(wid).nickname;
+            });
+            msgPanel.sysMsg("游戏结束, 胜利者是: " + winerNames.join(', '));
         },
         cleanGame: function() {
             if (gamePanel.isSelfTurn())

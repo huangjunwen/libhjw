@@ -74,7 +74,7 @@ class Game(EventSrc):
         self.meeples = dict([(color, [Meeple(color) for i in xrange(MEEPLE_PER_PLAYER)]) 
             for color in xrange(MAX_PLAYER_PER_GAME)])
 
-        self.scores = [0 for i in xrange(MAX_PLAYER_PER_GAME)]
+        self.scores = [0 for color in xrange(MAX_PLAYER_PER_GAME)]
         self.curr_player = None
         self.curr_tile = None
         self.curr_meeple = None
@@ -219,8 +219,9 @@ class Game(EventSrc):
             return False
         
         self.curr_meeple.put(tile, terra_idx, pos)
+        meeple_type = tile.terra_proto[terra_idx][0].meeple_type
         self.fireEv('putMeeple', player=player, meeple=meeple, tile=tile, 
-            terra_idx=terra_idx, pos=pos)
+            terra_idx=terra_idx, meeple_type=meeple_type, pos=pos)
         return True
 
     def pickMeeple(self, player):
@@ -261,13 +262,13 @@ class Game(EventSrc):
             self.calcScore(last=True)
 
             highest, winer = 0, []
-            for i in len(self.scores):
-                s = self.scores[i]
+            for color in xrange(MAX_PLAYER_PER_GAME):
+                s = self.scores[color]
                 if s > highest:
                     highest = s
                     winer = []
-                if s == highest:
-                    winer.append(self.color2player[i])
+                if highest and s == highest:
+                    winer.append(self.color2player[color])
             self.fireEv('gameEndResult', winer=winer)
             self.cleanGame()
             return True
@@ -291,29 +292,43 @@ class Game(EventSrc):
         return set((color for color, cnt in meeple_cnt.iteritems() 
             if cnt == max_cnt))
 
+    def _calcOneTerraScore(self, terra):
+        meeples = terra.pickMeeples()
+        if not meeples:
+            return set()
+
+        score_colors = self._getScoredColor(meeples)
+        assert score_colors
+        
+        score = terra.getScore()
+        for m in meeples:
+            if m.color in score_colors:
+                self.fireEv('pickMeeple', meeple=m, score=score)
+                score_colors.discard(m.color)
+            else:
+                self.fireEv('pickMeeple', meeple=m)
+        assert not score_colors
+        return meeples
+        
     def calcScore(self, last=False):
         for terra in self.completedTerra:
-            meeples = terra.pickMeeples()
-
-            score_colors = self._getScoredColor(meeples)
-            if not score_colors:
-                continue
-            
-            score = terra.getScore()
-            for m in meeples:
-                if m.color in score_colors:
-                    self.fireEv('pickMeeple', meeple=m, score=score)
-                    score_colors.discard(m.color)
-                else:
-                    self.fireEv('pickMeeple', meeple=m)
-            assert not score_colors
-
+            self._calcOneTerraScore(terra)
         self.completedTerra = set()
 
         if not last:
             return
 
-        # XXX end game calc score here
+        # end game calc score here
+        remainMeeples = set()
+        for meeples in self.meeples.itervalues():
+            for m in meeples:
+                if m.used:
+                    remainMeeples.add(m)
+
+        while remainMeeples:
+            m = remainMeeples.pop()
+            terra = self.board.terraOnTileByIdx(m.tile, m.terra_idx)
+            remainMeeples -= self._calcOneTerraScore(terra)
 
     def putTile(self, player, x, y):
         if self.st != GAME_ST_GAMING or player != self.curr_player:
@@ -403,7 +418,9 @@ class GameNotifier(object):
         self.notifyAll('cleanGame')
 
     def onPutMeeple(self, ev):
-        self.notifyAll('putMeeple', ev.meeple.id, ev.meeple.color, ev.tile.id, ev.pos)
+        
+        self.notifyAll('putMeeple', ev.meeple.id, ev.meeple.color, 
+            ev.tile.id, ev.meeple_type, ev.pos)
         
     def onPickMeeple(self, ev):
         if ev.score:

@@ -625,6 +625,8 @@ class Terra(object):
 class FIELD(Terra):
     terra_type = 1
 
+    meeple_type = '农民'
+
     def getScore(self):
         return len(filter(lambda t: isinstance(t, CITY) and t.closed, 
             self.adjacent)) * 3
@@ -633,12 +635,16 @@ class FIELD(Terra):
 class ROAD(Terra): 
     terra_type = 2
 
+    meeple_type = '盗贼'
+
     def getScore(self):
         return len(self.all_tiles)
 
 
 class CITY(Terra):
     terra_type = 3
+
+    meeple_type = '骑士'
 
     def joinExtra(self, terra):
         self.extra.setdefault('shield', 0)
@@ -660,6 +666,8 @@ class CITY(Terra):
 
 class CLOISTER(Terra):
     terra_type = 4
+
+    meeple_type = '僧侣'
 
     def __init__(self, *args):
         Terra.__init__(self, *args)

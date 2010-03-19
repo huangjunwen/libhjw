@@ -119,3 +119,29 @@
 #msgSubmit {
     margin: 0px 15px 15px 0px;
 }
+.resultBox {
+    position: absolute;
+    background-color: pink;
+    font-family: sans-serif;
+    text-align: center;
+    padding: 20px;
+    width: 300px;
+    z-index: 1600;
+}
+.closeResultBox {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border: 1px solid black;
+    padding: 0px;
+    text-decoration: none;
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+}
+#youWin h1{
+    color: green;
+}
+#youLose h1 {
+    color: red;
+}
