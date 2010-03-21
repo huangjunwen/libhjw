@@ -1188,25 +1188,25 @@ function Carcassonne() {
 
     // XXX
     var _callbacks = {
-        join: function(id, nickname, colorID) {
-            gamePanel.selectColor(new Player(id, nickname), colorID);
+        join: function(playerID, nickname, colorID) {
+            gamePanel.selectColor(new Player(playerID, nickname), colorID);
             msgPanel.sysMsg(nickname + " 进入房间");
         },
-        leave: function(id) {
-            var p = UniqObj.fromID(id);
+        leave: function(playerID) {
+            var p = UniqObj.fromID(playerID);
             gamePanel.unselectColor(p);
             msgPanel.sysMsg(p.nickname + " 退出了房间");
             p.finalize();
         },
-        ready: function(id) {
-            var player = UniqObj.fromID(id);
+        ready: function(playerID) {
+            var player = UniqObj.fromID(playerID);
             gamePanel.becomeReady(player);
             msgPanel.sysMsg(player.nickname + " 准备好了");
         },
-        chat: function(id, msg) {
-            // if (id == Player.self.toID())                                                // filter out
+        chat: function(playerID, msg) {
+            // if (playerID == Player.self.toID())                                                // filter out
             //    return false;
-            msgPanel.chatMsg(msg, UniqObj.fromID(id));
+            msgPanel.chatMsg(msg, UniqObj.fromID(playerID));
         },
         sysMsg: function(msg) {
             msgPanel.sysMsg(msg);
