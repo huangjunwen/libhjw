@@ -520,7 +520,7 @@ var Board = (function() {
             // DOM
             this.el = new Element('div', {
                 'styles': {
-                    'background-color': '#e0e0e0',
+                    'outline-style': 'dotted',
                     'border': 'none',                           // no border for caculating coord simpler
                     'position': 'absolute',
                     'width': tileImgSize + "px",
@@ -1066,6 +1066,11 @@ function Carcassonne() {
         $("youWin").hide();
         $("youLose").hide();
     };
+
+    gamePanel.addEvent('mvcentclick', function() {
+        if (board)
+            $(board).mvToPageCenter();
+    });
 
     /************************
      * RPCs called to server 
