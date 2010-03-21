@@ -1052,6 +1052,7 @@ function Carcassonne() {
     document.getElements('.closeResultBox').each(function(c) {
         c.addEvent('click', function(ev) {
             c.getParent().hide();
+            return false;
         });
     });
 
@@ -1282,7 +1283,10 @@ function Carcassonne() {
             var winerNames = winers.map(function(wid) {
                 return UniqObj.fromID(wid).nickname;
             });
-            msgPanel.sysMsg("游戏结束, 胜利者是: " + winerNames.join(', '));
+            var m = "游戏结束";
+            if (winerNames.length)
+                m += ", 胜利者是: " + winerNames.join(', ');
+            msgPanel.sysMsg(m);
         },
         cleanGame: function() {
             if (gamePanel.isSelfTurn())

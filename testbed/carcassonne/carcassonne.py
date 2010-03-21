@@ -303,6 +303,7 @@ class Game(EventSrc):
         score = terra.getScore()
         for m in meeples:
             if m.color in score_colors:
+                self.scores[m.color] += score
                 self.fireEv('pickMeeple', meeple=m, score=score)
                 score_colors.discard(m.color)
             else:
