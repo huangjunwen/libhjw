@@ -28,6 +28,11 @@ body {
     opacity: 0.9;
 }
 
+.noSelect {
+    -moz-user-select: none;                         /* mozilla browsers */
+    -khtml-user-select: none;                       /* webkit browsers */
+}
+
 #loginPanel {
     position: fixed;
     top: 100px;

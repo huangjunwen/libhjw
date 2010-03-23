@@ -38,13 +38,6 @@ Element.Events.spacePressed = {
     }
 };
 
-Element.Events.cntrlClick = {
-    base: 'click',
-    condition: function(ev) {
-        return ev.control;
-    }
-};
-
 if (!window.WebSocket) {
     window.addEvent('domready', function() {
         $("browserNotSupport").show();
@@ -347,10 +340,9 @@ var Tile = (function() {
         },
         setTargetPos: setTargetPos,
         makeDraggable: function() {
-            if (this.dragger) {
-                this.dragger.attach();
+            if (this.dragger)
                 return;
-            }
+
             var inst = this;
             this.dragger = new Drag.Move($(inst), {
                 onStart: function(el) {
@@ -365,10 +357,6 @@ var Tile = (function() {
                     morphToTargetPos.call(inst);
                 }
             });
-        },
-        stopDraggable: function() {
-            if (this.dragger)
-                this.dragger.detach();
         },
         moveTo: function(pos) {
             if (this.frozed)
@@ -402,16 +390,21 @@ var Tile = (function() {
         freeze: function(permanent) {        
             if (this.permanent)
                 return;
-            this.stopDraggable();
+
+            if (this.dragger)
+                this.dragger.detach();
             this.frozed = true;
+
             if (permanent)
                 this.permanent = true;
         },
         unfreeze: function() {        
             if (this.permanent)
                 return;
+
+            if (this.dragger)
+                this.dragger.attach();
             this.frozed = false;
-            this.makeDraggable();
         },
         stop: function() {
             this.freeze(true);
@@ -861,6 +854,12 @@ var MsgPanel = (function() {
                 $("msgContent").setProperty("value", "");
                 return false;
             });
+            $("msgContent").addEvent("keyup", function(ev) {
+                return false;                                   // prevent space bubbling
+            });
+            $("msgSubmit").addEvent("keyup", function(ev) {
+                return false;                                   // prevent space bubbling
+            });
             this.parent();
         },
         toElement: function() {
@@ -1018,17 +1017,18 @@ function Carcassonne() {
             });
             tile.makeDraggable();
         }
-        function __onCntrlClick(ev) {
+        function __onDblClick(ev) {
             var coord = board.getGridCoord(ev.page);
             if (board.occupied(coord))
-                return;
+                return false;
 
             if (board.currTile) {
                 board.currTile.moveTo(coord);
-                return;
+                return false;
             }
             
             _putTile(coord);
+            return false;
         }
         function __onSpacePressed() {
             if (board.currTile)
@@ -1037,14 +1037,14 @@ function Carcassonne() {
 
         takeCntrl = function() {
             board.addEvent('tilecreated', __onTileCreated);
-            window.addEvent('cntrlClick', __onCntrlClick);
+            window.addEvent('dblclick', __onDblClick);
             window.addEvent('spacePressed', __onSpacePressed);
         };
 
         handOverCntrl = function() {
             board.stopCurrTile();
             board.removeEvent('tilecreated', __onTileCreated);
-            window.removeEvent('cntrlClick', __onCntrlClick);
+            window.removeEvent('dblclick', __onDblClick);
             window.removeEvent('spacePressed', __onSpacePressed);
         };
     })();
@@ -1324,6 +1324,7 @@ function Carcassonne() {
             transport.close();
             transport = null;
         }
+        return true;
     });
 }
 
