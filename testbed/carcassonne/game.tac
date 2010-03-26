@@ -3,9 +3,9 @@
 # run this for debug: twistd -ny game.tac
 
 import sys
-from os.path import abspath
+from os.path import abspath, dirname
 
-sys.path.insert(0, abspath('.'))                    # make sure curr dir in sys.path
+sys.path.insert(0, abspath(dirname(__file__)))                    # make sure curr dir in sys.path
 
 if sys.platform.startswith('linux'):
     try:
