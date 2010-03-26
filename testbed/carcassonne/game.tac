@@ -3,9 +3,10 @@
 # run this for debug: twistd -ny game.tac
 
 import sys
-from os.path import abspath, dirname
+from os.path import abspath, dirname, join
 
-sys.path.insert(0, abspath(dirname(__file__)))                    # make sure curr dir in sys.path
+path = abspath(dirname(__file__))
+sys.path.insert(0, path)                                # make sure curr dir in sys.path
 
 if sys.platform.startswith('linux'):
     try:
@@ -21,7 +22,7 @@ from carcassonne import GameHandler
 
 GameHandler.DEBUG = True
 
-wwwRoot = static.File('www')
+wwwRoot = static.File(join(path, 'www'))
 wwwRoot.indexNames = ['carcassonne.html']
 site = WebSocketSite(wwwRoot)
 site.addHandler("/ws/carcassonne", GameHandler)
