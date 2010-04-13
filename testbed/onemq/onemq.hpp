@@ -1,66 +1,82 @@
 #ifndef _ONEMQ_HPP_
 #define _ONEMQ_HPP_
 
+#include <stdint.h>
+#include <uuid/uuid.h>
+
 namespace omq {
 
-class Queue;
-class QueueReader;
-typedef struct MessageID MessageID;
-typedef struct Message Message;
+/**************************
+ *          Msg           *
+ **************************/
+#define UNKNOWN_SEQ (UINT64_MAX-1)
 
+typedef struct {
+    const uuid_t * src;             // uuid of the msg source
+    int64_t seq;                    // monotonic increasing number
+} msg_id_t;
 
-class _QActor {
-public:
-    int last_err() { return _last_err; }
-protected:
-    void set_last_err(int err) { _last_err = err; }
-private:
-    int _last_err;
-};
-
-
-struct Message {
+typedef struct {
     const char * content;
     size_t len;
-    MessageID id;
+} msg_t;
+
+/**************************
+ *          Queue         *
+ **************************/
+class producer_t;
+class consumer_t;
+
+class queue_t {
+public:
+    // A queue is universal unique.
+    queue_t(const uuid_t id);
+    const uuid_t * get_id();
+
+    // A queue can create multiple producers.
+    virtual producer_t * create_producer() = 0;
+
+    // A queue can create one consumer only.
+    virtual consumer_t * create_consumer() = 0;
+
+private:
+    uuid_t _id;
 };
 
+/**************************
+ * Producer and Consumer  *
+ **************************/
+typedef enum {
+    MSG_TOO_OLD = 1,                // message is too old (already sent)
+    UNKNOWN = 255                   // unknown error
+} err_t;
 
-class Queue {
+class _queue_actor {
 public:
-    virtual MsgProducer * create_producer() = 0;
-    virtual MsgConsumer * create_consumer() = 0;
-    virtual QueueReader * create_reader() = 0;
+    err_t last_err() { return _last_err; }
+protected:
+    void set_last_err(err_t err) { _last_err = err; }
+private:
+    err_t _last_err;
 };
 
-
-// XXX !!! need to think about how external transactions
-// to avoid duplicate produce
-class MsgProducer: public _QActor {
+class producer_t: public _queue_actor {
 public:
-    virtual bool produce(Message * msg) = 0;
+    // Enqueue a message.
+    // If the message has an orignal source, pass msg_id in.
+    // Return seq number in this queue or UNKNOWN_SEQ on error.
+    virtual uint64_t enqueue(const msg_id_t * msg_id, const msg_t * msg) = 0;
 };
 
-
-// XXX !!! conflict with the reader
-class MsgConsumer: public _QActor {
+class consumer_t: public _queue_actor {
 public:
-    virtual bool consume(Message * msg) = 0;
-};
-
-
-class QueueReader: public _QActor {
-public:
-    // Seek to some position in the message queue.
-    // Return false if seek to an unvalid position.
-    virtual bool seek(const MessageID * mid) = 0;
-
-    // Read the next msg. Message is a block of opaque memory.
-    // If `block` == false, the function will return (false) immediately if 
-    // there is no more messages in the queue now.
+    // Read the 'head' msg.
     // Note that the `content` holded in `msg` is ONLY valid before the next read.
     // Don't free it yourself.
-    virtual bool next(Message * msg, bool block = true) = 0;
+    virtual bool read(msg_id_t * msg_id, msg_t * msg) = 0;
+
+    // Dequeue 'head' msg.
+    virtual bool dequeue(msg_id_t * msg_id, msg_t * msg) = 0;
 };
 
 
