@@ -2,25 +2,17 @@
 
 using namespace omq;
 
-queue_t::queue_t(const uuid_t id) {
+queue_t::queue_t() {
+    uuid_clear(_id);
+}
+
+bool queue_t::set_id(const uuid_t id) {
+    if (!uuid_is_null(_id))
+        return false;
     uuid_copy(_id, id);
+    return true;
 }
 
 const uuid_t * queue_t::get_id() {
     return &_id;
 }
-
-#if 0
-
-#include <iostream>
-
-int main() {
-    std::cout << sizeof(msg_id_t) << std::endl;
-    uuid_t a;
-    uuid_parse("d1712bb4-46ec-11df-b24b-000c29bb2336", a);
-    msg_id_t mid;
-    mid.src = &a;
-    mid.seq = 0;
-    return 0;
-}
-#endif

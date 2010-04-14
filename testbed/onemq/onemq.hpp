@@ -9,16 +9,17 @@ namespace omq {
 /**************************
  *          Msg           *
  **************************/
-#define UNKNOWN_SEQ (UINT64_MAX-1)
-
-typedef struct {
+typedef struct msg_id_t {
+    msg_id_t(): src(NULL), seq(0) {}
     const uuid_t * src;             // uuid of the msg source
     int64_t seq;                    // monotonic increasing number
 } msg_id_t;
 
-typedef struct {
+typedef struct msg_t {
+    msg_t(): content(NULL), len(0), id() {}
     const char * content;
     size_t len;
+    msg_id_t id;
 } msg_t;
 
 /**************************
@@ -30,7 +31,8 @@ class consumer_t;
 class queue_t {
 public:
     // A queue is universal unique.
-    queue_t(const uuid_t id);
+    queue_t();
+    bool set_id(const uuid_t id);
     const uuid_t * get_id();
 
     // A queue can create multiple producers.
@@ -53,19 +55,23 @@ typedef enum {
 
 class _queue_actor {
 public:
+    _queue_actor(queue_t & q): _queue(q) {}
     err_t last_err() { return _last_err; }
 protected:
-    void set_last_err(err_t err) { _last_err = err; }
-private:
+    queue_t & _queue;
     err_t _last_err;
+private:
+    _queue_actor();                 // no default constructor
 };
 
 class producer_t: public _queue_actor {
 public:
     // Enqueue a message.
-    // If the message has an orignal source, pass msg_id in.
-    // Return seq number in this queue or UNKNOWN_SEQ on error.
-    virtual uint64_t enqueue(const msg_id_t * msg_id, const msg_t * msg) = 0;
+    // `msg` can be from some external source so its `id` is not 0.
+    // In this case `producer_t` MUST check whether it is newer than the most recent 
+    // one from the source.
+    // Pass `seq` in if interested in the new seq in this queue.
+    virtual bool enqueue(const msg_t * msg, uint64_t * seq) = 0;
 };
 
 class consumer_t: public _queue_actor {
@@ -73,10 +79,10 @@ public:
     // Read the 'head' msg.
     // Note that the `content` holded in `msg` is ONLY valid before the next read.
     // Don't free it yourself.
-    virtual bool read(msg_id_t * msg_id, msg_t * msg) = 0;
+    virtual bool read(msg_t * msg) = 0;
 
     // Dequeue 'head' msg.
-    virtual bool dequeue(msg_id_t * msg_id, msg_t * msg) = 0;
+    virtual bool dequeue(msg_t * msg) = 0;
 };
 
 
