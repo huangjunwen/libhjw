@@ -57,13 +57,9 @@ typedef enum {
 
 class _queue_actor {
 public:
-    _queue_actor(queue_t & q): _queue(q) {}
     err_t last_err() { return _last_err; }
 protected:
-    queue_t & _queue;
     err_t _last_err;
-private:
-    _queue_actor();                                 // no default constructor
 };
 
 class producer_t: public _queue_actor {
