@@ -1,4 +1,4 @@
-#include "onemq.hpp"
+#include "queue.hpp"
 
 using namespace omq;
 

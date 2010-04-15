@@ -1,5 +1,5 @@
-#ifndef _ONEMQ_HPP_
-#define _ONEMQ_HPP_
+#ifndef _QUEUE_HPP_
+#define _QUEUE_HPP_
 
 #include <stdint.h>
 #include <uuid/uuid.h>
@@ -11,8 +11,8 @@ namespace omq {
  **************************/
 typedef struct msg_id_t {
     msg_id_t(): src(NULL), seq(0) {}
-    const uuid_t * src;             // uuid of the msg source
-    int64_t seq;                    // monotonic increasing number
+    const uuid_t * src;                                 // uuid of the msg source
+    int64_t seq;                                        // monotonic increasing number
 } msg_id_t;
 
 typedef struct msg_t {
@@ -30,18 +30,20 @@ class consumer_t;
 
 class queue_t {
 public:
-    // A queue is universal unique.
+    // A queue is identified by an uuid.
     queue_t();
     bool set_id(const uuid_t id);
     const uuid_t * get_id();
 
-    // A queue can create multiple producers.
+    // A queue can create 0+ producers (depends on what kind of queue is and
+    // status of the queue).
     virtual producer_t * create_producer() = 0;
 
-    // A queue can create one consumer only.
+    // A queue can create 0+ consumers (depends on what kind of queue is and
+    // status of the queue).
     virtual consumer_t * create_consumer() = 0;
 
-private:
+protected:
     uuid_t _id;
 };
 
@@ -49,8 +51,8 @@ private:
  * Producer and Consumer  *
  **************************/
 typedef enum {
-    MSG_TOO_OLD = 1,                // message is too old (already sent)
-    UNKNOWN = 255                   // unknown error
+    MSG_TOO_OLD = 1,                                // message is too old (already sent)
+    UNKNOWN = 255                                   // unknown error
 } err_t;
 
 class _queue_actor {
@@ -61,7 +63,7 @@ protected:
     queue_t & _queue;
     err_t _last_err;
 private:
-    _queue_actor();                 // no default constructor
+    _queue_actor();                                 // no default constructor
 };
 
 class producer_t: public _queue_actor {
@@ -88,4 +90,4 @@ public:
 
 }
 
-#endif // _ONEMQ_HPP_
+#endif // _QUEUE_HPP_
