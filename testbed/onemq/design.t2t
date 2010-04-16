@@ -1,0 +1,27 @@
+OneMQ
+Huang jun wen 
+Last update: %%mtime(%c)
+
+%!encoding: utf-8
+
+= onemq-fs-queue =
+
+Fs queue use three kind of files: meta/index/data files.
+
+== Meta file == 
+
+=== File format ===
+
+| **Static fields** ||
+| 6 bytes | "omq-fs" |
+| 2 bytes | Version number. (uint16_t) |
+| 16 bytes | The uuid for the queue. |
+| 4 bytes | Index entries number per index file. (uint32_t) |
+| 4 bytes | Data file size limit. (uint32_t) |
+| **This below two fields will be locked when updating seq** ||
+| 4 bytes | Last index file index. (uint32_t) |
+| 8 bytes | Tail seq number in the queue. (uint64_t) | 
+| **The below three fields will be locked before writing data** ||
+| 4 bytes | Last data file index. (uint32_t) |
+| 4 bytes | Last data file current size. (uint32_t) |
+| 4 bytes | Last data file current offset. (uint32_t) | 
