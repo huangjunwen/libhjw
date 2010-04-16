@@ -45,7 +45,7 @@ public:
     virtual consumer_t * create_consumer() = 0;
 
 protected:
-    uuid_t _id;
+    uuid_t id;
 };
 
 /**************************
@@ -56,14 +56,14 @@ typedef enum {
     UNKNOWN = 255                                   // unknown error
 } err_t;
 
-class _queue_actor {
+class _queue_actor_t {
 public:
-    err_t last_err() { return _last_err; }
+    err_t get_last_err() { return last_err; }
 protected:
-    err_t _last_err;
+    err_t last_err;
 };
 
-class producer_t: public _queue_actor {
+class producer_t: public _queue_actor_t {
 public:
     // Enqueue a message.
     // `msg` can be from some external source so its `id` is not 0.
@@ -73,7 +73,7 @@ public:
     virtual bool enqueue(const msg_t * msg, uint64_t * seq) = 0;
 };
 
-class consumer_t: public _queue_actor {
+class consumer_t: public _queue_actor_t {
 public:
     // Read the 'head' msg.
     // Note that the `content` holded in `msg` is ONLY valid before the next read.

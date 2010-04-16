@@ -3,18 +3,18 @@
 namespace omq {
 
 queue_t::queue_t() {
-    uuid_clear(_id);
+    uuid_clear(id);
 }
 
-bool queue_t::set_id(const uuid_t id) {
-    if (!uuid_is_null(_id))
+bool queue_t::set_id(const uuid_t id_) {
+    if (!uuid_is_null(id))
         return false;
-    uuid_copy(_id, id);
+    uuid_copy(id, id_);
     return true;
 }
 
 const uuid_t * queue_t::get_id() {
-    return &_id;
+    return &id;
 }
 
 }
