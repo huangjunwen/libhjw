@@ -15,12 +15,13 @@ typedef struct msg_id_t {
     int64_t seq;                                        // monotonic increasing number
 } msg_id_t;
 
-typedef struct msg_t {
-    msg_t(): content(NULL), len(0), id() {}
-    const char * content;
-    size_t len;
+class msg_t {
+public:
     msg_id_t id;
-} msg_t;
+
+    // Return true if there is more data.
+    virtual bool get_content(const char ** content, size_t * len) = 0;
+};
 
 /**************************
  *          Queue         *
