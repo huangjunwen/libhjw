@@ -43,3 +43,9 @@ SING_PROC will place an exclusive record lock on some fields.
 | **The below fields will be locked before writing data** |||
 | 4 bytes | uint32_t | Last data file index. |
 | 4 bytes | uint32_t | Last data file size. |
+
+
+=== XXX ===
+- Fs-queue need a init to create mutexes for threads. (dlopen?)
+- How to detect a process is crashed when writing data file? Since data files need to be purged. (time expire?)
+- How producers tell consumer to consumer msg?
