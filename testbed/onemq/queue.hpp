@@ -40,8 +40,7 @@ public:
     // status of the queue).
     virtual producer_t * create_producer() = 0;
 
-    // A queue can create 0+ consumers (depends on what kind of queue is and
-    // status of the queue).
+    // A queue can create only one consumer.
     virtual consumer_t * create_consumer() = 0;
 
 protected:

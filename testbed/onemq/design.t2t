@@ -1,5 +1,5 @@
 OneMQ
-Huang jun wen 
+Huang jun wen (Jayven)
 Last update: %%mtime(%c)
 
 %!encoding: utf-8
@@ -10,18 +10,36 @@ Fs queue use three kind of files: meta/index/data files.
 
 == Meta file == 
 
+Fs queue can be accessed by multiple producers and one consumer.
+
+=== Mode ===
+
+Queue mode is set in the flags field (see below) when creating queues.
+
+|| flag name | desc | default |
+| SING_PROC | Set if only allow one producer process to access the queue | unset |
+| SING_THD | Set if only allow one producer thread to access the queue (this will also set SING_PROC) | unset |
+
+SING_PROC will place an exclusive record lock on some fields.
+
 === File format ===
 
-| **Static fields** ||
-| 6 bytes | "omq-fs" |
-| 2 bytes | Version number. (uint16_t) |
-| 16 bytes | The uuid for the queue. |
-| 4 bytes | Index entries number per index file. (uint32_t) |
-| 4 bytes | Data file size limit. (uint32_t) |
-| **This below two fields will be locked when updating seq** ||
-| 4 bytes | Last index file index. (uint32_t) |
-| 8 bytes | Tail seq number in the queue. (uint64_t) | 
-| **The below three fields will be locked before writing data** ||
-| 4 bytes | Last data file index. (uint32_t) |
-| 4 bytes | Last data file current size. (uint32_t) |
-| 4 bytes | Last data file current offset. (uint32_t) | 
+|| length | type | desc |
+| **Static fields** |||
+| 6 bytes | char[6] | "omq-fs" |
+| 2 bytes | uint16_t | Version number. |
+| 16 bytes | uuid_t | The uuid for the queue. |
+| 4 bytes | uint32_t | Index entries number per index file. |
+| 4 bytes | uint32_t | Data file size limit. |
+| 8 bytes | uint64_t | Flags. |
+| **This below fields will be locked when enqueue** |||
+| 4 bytes | uint32_t | Tail index file index. |
+| 4 bytes | uint32_t | Tail index file entry index. |
+| 8 bytes | uint64_t | Tail seq number in the queue. | 
+| **The below fields will be used for the consumer** |||
+| 4 bytes | uint32_t | Head index file index. |
+| 4 bytes | uint32_t | Head index file entry index. |
+| 8 bytes | uint64_t | Head seq number in the queue. | 
+| **The below fields will be locked before writing data** |||
+| 4 bytes | uint32_t | Last data file index. |
+| 4 bytes | uint32_t | Last data file size. |
