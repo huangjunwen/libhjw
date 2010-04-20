@@ -10,18 +10,21 @@ Fs queue can be accessed by multiple producers and one consumer.
 
 Fs queue use these kind of files: meta/src/index/data files.
 
+Files are flush to disk by producer since consumer's data is tolerant to lost (just consume again).
+
+
 == Meta file == 
 
 Meta files contain meta information about one message queue.
 
-=== Mode ===
-
-Queue mode is set in the flags field (see below) when creating queues.
+=== Flags ===
 
 || flag name | desc | default |
-| SING_PROC | Set if only allow one producer process to access the queue | unset |
+| SING_PROC | Set if only allow one producer process to access the queue. | unset |
 | SING_PROC will place an exclusive record lock on some fields so only one process can get it. |||
-
+| SING_SRC | Set if only allow one message source. (good idea to have SING_PROC set) | unset |
+| MIRROR | Set if this queue is a mirror of another queue. (same uuid) | unset |
+| SAFER | Set if flush to disk on every enqueue. (default is every second or more) | unset |
 
 === File format ===
 
@@ -33,7 +36,10 @@ Queue mode is set in the flags field (see below) when creating queues.
 | 4 bytes | uint32_t | Index entries number per index file. |
 | 4 bytes | uint32_t | Data file size limit. |
 | 8 bytes | uint64_t | Flags. |
-| 472 bytes | char[472] | Unused. |
+| 216 bytes | char[216] | Unused. |
+| **Dynamic fields** |||
+| 4 bytes | uint32_t | Last flush time. |
+| 252 bytes | char[252] | Unused. |
 | **Consumer fields** |||
 | 4 bytes | uint32_t | Store consumer pid as a uint32_t. This field is used to detect consumer crash. |
 | 4 bytes | uint32_t | Head index file index. |
@@ -58,11 +64,23 @@ Queue mode is set in the flags field (see below) when creating queues.
 
 == Src file == 
 
-
 === File format ===
 
 || length | type | desc |
 | **Message sources** |||
 | 16 bytes | uuid_t | Message source. |
 | 8 bytes | uint64_t | Last recv seq from this source. |
+| 8 bytes | uint64_t | Last recv time from this source. |
+| ... repeat ... |
+
+
+== Index file == 
+
+=== File format ===
+
+|| length | type | desc |
+| 4 bytes | uint32_t | Data file index. |
+| 4 bytes | uint32_t | Data file offset. |
+| 4 bytes | uint32_t | Entry size. |
+| 4 bytes | uint32_t | Enqueue time. |
 | ... repeat ... |
