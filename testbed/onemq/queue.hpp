@@ -19,8 +19,10 @@ class msg_t {
 public:
     msg_id_t id;
 
-    // Return true if there is more data.
-    virtual bool get_content(const char ** content, size_t * len) = 0;
+    virtual size_t get_content_len() = 0;
+
+    // Return next block of content.
+    virtual size_t get_content(const char ** content) = 0;
 };
 
 /**************************

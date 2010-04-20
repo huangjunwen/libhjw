@@ -6,11 +6,13 @@ Last update: %%mtime(%c)
 
 = onemq-fs-queue =
 
-Fs queue can be accessed by multiple producers and one consumer.
+Fs queue can be accessed by multiple producers and one consumer in one process.
+
+Implement a shared memory multi-processes fs queue is harder. The main reason is:
+ - Crash detection and recovery is harder to implement when multi-processes involved.
+
 
 Fs queue use these kind of files: meta/src/index/data files.
-
-Files are flush to disk by producer since consumer's data is tolerant to lost (just consume again).
 
 
 == Meta file == 
@@ -20,11 +22,10 @@ Meta files contain meta information about one message queue.
 === Flags ===
 
 || flag name | desc | default |
-| SING_PROC | Set if only allow one producer process to access the queue. | unset |
-| SING_PROC will place an exclusive record lock on some fields so only one process can get it. |||
-| SING_SRC | Set if only allow one message source. (good idea to have SING_PROC set) | unset |
-| MIRROR | Set if this queue is a mirror of another queue. (same uuid) | unset |
-| SAFER | Set if flush to disk on every enqueue. (default is every second or more) | unset |
+| FLAG_SING_THD | Set if only allow one thread to access the queue. | unset |
+| FLAG_MIRROR | Set if this queue is a mirror of another queue. (same uuid) | unset |
+| FLAG_SAFER | Set if flush to disk on every enqueue. (default is every second or more) | unset |
+| FLAG_SAVE_SRC | Set if need to save source and source seq. | unset |
 
 === File format ===
 
@@ -38,22 +39,21 @@ Meta files contain meta information about one message queue.
 | 8 bytes | uint64_t | Flags. |
 | 216 bytes | char[216] | Unused. |
 | **Dynamic fields** |||
+| 4 bytes | uint32_t | Pid. |
 | 4 bytes | uint32_t | Last flush time. |
 | 252 bytes | char[252] | Unused. |
 | **Consumer fields** |||
-| 4 bytes | uint32_t | Store consumer pid as a uint32_t. This field is used to detect consumer crash. |
 | 4 bytes | uint32_t | Head index file index. |
 | 4 bytes | uint32_t | Head index file entry index. (next entry to be read) |
-| 244 bytes | char[244] | Unused. |
+| 248 bytes | char[248] | Unused. |
 | **Producer fields** |||
-| 4 bytes | uint32_t | Store producer pid as a uint32_t. This field is used to detect producer crash. |
 | 4 bytes | uint32_t | Tail index file index. |
 | 4 bytes | uint32_t | Tail index file entry index. |
 | 8 bytes | uint64_t | Tail seq number in the queue. | 
 | 4 bytes | uint32_t | Message sources count. |
 | 4 bytes | uint32_t | Last data file index. |
 | 4 bytes | uint32_t | Last data file size. |
-| 224 bytes | char[224] | Unused. |
+| 228 bytes | char[228] | Unused. |
 
 
 === XXX ===
@@ -71,7 +71,8 @@ Meta files contain meta information about one message queue.
 | 16 bytes | uuid_t | Message source. |
 | 8 bytes | uint64_t | Last recv seq from this source. |
 | 8 bytes | uint64_t | Last recv time from this source. |
-| ... repeat ... |
+| ... repeat ... |||
+
 
 
 == Index file == 
@@ -83,4 +84,17 @@ Meta files contain meta information about one message queue.
 | 4 bytes | uint32_t | Data file offset. |
 | 4 bytes | uint32_t | Entry size. |
 | 4 bytes | uint32_t | Enqueue time. |
-| ... repeat ... |
+| ... repeat ... |||
+
+
+== Data file == 
+
+=== File format ===
+
+|| length | type | desc |
+| 4 bytes | uint32_t | Data size (N). | 
+| 4 bytes | uint32_t | Data write time. |
+| 4 bytes | uint32_t | Src index. |
+| 8 bytes | uint64_t | Src seq. |
+| N bytes | char[N] | Msg data. |
+| ... repeat ... |||
