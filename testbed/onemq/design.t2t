@@ -31,21 +31,21 @@ Meta files contain meta information about one message queue.
 
 || length | type | desc |
 | **Static fields** |||
-| 6 bytes | char[6] | "omq-fs" |
+| 6 bytes | unsigned char[6] | "omq-fs" |
 | 2 bytes | uint16_t | Version number. |
 | 16 bytes | uuid_t | The uuid for the queue. |
 | 4 bytes | uint32_t | Index entries number per index file. |
 | 4 bytes | uint32_t | Data file size limit. |
 | 8 bytes | uint64_t | Flags. |
-| 216 bytes | char[216] | Unused. |
+| 216 bytes | unsigned char[216] | Unused. |
 | **Dynamic fields** |||
 | 4 bytes | uint32_t | Pid. |
 | 4 bytes | uint32_t | Last flush time. |
-| 252 bytes | char[252] | Unused. |
+| 252 bytes | unsigned char[252] | Unused. |
 | **Consumer fields** |||
 | 4 bytes | uint32_t | Head index file index. |
 | 4 bytes | uint32_t | Head index file entry index. (next entry to be read) |
-| 248 bytes | char[248] | Unused. |
+| 248 bytes | unsigned char[248] | Unused. |
 | **Producer fields** |||
 | 4 bytes | uint32_t | Tail index file index. |
 | 4 bytes | uint32_t | Tail index file entry index. |
@@ -53,7 +53,7 @@ Meta files contain meta information about one message queue.
 | 4 bytes | uint32_t | Message sources count. |
 | 4 bytes | uint32_t | Last data file index. |
 | 4 bytes | uint32_t | Last data file size. |
-| 228 bytes | char[228] | Unused. |
+| 228 bytes | unsigned char[228] | Unused. |
 
 
 === XXX ===
@@ -96,5 +96,5 @@ Meta files contain meta information about one message queue.
 | 4 bytes | uint32_t | Data write time. |
 | 4 bytes | uint32_t | Src index. |
 | 8 bytes | uint64_t | Src seq. |
-| N bytes | char[N] | Msg data. |
+| N bytes | unsigned char[N] | Msg data. |
 | ... repeat ... |||

@@ -22,7 +22,7 @@ public:
     virtual size_t get_content_len() = 0;
 
     // Return next block of content.
-    virtual size_t get_content(const char ** content) = 0;
+    virtual size_t get_content(const unsigned char ** content) = 0;
 };
 
 /**************************
