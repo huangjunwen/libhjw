@@ -37,7 +37,7 @@ public:
     uint32_t get_key_count(){ return key_count; }
     void clear();
 protected:
-    tst_node_t<V> * find_node(const unsigned char * key, size_t klen, 
+    inline tst_node_t<V> * find_node(const unsigned char * key, size_t klen, 
         bool create_if_not_found);
 
     tst_node_t<V> * root;
@@ -72,7 +72,8 @@ bool tst_t<V>::find(V * val, const unsigned char * key, size_t klen) {
     tst_node_t<V> * n  = find_node(key, klen, false);
     if (!n || !n->occupied)
         return false;
-    *val = n->val;
+    if (val)
+        *val = n->val;
     return true;
 }
 
