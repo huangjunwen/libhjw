@@ -43,17 +43,14 @@ Meta files contain meta information about one message queue.
 | 4 bytes | uint32_t | Last flush time. |
 | 252 bytes | unsigned char[252] | Unused. |
 | **Consumer fields** |||
-| 4 bytes | uint32_t | Head index file index. |
-| 4 bytes | uint32_t | Head index file entry index. (next entry to be read) |
+| 8 bytes | uint64_t | Head seq. (last seq read) |
 | 248 bytes | unsigned char[248] | Unused. |
 | **Producer fields** |||
-| 4 bytes | uint32_t | Tail index file index. |
-| 4 bytes | uint32_t | Tail index file entry index. |
-| 8 bytes | uint64_t | Tail seq number in the queue. | 
+| 8 bytes | uint64_t | Tail seq. (last seq written) | 
 | 4 bytes | uint32_t | Message sources count. |
 | 4 bytes | uint32_t | Last data file index. |
 | 4 bytes | uint32_t | Last data file size. |
-| 228 bytes | unsigned char[228] | Unused. |
+| 236 bytes | unsigned char[236] | Unused. |
 
 
 === XXX ===
@@ -67,12 +64,11 @@ Meta files contain meta information about one message queue.
 === File format ===
 
 || length | type | desc |
-| **Message sources** |||
+| 4 bytes | uint32_t | Src id. (start from 0) |
 | 16 bytes | uuid_t | Message source. |
 | 8 bytes | uint64_t | Last recv seq from this source. |
-| 8 bytes | uint64_t | Last recv time from this source. |
+| 4 bytes | uint32_t | Last recv time from this source. |
 | ... repeat ... |||
-
 
 
 == Index file == 
@@ -80,21 +76,27 @@ Meta files contain meta information about one message queue.
 === File format ===
 
 || length | type | desc |
-| 4 bytes | uint32_t | Data file index. |
+| 4 bytes | uint32_t | Data file id. (!=0xffffffff) |
 | 4 bytes | uint32_t | Data file offset. |
-| 4 bytes | uint32_t | Entry size. |
+| 4 bytes | uint32_t | Entry size. (include head) |
 | 4 bytes | uint32_t | Enqueue time. |
 | ... repeat ... |||
 
+Otherwise:
+
+|| length | type | desc |
+| 4 bytes | uint32_t | 0xffffffff |
+| 8 bytes | uint64_t | Next seq. |
+| 4 bytes | uint32_t | Unused. |
 
 == Data file == 
 
 === File format ===
 
 || length | type | desc |
-| 4 bytes | uint32_t | Data size (N). | 
+| 4 bytes | uint32_t | Data size. (N) | 
 | 4 bytes | uint32_t | Data write time. |
-| 4 bytes | uint32_t | Src index. |
+| 4 bytes | uint32_t | Src id. |
 | 8 bytes | uint64_t | Src seq. |
 | N bytes | unsigned char[N] | Msg data. |
 | ... repeat ... |||

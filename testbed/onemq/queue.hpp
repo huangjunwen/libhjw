@@ -9,6 +9,8 @@ namespace omq {
 /**************************
  *          Msg           *
  **************************/
+#define NULL_SEQ (0)
+
 typedef struct msg_id_t {
     msg_id_t(): src(NULL), seq(0) {}
 
@@ -85,6 +87,7 @@ public:
     // Read the 'head' msg.
     // Note that the `content` holded in `msg` is ONLY valid before the next read.
     // Don't free it yourself.
+    // Return false if no more to read.
     virtual bool read(msg_t * msg) = 0;
 
     // Dequeue 'head' msg.
