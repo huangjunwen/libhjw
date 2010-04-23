@@ -27,7 +27,7 @@ tst_node_t<V>::tst_node_t(): left(NULL), right(NULL), middle(NULL),
 template <typename V>
 class tst_t {
 public:
-    tst_t(): root(NULL), nodes(NULL), key_count(0) {
+    tst_t(): root(NULL), nodes(NULL), key_count(0), node_count(0) {
     }
     ~tst_t();
     // Return false if already has a key.
@@ -35,6 +35,7 @@ public:
     void replace(V val, const unsigned char * key, size_t klen = 0);
     bool find(V * val, const unsigned char * key, size_t klen = 0);
     uint32_t get_key_count(){ return key_count; }
+    uint32_t get_node_count(){ return node_count; }
     void clear();
 protected:
     inline tst_node_t<V> * find_node(const unsigned char * key, size_t klen, 
@@ -43,6 +44,7 @@ protected:
     tst_node_t<V> * root;
     tst_node_t<V> * nodes;
     uint32_t key_count;
+    uint32_t node_count;
 };
 
 template <typename V>
@@ -86,6 +88,7 @@ void tst_t<V>::clear() {
     }
     root = NULL;
     key_count = 0;
+    node_count = 0;
 }
 
 template <typename V>
@@ -135,6 +138,7 @@ tst_node_t<V> * tst_t<V>::find_node(const unsigned char * key, size_t klen,
 
     while (s != end) {
         curr = *pnext = new tst_node_t<V>();
+        ++node_count;
         curr->c = *s;
         curr->next = nodes;
         nodes = curr;
