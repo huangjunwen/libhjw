@@ -4,6 +4,22 @@ Last update: %%mtime(%c)
 
 %!encoding: utf-8
 
+= onemq =
+
+目标是设计一套小巧灵活而又能满足我们需求的消息(队列)中间件.
+
+首先, 需要有一组接口明确功能单一的"设备"组件, 例如包括:
+ - queue device
+  - queue on fs
+  - queue on mysql
+ - consumer device (为什么没有 producer device 呢? 因为 producer 是主动的. device 一般是"被动"的)
+  - connector (从一个队列出来的转入另一个队列)
+  - dispatcher (从一个队列到多个 consumer device, 各个 consumer 处理不同的 msg)
+  - subscriber (从一个队列到多个 consumer device, 各个 consumer 处理相同的 msg)
+  - filter
+  - handler (最终 notify 用户程序)
+
+
 = onemq-fs-queue =
 
 Fs queue can be accessed by multiple producers and one consumer in one process.
