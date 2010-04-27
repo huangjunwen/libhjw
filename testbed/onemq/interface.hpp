@@ -13,6 +13,11 @@ class i_msg_t;
 class i_msg_provider_t;
 class i_msg_consumer_t;
 
+/*******************************************************
+ *
+ * Messages are tagged. (ordered)
+ *
+ *******************************************************/
 typedef struct msg_id_t {
     msg_id_t(): uuid(NULL), seq(NULL_SEQ) {}
 
@@ -30,20 +35,40 @@ public:
     msg_id_t id;
 };
 
+/*******************************************************
+ *
+ * Msg provider is responsable to provide (queued) msg. 
+ *
+ *******************************************************/
 class i_msg_provider_t {
 public:
-    // Msg provider is reponsable to provide (queued) msg. 
     // A provider can bind ONLY ONE consumer. 
-    //   The consumer's `msg_provided` should be called when some msg is available.
+    // The consumer's `msg_provided` should be called when some msg is available.
     virtual bool bind_consumer(i_msg_consumer_t *) = 0;
-    virtual bool msg_consumed(i_msg_consumer_t *, const msg_id_t *) = 0;
+    virtual i_msg_consumer_t * bound_consumer() = 0;
+
+    // These can be called by the consumer.
+    // Get the msg.
+    virtual i_msg_t * get_msg(const msg_id_t *) = 0;
+    // Called by the consumer when a msg is handled.
+    virtual bool msg_consumed(const msg_id_t *) = 0;
 };
 
+class i_queue_t: i_msg_provider_t {
+public:
+    virtual bool enqueue(const i_msg_t *) = 0;
+};
+
+/*******************************************************
+ *
+ * Msg consumer is responsable to handle msg. 
+ *
+ *******************************************************/
 class i_msg_consumer_t {
 public:
-    // Called when a msg is arrived to this device.
     virtual void msg_provided(i_msg_provider_t *, const msg_id_t *) = 0;
 };
+
 
 #if 0
 class i_dispatcher_t: public i_consumer_t {
