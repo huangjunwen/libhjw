@@ -37,9 +37,14 @@ typedef struct msg_t {
  *
  * Msg provider is responsable to provide (queued) msg. 
  * Msg consumer is responsable to handle msg. 
- *
+ * 1 provider to 1 consumer.
+ * 
  *******************************************************/
 class i_msg_provider_t {
+public:
+    // Universal unique.
+    virtual const uuid_t * get_uuid() = 0;
+
 public:
     /* These public interfaces are called by the scheduler */
     // Called when a msg is really consumed.
@@ -79,28 +84,47 @@ protected:
  * Component interfaces.
  *
  *******************************************************/
-class i_queue_t: public i_msg_provider_t {
+// All components are create/configure/destory in main thread.
+// But can have many parts in different threads at run time.
+class i_comp_t {
 public:
-    // Queue is universal unique.
-    virtual const uuid_t * get_uuid() = 0;
-
-    // Enqueue a message.
-    virtual int enqueue(const msg_t *) = 0;
+    virtual void inc_ref() = 0;
+    virtual void dec_ref() = 0;
 };
 
 
-class i_filter_t: public i_msg_consumer_t, public i_msg_provider_t {
+class i_queue_t: public i_msg_provider_t, public i_comp_t {
+public:
+    virtual bool add_provider(i_msg_provider_t *) = 0;
+};
+
+
+class i_filter_t: public i_msg_consumer_t, public i_msg_provider_t, public i_comp_t {
 public:
     typedef bool (*filter_fn)(const msg_t *);
     virtual void set_filter_fn(typename filter_fn) = 0;
 };
 
 
-class i_publisher_t: public i_msg_consumer_t {
+class i_publisher_t: public i_msg_consumer_t, public i_comp_t {
 public:
     // Publisher is a consumer that can 'link' many consumers.
     virtual bool add_subscriber(i_msg_consumer_t *) = 0;
 };
+
+
+class i_dispatcher_t: public i_msg_consumer_t, public i_comp_t {
+public:
+    virtual bool add_worker(i_msg_consumer_t *) = 0;
+};
+
+
+class i_handler_t: public i_msg_consumer_t, public i_comp_t {
+public:
+    typedef bool (*cb_fn)(const msg_t *);
+    virtual void set_cb_fn(typename cb_fn) = 0;
+};
+
 
 }
 
