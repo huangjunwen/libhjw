@@ -5,8 +5,6 @@
 #include <uuid/uuid.h>
 
 namespace omq {
-
-
 /*******************************************************
  *
  * Messages are tagged. (ordered)
@@ -30,57 +28,78 @@ typedef struct {
 #define NTS (0)
 
 typedef struct msg_t {
-    msg_id_t id;
     const unsigned char * content;
     size_t len;
+    msg_id_t id;
 } msg_t;
 
 /*******************************************************
  *
- * Component interfaces.
- * Queue is responsable to provide msg.
- * Consumer is responsable to handle msg. 
+ * Msg provider is responsable to provide (queued) msg. 
+ * Msg consumer is responsable to handle msg. 
  *
  *******************************************************/
-class i_queue_t;
-class i_consumer_t;
+class i_msg_provider_t {
+public:
+    /* These public interfaces are called by the scheduler */
+    // Called when a msg is really consumed.
+    // Return error when msgs are not consumed in order.
+    virtual int on_msg_consumed(const msg_t *) = 0;
 
-class i_queue_t {
+    // Called to get new msg after `ready_to_provide`.
+    // The msg is not really consumed before `on_msg_consumed` is called.
+    // Provider is responsable to allocate/free msg's memory.
+    virtual const msg_t * get_msg() = 0;
+
+protected:
+    /* These protected interfaces are called by sub class at the right time */
+    // Ready to provide new msg.
+    virtual void ready_to_provide();
+};
+
+
+class i_msg_consumer_t {
+public:
+    /* These public interfaces are called by the scheduler */
+    // Called when a msg is provided after `ready_to_consume`.
+    virtual void on_msg_provided(const msg_t *) = 0;
+
+protected:
+    /* These protected interfaces are called by sub class at the right time */
+    // Ready to consume new msg.
+    virtual void ready_to_consume();
+
+    // Called when the msg has handled.
+    virtual void consume_msg(const msg_t *);
+};
+
+
+/*******************************************************
+ *
+ * Component interfaces.
+ *
+ *******************************************************/
+class i_queue_t: public i_msg_provider_t {
 public:
     // Queue is universal unique.
     virtual const uuid_t * get_uuid() = 0;
 
     // Enqueue a message.
-    virtual bool enqueue(const msg_t *) = 0;
-
-    // A queue can be pause and resume.
-    virtual void pause() = 0;
-    virtual void resume() = 0;
-    // Return the number of messages that have given to the consumer but 
-    // not consumed.
-    virtual uint32_t outstand_msgs() = 0;
-
-    // A provider can bind ONLY ONE consumer. 
-    virtual bool bind_consumer(i_consumer_t *) = 0;
-    virtual i_consumer_t * bound_consumer() = 0;
-
-    // These can be called by the consumer.
-    // Get the msg.
-    virtual const msg_t * get_msg(const msg_id_t *) = 0;
-    // Called by the consumer when a msg is handled.
-    virtual bool msg_consumed(const msg_id_t *) = 0;
+    virtual int enqueue(const msg_t *) = 0;
 };
 
-class i_consumer_t {
+
+class i_filter_t: public i_msg_consumer_t, public i_msg_provider_t {
 public:
-    // `msg_provided` should be called by the provider when some msg is available.
-    virtual void msg_provided(i_queue_t *, const msg_id_t *) = 0;
+    typedef bool (*filter_fn)(const msg_t *);
+    virtual void set_filter_fn(typename filter_fn) = 0;
 };
 
-// Publisher is also a consumer.
-class i_publisher_t: public i_consumer_t {
+
+class i_publisher_t: public i_msg_consumer_t {
 public:
-    virtual bool add_subscriber(i_consumer_t *) = 0;
+    // Publisher is a consumer that can 'link' many consumers.
+    virtual bool add_subscriber(i_msg_consumer_t *) = 0;
 };
 
 }
