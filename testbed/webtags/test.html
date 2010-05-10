@@ -1,0 +1,58 @@
+<html>
+<head>
+    <title>Test code prettify</title>
+    <link href="http://google-code-prettify.googlecode.com/svn/trunk/src/prettify.css" type="text/css" rel="stylesheet" />
+    <script type="text/javascript" src="http://google-code-prettify.googlecode.com/svn/trunk/src/prettify.js"></script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/mootools/1.2.4/mootools-yui-compressed.js"></script>
+    <script type="text/javascript">
+        window.addEvent("domready", function() {
+            Element.Events.cntrlClick = {
+                base: 'click',
+                condition: function(ev) {
+                    return ev.control;
+                }
+            };
+            Element.Events.cntrlOver = {
+                base: 'mouseover',
+                condition: function(ev) {
+                    return ev.control;
+                }
+            };
+
+            $("codes").addEvent("cntrlClick", function(ev) {
+                var target = ev.target;
+                if (!target.hasClass("pln"))
+                    return;
+                var text = target.get("text").trim();
+                if (!text)
+                    return;
+                $("selectedCode").set("text", text);
+            }).addEvent("cntrlOver", function(ev) {
+                var target = ev.target;
+                if (!target.hasClass("pln"))
+                    return;
+                var text = target.get("text").trim();
+                if (!text)
+                    return;
+                target.setStyles({"font-weight": "thicker", "cursor": "pointer"});
+            }).addEvent("mouseout", function(ev) {
+                var target = ev.target;
+                if (!target.hasClass("pln"))
+                    return;
+                target.setStyles({"font-weight": "", "cursor": ""});
+            });
+        });
+    </script>
+</head>
+<body onload="prettyPrint()">
+    <div id="selectedCode"></div>
+    <div>
+    <pre id="codes" class="prettyprint">
+    class A(object):
+        def __init__(self):
+            self.x = 123       
+    a = A()
+    print a.x</pre>
+    </div>
+</body>
+</html>
