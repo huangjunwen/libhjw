@@ -6,53 +6,88 @@
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/mootools/1.2.4/mootools-yui-compressed.js"></script>
     <script type="text/javascript">
         window.addEvent("domready", function() {
-            Element.Events.cntrlClick = {
-                base: 'click',
-                condition: function(ev) {
-                    return ev.control;
-                }
-            };
-            Element.Events.cntrlOver = {
-                base: 'mouseover',
-                condition: function(ev) {
-                    return ev.control;
-                }
-            };
-
-            $("codes").addEvent("cntrlClick", function(ev) {
+            $("codes").addEvent("click", function(ev) {
                 var target = ev.target;
                 if (!target.hasClass("pln"))
                     return;
                 var text = target.get("text").trim();
                 if (!text)
                     return;
-                $("selectedCode").set("text", text);
-            }).addEvent("cntrlOver", function(ev) {
+                if (!ev.control) {
+                    $("selectedCode").set("text", text);
+                    return;
+                }
+                $("selectedCode").set("text", "goto: {text}".substitute({"text": text}));
+            }).addEvent("mouseover", function(ev) {
                 var target = ev.target;
                 if (!target.hasClass("pln"))
                     return;
                 var text = target.get("text").trim();
                 if (!text)
                     return;
-                target.setStyles({"font-weight": "thicker", "cursor": "pointer"});
+                if (text.split(/\s+/g).length == 1) {
+                    target.setStyles({"color": "red", "cursor": "pointer"});
+                }
+                else {
+                }
             }).addEvent("mouseout", function(ev) {
                 var target = ev.target;
                 if (!target.hasClass("pln"))
                     return;
-                target.setStyles({"font-weight": "", "cursor": ""});
+                target.setStyles({"color": "", "cursor": ""});
             });
         });
     </script>
 </head>
 <body onload="prettyPrint()">
-    <div id="selectedCode"></div>
-    <div>
-    <pre id="codes" class="prettyprint">
-    class A(object):
-        def __init__(self):
-            self.x = 123       
-    a = A()
-    print a.x</pre>
-    </div>
+<div id="selectedCode"></div>
+<div>
+<pre id="codes" class="prettyprint">
+/*
+    Copyright (c) 2007-2010 iMatix Corporation
+
+    This file is part of 0MQ.
+
+    0MQ is free software; you can redistribute it and/or modify it under
+    the terms of the Lesser GNU General Public License as published by
+    the Free Software Foundation; either version 3 of the License, or
+    (at your option) any later version.
+
+    0MQ is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    Lesser GNU General Public License for more details.
+
+    You should have received a copy of the Lesser GNU General Public License
+    along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
+*/
+
+#include &quot;../include/zmq.h&quot;
+
+#include &quot;pipe.hpp&quot;
+
+zmq::reader_t::reader_t (object_t *parent_,
+      uint64_t hwm_, uint64_t lwm_) :               // XXX
+    object_t (parent_),
+    pipe (NULL),
+    peer (NULL),
+    hwm (hwm_),
+    lwm (lwm_),
+    msgs_read (0),
+    endpoint (NULL)
+{
+    //  Adjust lwm and hwm.
+    if (lwm == 0 || lwm &gt; hwm)
+        lwm = hwm;
+}
+
+zmq::reader_t::~reader_t ()                         // XXX?
+{
+    if (pipe)
+        unregister_pipe (pipe);
+}
+
+</pre>
+</div>
 </body>
 </html>
