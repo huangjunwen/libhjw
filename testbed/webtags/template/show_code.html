@@ -1,0 +1,71 @@
+$def with (lines)
+<html>
+<head>
+    <title>Test code prettify</title>
+    <link href="/static/prettify.css" type="text/css" rel="stylesheet" />
+    <style type="text/css">
+    span.plnWord:hover {
+        color: red;
+        cursor: pointer;
+    }
+    </style>
+    <script type="text/javascript" src="/static/prettify.js"></script>
+    <script type="text/javascript" src="/static/jquery.min.js"></script>
+    <script type="text/javascript">
+        var jq = jQuery;
+        jq(function() {
+            prettyPrint();
+
+            // ref: http://stackoverflow.com/questions/1219860?tab=votes#tab-top
+            function htmlEncode(s) {
+                return jq("<div/>").text(s).html();
+            }
+            function htmlDecode(s) {
+                return jq("<div/>").html(s).text();
+            }
+
+            function split(line) {
+                var re = /\S+|\s+/;
+                var res = [];
+                while (true) {
+                    var part = re.exec(line);
+                    if (part == null)
+                        break;
+                    part = part[0];
+                    res.push(part);
+                    line = line.substr(part.length);
+                }
+                return res;
+            }
+
+            jq("span.pln").each(function(idx, el) {
+                el = jq(el);
+                var lines = el.html().split(/<br\/?>/ig);
+                for (var i = 0; i < lines.length; ++i) {
+                    var line = htmlDecode(lines[i]);
+                    var parts = split(line);
+                    for (var j = 0; j < parts.length; ++j) {
+                        if (/\s+/.test(parts[j]))               // blank
+                            parts[j] = "<span>" + parts[j] + "</span>";
+                        else
+                            parts[j] = "<span class='plnWord'>" + parts[j] + "</span>";
+                    }
+                    lines[i] = parts.join("");
+                }
+                el.html(lines.join("<br>"));
+            });
+        });
+    </script>
+</head>
+<body>
+<div id="selectedCode"></div>
+<div>
+<pre id="codes" class="prettyprint">
+$code:
+    lineno_pat = '%%0%dd  ' % len(str(len(lines)))
+$for line in lines:
+    <span class="nocode">$(lineno_pat % loop.index)</span>$line.rstrip()
+</pre>
+</div>
+</body>
+</html>
