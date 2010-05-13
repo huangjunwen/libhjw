@@ -1,4 +1,4 @@
-$def with (lines)
+$def with (fname, flines)
 <html>
 <head>
     <title>Test code prettify</title>
@@ -58,10 +58,15 @@ $def with (lines)
     </style>
 </head>
 <body>
-<pre id="codes" class="prettyprint">
 $code:
-    lineno_pat = ' %%0%dd ' % len(str(len(lines)))
-$for line in lines:
+    if len(fname.split(".")) == 2:
+        lang = "lang-%s" % fname.split(".")[1]
+    else:
+        lang = ""
+<pre id="codes" class="prettyprint $lang">
+$code:
+    lineno_pat = ' %%0%dd ' % len(str(len(flines)))
+$for line in flines:
     $ lineno = lineno_pat % loop.index
     <span class="lineno nocode"><a name=$loop.index href="#$loop.index">$lineno</a> </span>$line.rstrip()
 </pre>

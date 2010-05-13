@@ -14,7 +14,7 @@ class show_code:
         globals = {'str': str}
         render = web.template.render('template/', globals=globals)
         try:
-            return render.show_code(open(filename).readlines())
+            return render.show_code(filename, open(filename).readlines())
         except IOError:
             raise web.notfound("Source file not found")
 
