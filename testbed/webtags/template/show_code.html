@@ -27,8 +27,9 @@ $def with (fname, flines)
                 for (var i = 0; i < parts.length; ++i) {
                     if (/\s+/.test(parts[i]))
                         parts[i] = "<span>" + parts[i] + "</span>";
-                    else
-                        parts[i] = "<span class='plnWord'>" + parts[i] + "</span>";
+                    else {
+                        parts[i] = "<span class='plnWord " + parts[i] + "'>" + parts[i] + "</span>";
+                    }
                 }
                 parts = parts.join("");
 
@@ -37,6 +38,13 @@ $def with (fname, flines)
                     parts += "<br>";
                 el.html(parts);
             });
+
+            var lastHighLight = null;
+            jq("span.plnWord").click(function() {
+                if (lastHighLight)
+                    lastHighLight.removeClass("hl");
+                lastHighLight = jq("." + jq(this).text()).filter(".plnWord").addClass("hl");
+            });
         });
     </script>
     <link href="/static/prettify.css" type="text/css" rel="stylesheet" />
@@ -44,6 +52,9 @@ $def with (fname, flines)
     span.plnWord:hover {
         color: red;
         cursor: pointer;
+    }
+    .hl {
+        background-color: yellow;
     }
     </style>
 </head>
