@@ -23,7 +23,6 @@ class CacheFileMeta(type):
             def ret(self, fname):
                 if fname not in self._cache:
                     self._cache[fname] = f(self, fname)
-                    print 'haha'
                 return self._cache[fname]
             return ret
         
