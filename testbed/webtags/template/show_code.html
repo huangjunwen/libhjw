@@ -17,33 +17,23 @@ $def with (fname, flines)
                 return jq("<div/>").html(s).text();
             }
 
-            function split(line) {
-                var re = /\S+|\s+/;
-                var res = [];
-                while (true) {
-                    var part = re.exec(line);
-                    if (part == null)
-                        break;
-                    part = part[0];
-                    res.push(part);
-                    line = line.substr(part.length);
-                }
-                return res;
-            }
-
             jq("span.pln").each(function(idx, el) {
                 el = jq(el);
-                // line end if next elem is the line no
-                var lineEnd = el.next().hasClass("lineno");
-                var parts = split(htmlDecode(el.html()));
-                for (var j = 0; j < parts.length; ++j) {
-                    if (/\s+/.test(parts[j]))               // blank
-                        parts[j] = "<span>" + parts[j] + "</span>";
+
+                // split plain words
+                var parts = htmlDecode(el.html()).match(/\S+|\s+/g);
+                if (parts == null)
+                    parts = [];
+                for (var i = 0; i < parts.length; ++i) {
+                    if (/\s+/.test(parts[i]))
+                        parts[i] = "<span>" + parts[i] + "</span>";
                     else
-                        parts[j] = "<span class='plnWord'>" + parts[j] + "</span>";
+                        parts[i] = "<span class='plnWord'>" + parts[i] + "</span>";
                 }
                 parts = parts.join("");
-                if (lineEnd)
+
+                // line end if next elem is the line no
+                if (el.next().hasClass("lineno"))
                     parts += "<br>";
                 el.html(parts);
             });
