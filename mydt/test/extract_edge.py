@@ -16,9 +16,6 @@ for line in infile:
     s.add((b, c))
     s.add((a, c))
 
-l = list(s)
-l.sort(lambda x, y: cmp(x[0], y[0]))
-
-for a, b in l:
+for a, b in s:
     outfile.write("%d %d\n" % (a, b))
 
