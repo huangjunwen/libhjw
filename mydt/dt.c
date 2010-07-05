@@ -6,7 +6,6 @@
 #include <time.h>
 #include <assert.h>
 #include "dt.h"
-#include "codebase/mem_pool.h"
 
 /*********************************
  * BST
@@ -43,21 +42,23 @@ struct wave {
 #define cevent_init(cev) (memset((cev), 0, sizeof(cirlEvent)))
 #define wave_init(wv) (memset((wv), 0, sizeof(wave)))
 
+// node order: from +y -x to -y +x
+#define NODE_ORD_CMP(n1, n2) ((n1)->y > (n2)->y || ( (n1)->y == (n2)->y && (n1)->x < (n2)->x ))
+
+
 /*********************************
  * Site event array
  *********************************/
 typedef struct {
     siteEvent ** elems;
-    uint32 capacity;
-    uint32 size;
+    uint32_t capacity;
+    uint32_t size;
 } sevArray;
 
 INTERNAL boolean se_array_init(sevArray * a) {
-#define INIT_ARRAY_CAPACITY (1024)
     if (!(a->elems = (siteEvent **)malloc(sizeof(siteEvent *) * INIT_ARRAY_CAPACITY)))
         return 0;
     a->capacity = INIT_ARRAY_CAPACITY;
-#undef INIT_ARRAY_CAPACITY
     a->size = 0;
     return 1;
 }
@@ -82,13 +83,13 @@ INTERNAL boolean se_array_push_back(sevArray * a, siteEvent * elem) {
     return 1;
 }
 
-INTERNAL uint32 _partition(siteEvent ** elems, uint32 left, uint32 right) {
+INTERNAL uint32_t _partition(siteEvent ** elems, uint32_t left, uint32_t right) {
     siteEvent * tmp;
 #define SWAP(i1, i2) tmp = elems[i1]; elems[i1] = elems[i2]; elems[i2] = tmp
     siteEvent * pivot = elems[left];
     SWAP(left, right);
-    uint32 idx = left;
-    uint32 i;
+    uint32_t idx = left;
+    uint32_t i;
     for (i = left; i < right; ++i) {
         if (NODE_ORD_CMP(elems[i], pivot)) {
             SWAP(i, idx);
@@ -99,10 +100,10 @@ INTERNAL uint32 _partition(siteEvent ** elems, uint32 left, uint32 right) {
     return idx;
 }
 
-void _qsort(siteEvent ** elems, uint32 left, uint32 right) {
+void _qsort(siteEvent ** elems, uint32_t left, uint32_t right) {
     if (left >= right)
         return;
-    uint32 i = _partition(elems, left, right);
+    uint32_t i = _partition(elems, left, right);
     if (i) 
         _qsort(elems, left, i - 1); 
     _qsort(elems, i + 1, right);
@@ -118,16 +119,14 @@ INTERNAL void se_array_sort(sevArray * a) {
 
 typedef struct {
     cirlEvent ** elems;
-    uint32 capacity;
-    uint32 size;
+    uint32_t capacity;
+    uint32_t size;
 } cevHeap;
 
 INTERNAL boolean ce_heap_init(cevHeap * h) {
-#define INIT_HEAP_CAPACITY (256)
     if (!(h->elems = (cirlEvent **)malloc(sizeof(cirlEvent *) * INIT_HEAP_CAPACITY)))
         return 0;
     h->capacity = INIT_HEAP_CAPACITY;
-#undef INIT_HEAP_CAPACITY
     h->size = 0;
     return 1;
 }
@@ -150,8 +149,8 @@ INTERNAL boolean ce_heap_push(cevHeap * h, cirlEvent * elem) {
     }
 
     // bottom to top
-    uint32 curr = h->size++;
-    uint32 parent;
+    uint32_t curr = h->size++;
+    uint32_t parent;
     cirlEvent ** elems = h->elems;
     while (curr) {
         parent = (curr - 1) >> 1;
@@ -175,9 +174,9 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
     cirlEvent * last = h->elems[--h->size];
 
     // find postion for last from top to bottom
-    uint32 child;
-    uint32 curr = 0;
-    uint32 last_idx = h->size - 1;
+    uint32_t child;
+    uint32_t curr = 0;
+    uint32_t last_idx = h->size - 1;
     cirlEvent ** elems = h->elems;
     while ((child = (curr << 1) + 1) <= last_idx){
         if (child + 1 <= last_idx && 
@@ -457,15 +456,14 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
 
     // recalculate candidate circle event for dup_wv and curr
     cirlEvent * new_cevent;
-    memPool * pool = &dt->ce_pool;
     cevHeap * heap = &dt->ce_heap;
 
-    if (new_cevent = candidate_circle_event(dt, curr)) {
+    if ((new_cevent = candidate_circle_event(dt, curr))) {
         LINK_CEVENT(curr, new_cevent);
         ce_heap_push(heap, new_cevent);
     }
     
-    if (new_cevent = candidate_circle_event(dt, dup_wv)) {
+    if ((new_cevent = candidate_circle_event(dt, dup_wv))) {
         LINK_CEVENT(dup_wv, new_cevent);
         ce_heap_push(heap, new_cevent);
     }
@@ -484,7 +482,7 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
     wave * wv = e->wv;
     if (!wv)
         return;
-    INIT_WV_SHORTCUT(dt);
+    //INIT_WV_SHORTCUT(dt);
 
     // remove this wave
     wave * p;
@@ -496,15 +494,14 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
     UNLINK_CEVENT(n);
     
     cirlEvent * new_cevent;
-    memPool * pool = &dt->ce_pool;
     cevHeap * heap = &dt->ce_heap;
 
-    if (new_cevent = candidate_circle_event(dt, p)) {
+    if ((new_cevent = candidate_circle_event(dt, p))) {
         LINK_CEVENT(p, new_cevent);
         ce_heap_push(heap, new_cevent);
     }
     
-    if (new_cevent = candidate_circle_event(dt, n)) {
+    if ((new_cevent = candidate_circle_event(dt, n))) {
         LINK_CEVENT(n, new_cevent);
         ce_heap_push(heap, new_cevent);
     }
@@ -534,9 +531,16 @@ void dt_begin(myDt dt, edgeHandler handler, void * extra) {
 #endif
 }
 
-void dt_next_sorted(myDt dt, node * nd) {
+void dt_next(myDt dt, metric x, metric y, void * attr) {
     myDtImpl * d = (myDtImpl *)dt;
+    node * n = (node *)mem_pool_get(&d->nd_pool);
+    n->x = x;
+    n->y = y;
+    n->attr = attr;
+    se_array_push_back(&d->se_array, n);
+}
 
+INTERNAL void _next_sorted(myDtImpl * d, node * nd) {
     cevHeap * heap = &d->ce_heap;
     while (heap->size && NODE_ORD_CMP(&heap->elems[0]->coord, nd)) {
         cirlEvent * cev = ce_heap_pop(heap);
@@ -547,8 +551,7 @@ void dt_next_sorted(myDt dt, node * nd) {
     handle_site_event(d, nd);
 }
 
-void dt_end_sorted(myDt dt) {
-    myDtImpl * d = (myDtImpl *)dt;
+INTERNAL void _end_sorted(myDtImpl * d) {
     cevHeap * heap = &d->ce_heap;
     while (heap->size) {
         cirlEvent * cev = ce_heap_pop(heap);
@@ -557,29 +560,11 @@ void dt_end_sorted(myDt dt) {
     }
 }
 
-void dt_next_node(myDt dt, node * nd) {
-    myDtImpl * d = (myDtImpl *)dt;
-    se_array_push_back(&d->se_array, nd);
-}
-
-void dt_end_node(myDt dt) {
+void dt_end(myDt dt) {
     myDtImpl * d = (myDtImpl *)dt;
     se_array_sort(&d->se_array);
-    uint32 i;
+    uint32_t i;
     for (i = 0; i < d->se_array.size; ++i)
-        dt_next_sorted(dt, d->se_array.elems[i]);
-    dt_end_sorted(dt);
-}
-
-void dt_next(myDt dt, metric x, metric y, void * attr) {
-    myDtImpl * d = (myDtImpl *)dt;
-    node * n = (node *)mem_pool_get(&d->nd_pool);
-    n->x = x;
-    n->y = y;
-    n->attr = attr;
-    dt_next_node(dt, n);
-}
-
-void dt_end(myDt dt) {
-    dt_end_node(dt);
+        _next_sorted(d, d->se_array.elems[i]);
+    _end_sorted(d);
 }

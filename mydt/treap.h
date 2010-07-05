@@ -3,15 +3,14 @@
 #ifndef _TREAP_H_
 #define _TREAP_H_
 
-#include "config.h"
-#include "codebase/types.h"
-#include "codebase/mem_pool.h"
+#include "codebase.h"
+#include "mydt_config.h"
 
 typedef struct treapNode treapNode;
 
 struct treapNode {
     void * val;
-    uint32 priority;                // the greater the closer to the root
+    uint32_t priority;              // the greater the closer to the root
     treapNode * parent;             // if parent == 0, this node is root
     treapNode * left;
     treapNode * right;

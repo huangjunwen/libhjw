@@ -1,6 +1,6 @@
 // vim:fdm=marker:nu:nowrap
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
+#ifndef _MYDT_CONFIG_H_
+#define _MYDT_CONFIG_H_
 
 // compile configs
 
@@ -9,10 +9,10 @@
  ****************/
 #define USE_TREAP       // use treap as BST
 
-
 /*****************
- * Metric
+ * Params
  ****************/
-//#define INT_METRIC    // use int type other than real type as metric
+#define INIT_ARRAY_CAPACITY (4096)
+#define INIT_HEAP_CAPACITY (256)
 
 #endif
