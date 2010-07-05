@@ -6,10 +6,10 @@
 /*********************************
  * Mem pool
  *********************************/
-static const uint32 memSegSz = sizeof(memSeg *) + sizeof(byte *);
+static const uint32_t memSegBaseSz = (uint32_t)(((memSeg*)0)->mem);
 
 memSeg * _new_seg(memPool * pool) {
-    uint32 sz = memSegSz + pool->item_sz * pool->inc_sz;
+    uint32_t sz = memSegBaseSz + pool->item_sz * pool->inc_sz;
     memSeg * ms = (memSeg *)malloc(sz);
     if (!ms)
         return 0;
@@ -24,7 +24,7 @@ void mem_pool_reset(memPool * pool) {
     pool->curr_seg = &pool->head_seg;
 }
 
-boolean mem_pool_init(memPool * pool, uint32 item_sz, uint32 inc_sz) {
+boolean mem_pool_init(memPool * pool, uint32_t item_sz, uint32_t inc_sz) {
     assert(item_sz >= sizeof(void *));
     assert(inc_sz > 0);
     pool->item_sz = item_sz;
