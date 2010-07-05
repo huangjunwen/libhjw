@@ -3,7 +3,7 @@
 #ifndef _MEM_POOL_H_
 #define _MEM_POOL_H_
 
-#include "types.h"
+#include "typedefs.h"
 
 typedef struct memSeg {
     struct memSeg * next;

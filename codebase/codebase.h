@@ -5,7 +5,7 @@
 
 #define INTERNAL static inline
 
-#include "types.h"
+#include "typedefs.h"
 #include "mem_pool.h"
 
 #endif
