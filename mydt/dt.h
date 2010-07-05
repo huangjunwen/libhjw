@@ -2,7 +2,7 @@
 #ifndef _DT_H_
 #define _DT_H_
 
-#include "codebase.h"
+#include "../codebase/codebase.h"
 #include "mydt_config.h"
 
 typedef real metric;

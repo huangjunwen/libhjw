@@ -3,7 +3,7 @@
 #ifndef _TREAP_H_
 #define _TREAP_H_
 
-#include "codebase.h"
+#include "../codebase/codebase.h"
 #include "mydt_config.h"
 
 typedef struct treapNode treapNode;

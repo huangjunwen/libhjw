@@ -6,20 +6,32 @@
 #include <time.h>
 #include <math.h>
 #include <sys/time.h>
-#include "dt.h"
+#include "../dt.h"
 
 // options
-#define OUTPUT 1
 #define LOOP_NUM (1)
 
+typedef struct output_elem {
+    int32_t n1;
+    int32_t n2;
+    struct output_elem * next;
+} output_elem;
+
+typedef struct {
+    memPool * pool;
+    output_elem * prev;
+} output_struct;
+
 void pp_handler(void * extra, const node * p1, const node * p2) {
-#if OUTPUT
     int32_t n1 = (uint32_t)p1->attr;
     int32_t n2 = (uint32_t)p2->attr;
-    int32_t min = n1>n2?n2:n1;
-    int32_t max = n1>n2?n1:n2;
-    printf("%d %d\n", min, max);
-#endif
+    output_struct * st = (output_struct *)extra;
+    output_elem * elem = (output_elem *)mem_pool_get(st->pool);
+    elem->n1 = n1>n2?n2:n1;
+    elem->n2 = n1>n2?n1:n2;
+    elem->next = 0;
+    st->prev->next = elem;
+    st->prev = elem;
 }
 
 int main() {
@@ -60,13 +72,21 @@ int main() {
         return 1;
     }
 
+    output_struct st;
+    output_elem head;
+    memPool output_pool;
+    mem_pool_init(&output_pool, sizeof(output_elem), 4096);
+    st.pool = &output_pool;
+    st.prev = &head;
+
     struct timeval tv0, tv1;
     struct timezone tz;
     gettimeofday(&tv0, &tz);
 
     int32_t i, j;
     for (i = 0; i < LOOP_NUM; ++i) {
-        dt_begin(dt, pp_handler, 0);
+        mem_pool_reset(&output_pool);
+        dt_begin(dt, pp_handler, &st);
         for (j = 0; j < total; ++j) {
             np = &buffer[j];
             dt_next(dt, np->x, np->y, np->attr);
@@ -74,10 +94,19 @@ int main() {
         dt_end(dt);
     }
 
-
     gettimeofday(&tv1, &tz);
-    fprintf(stderr, "%ld ms\n", 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l);
+    fprintf(stderr, "dt: %ld ms\n", 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l);
 
+    gettimeofday(&tv0, &tz);
+    output_elem * e = &head;
+    while (e->next) {
+        printf("%d %d\n", e->n1, e->n2);
+        e = e->next;
+    }
+    gettimeofday(&tv1, &tz);
+    fprintf(stderr, "output: %ld ms\n", 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l);
+
+    mem_pool_finalize(&output_pool);
     dt_destroy(&dt);
     free(buffer);
     return 0;
