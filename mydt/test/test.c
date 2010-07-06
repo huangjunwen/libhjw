@@ -98,8 +98,8 @@ int main() {
     fprintf(stderr, "dt: %ld ms\n", 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l);
 
     gettimeofday(&tv0, &tz);
-    output_elem * e = &head;
-    while (e->next) {
+    output_elem * e = head.next;
+    while (e) {
         printf("%d %d\n", e->n1, e->n2);
         e = e->next;
     }
