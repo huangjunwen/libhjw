@@ -206,9 +206,12 @@ typedef struct {
 #ifndef NOT_USE_BST
     BST bst;
 #endif
-    edgeHandler handler;            // edge handler
-    void * extra;                   // extra para for edge handler
+    edgeHandler edge_handler;       // edge handler
+    void * eh_param;                // param for edge handler
 } myDtImpl;
+
+void dummy_eh(void * eh_param, const node * n1, const node * n2) {
+}
 
 boolean dt_create(myDt * pdt) {
     myDtImpl * ret = (myDtImpl *)malloc(sizeof(myDtImpl));
@@ -223,6 +226,9 @@ boolean dt_create(myDt * pdt) {
 #endif
             ))
         return 0;
+    ret->edge_handler = dummy_eh;
+    ret->eh_param = NULL;
+
     *pdt = (void *)ret;
     //srand(clock());
     return 1;
@@ -240,6 +246,11 @@ void dt_destroy(myDt * pdt) {
 #endif
     free(dt);
     *pdt = 0;
+}
+
+void dt_set_edge_handler(myDt dt, edgeHandler edge_handler, void * eh_param) {
+    ((myDtImpl *)dt)->edge_handler = edge_handler;
+    ((myDtImpl *)dt)->eh_param = eh_param;
 }
 
 /*********************************
@@ -373,7 +384,7 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
 INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
     INIT_WV_SHORTCUT(dt);
 
-    if (!HEAD_WV->focus) {                        // the first one
+    if (!HEAD_WV->focus) {                          // the first one
         HEAD_WV->focus = e;
         HEAD_WV->next = LAST_WV = HEAD_WV;
 #ifndef NOT_USE_BST
@@ -381,13 +392,13 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
 #endif
         return;
     }
-    if (e->y == HEAD_WV->focus->y) {            // the first several one
+    if (e->y == HEAD_WV->focus->y) {                // the first several one
         wave * w = (wave *)mem_pool_get(&dt->wv_pool);
         wave_init(w);
         w->focus = e;
         CONNECT_WV(LAST_WV, w);
         CONNECT_WV(w, HEAD_WV);
-        dt->handler(dt->extra, w->prev->focus, w->focus);
+        dt->edge_handler(dt->eh_param, w->prev->focus, w->focus);
         return;
     }
 
@@ -474,8 +485,9 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
     else
         new_wv->bst_ptr = 0;
 #endif
-    // handler 
-    dt->handler(dt->extra, e, curr->focus);
+
+    // edge handler 
+    dt->edge_handler(dt->eh_param, e, curr->focus);
 }
 
 INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
@@ -512,14 +524,12 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
 
     mem_pool_release(&dt->wv_pool, wv);
     
-    // handler
-    dt->handler(dt->extra, p->focus, n->focus);
+    // edge handler
+    dt->edge_handler(dt->eh_param, p->focus, n->focus);
 }
 
-void dt_begin(myDt dt, edgeHandler handler, void * extra) {
+void dt_begin(myDt dt) {
     myDtImpl * d = (myDtImpl *)dt;
-    d->handler = handler;
-    d->extra = extra;
     wave_init(&d->wf_head);
     se_array_reset(&d->se_array);
     ce_heap_reset(&d->ce_heap);

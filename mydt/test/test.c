@@ -79,6 +79,8 @@ int main() {
     st.pool = &output_pool;
     st.prev = &head;
 
+    dt_set_edge_handler(dt, pp_handler, &st);
+
     struct timeval tv0, tv1;
     struct timezone tz;
     gettimeofday(&tv0, &tz);
@@ -86,7 +88,7 @@ int main() {
     int32_t i, j;
     for (i = 0; i < LOOP_NUM; ++i) {
         mem_pool_reset(&output_pool);
-        dt_begin(dt, pp_handler, &st);
+        dt_begin(dt);
         for (j = 0; j < total; ++j) {
             np = &buffer[j];
             dt_next(dt, np->x, np->y, np->attr);

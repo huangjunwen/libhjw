@@ -13,17 +13,19 @@ typedef struct {
     void * attr;
 } node;
 
-typedef void (*edgeHandler)(void * extra, const node *, const node *);
-
 // main struct
-typedef void* myDt;
+typedef void * myDt;
 
 // dt struct creation and destruction
 boolean dt_create(myDt * pdt);
 void dt_destroy(myDt * pdt);
 
+// dt params
+typedef void (*edgeHandler)(void *, const node *, const node *);
+void dt_set_edge_handler(myDt, edgeHandler, void *);
+
 // dt engine
-void dt_begin(myDt dt, edgeHandler handler, void * extra);
+void dt_begin(myDt dt);
 void dt_next(myDt dt, metric x, metric y, void * attr);
 void dt_end(myDt dt);
 
