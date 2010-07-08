@@ -21,8 +21,12 @@ boolean dt_create(myDt * pdt);
 void dt_destroy(myDt * pdt);
 
 // dt params
-typedef void (*edgeHandler)(void *, const node *, const node *);
+typedef void (*edgeHandler)(void * param, const node * n1, const node * n2);
 void dt_set_edge_handler(myDt, edgeHandler, void *);
+
+typedef void (*trianHandler)(void * param, const node * n1, const node * n2, const node * n3,
+    const node * ccc);      // ccc for center of the circumcircle 
+void dt_set_trian_handler(myDt, trianHandler, void *);
 
 // dt engine
 void dt_begin(myDt dt);

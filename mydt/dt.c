@@ -208,10 +208,9 @@ typedef struct {
 #endif
     edgeHandler edge_handler;       // edge handler
     void * eh_param;                // param for edge handler
+    trianHandler trian_handler;     // triangle handler
+    void * th_param;                // param for triangle handler
 } myDtImpl;
-
-void dummy_eh(void * eh_param, const node * n1, const node * n2) {
-}
 
 boolean dt_create(myDt * pdt) {
     myDtImpl * ret = (myDtImpl *)malloc(sizeof(myDtImpl));
@@ -226,8 +225,10 @@ boolean dt_create(myDt * pdt) {
 #endif
             ))
         return 0;
-    ret->edge_handler = dummy_eh;
+    ret->edge_handler = NULL;
     ret->eh_param = NULL;
+    ret->trian_handler = NULL;
+    ret->th_param = NULL;
 
     *pdt = (void *)ret;
     //srand(clock());
@@ -251,6 +252,11 @@ void dt_destroy(myDt * pdt) {
 void dt_set_edge_handler(myDt dt, edgeHandler edge_handler, void * eh_param) {
     ((myDtImpl *)dt)->edge_handler = edge_handler;
     ((myDtImpl *)dt)->eh_param = eh_param;
+}
+
+void dt_set_trian_handler(myDt dt, trianHandler trian_handler, void * th_param) {
+    ((myDtImpl *)dt)->trian_handler = trian_handler;
+    ((myDtImpl *)dt)->th_param = th_param;
 }
 
 /*********************************
@@ -398,7 +404,8 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
         w->focus = e;
         CONNECT_WV(LAST_WV, w);
         CONNECT_WV(w, HEAD_WV);
-        dt->edge_handler(dt->eh_param, w->prev->focus, w->focus);
+        if (dt->edge_handler)
+            dt->edge_handler(dt->eh_param, w->prev->focus, w->focus);
         return;
     }
 
@@ -487,20 +494,29 @@ INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
 #endif
 
     // edge handler 
-    dt->edge_handler(dt->eh_param, e, curr->focus);
+    if (dt->edge_handler)
+        dt->edge_handler(dt->eh_param, e, curr->focus);
 }
 
 INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
     wave * wv = e->wv;
-    if (!wv)
+    if (!wv)                            // false alarm
         return;
     //INIT_WV_SHORTCUT(dt);
+    wave * p = wv->prev;
+    wave * n = wv->next;
+
+    // edge handler
+    if (dt->edge_handler)
+        dt->edge_handler(dt->eh_param, p->focus, n->focus);
+
+    // triangle handler
+    if (dt->trian_handler)
+        dt->trian_handler(dt->th_param, p->focus, n->focus, wv->focus, &e->coord);
 
     // remove this wave
-    wave * p;
-    wave * n;
-    p = wv->next->prev = wv->prev;
-    n = wv->prev->next = wv->next;
+    wv->next->prev = p;
+    wv->prev->next = n;
     // set false alarms
     UNLINK_CEVENT(p);
     UNLINK_CEVENT(n);
@@ -523,9 +539,6 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
 #endif
 
     mem_pool_release(&dt->wv_pool, wv);
-    
-    // edge handler
-    dt->edge_handler(dt->eh_param, p->focus, n->focus);
 }
 
 void dt_begin(myDt dt) {

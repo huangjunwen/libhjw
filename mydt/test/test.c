@@ -34,6 +34,10 @@ void pp_handler(void * extra, const node * p1, const node * p2) {
     st->prev = elem;
 }
 
+void tri_handler(void * param, const node * p1, const node * p2, const node * p3, const node * cc) {
+    ++(*((int32_t *)param));
+}
+
 int main() {
 
     FILE * fp = fopen("in.node", "r");
@@ -78,8 +82,10 @@ int main() {
     mem_pool_init(&output_pool, sizeof(output_elem), 4096);
     st.pool = &output_pool;
     st.prev = &head;
+    int32_t tri_cnt;
 
     dt_set_edge_handler(dt, pp_handler, &st);
+    dt_set_trian_handler(dt, tri_handler, &tri_cnt);
 
     struct timeval tv0, tv1;
     struct timezone tz;
@@ -88,6 +94,7 @@ int main() {
     int32_t i, j;
     for (i = 0; i < LOOP_NUM; ++i) {
         mem_pool_reset(&output_pool);
+        tri_cnt = 0;
         dt_begin(dt);
         for (j = 0; j < total; ++j) {
             np = &buffer[j];
@@ -97,6 +104,7 @@ int main() {
     }
 
     gettimeofday(&tv1, &tz);
+    fprintf(stderr, "%d triangles\n", tri_cnt);
     fprintf(stderr, "dt: %ld ms\n", 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l);
 
     gettimeofday(&tv0, &tz);
