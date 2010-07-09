@@ -30,8 +30,8 @@ typedef struct {
 } cirlEvent;
 
 struct wave {
-    node * focus;                    // the focus point ( the coord of site event )
-    cirlEvent * cevent;              // the circle event 
+    const node * focus;              // the focus point ( the coord of site event )
+    cirlEvent * cevent;              // the candidate circle event 
 #ifndef NOT_USE_BST
     void * bst_ptr;                    
 #endif
@@ -41,77 +41,6 @@ struct wave {
 
 #define cevent_init(cev) (memset((cev), 0, sizeof(cirlEvent)))
 #define wave_init(wv) (memset((wv), 0, sizeof(wave)))
-
-// node order: from +y -x to -y +x
-#define NODE_ORD_CMP(n1, n2) ((n1)->y > (n2)->y || ( (n1)->y == (n2)->y && (n1)->x < (n2)->x ))
-
-
-/*********************************
- * Site event array
- *********************************/
-typedef struct {
-    siteEvent ** elems;
-    uint32_t capacity;
-    uint32_t size;
-} sevArray;
-
-INTERNAL boolean se_array_init(sevArray * a) {
-    if (!(a->elems = (siteEvent **)malloc(sizeof(siteEvent *) * INIT_ARRAY_CAPACITY)))
-        return 0;
-    a->capacity = INIT_ARRAY_CAPACITY;
-    a->size = 0;
-    return 1;
-}
-
-INTERNAL void se_array_reset(sevArray * a) {
-    a->size = 0;
-}
-
-INTERNAL void se_array_finalize(sevArray * a) {
-    free(a->elems);
-}
-
-INTERNAL boolean se_array_push_back(sevArray * a, siteEvent * elem) {
-    if (a->size >= a->capacity) {
-        void * ne;
-        if ( !(ne = realloc(a->elems, sizeof(siteEvent *) * (a->capacity + a->capacity))) )
-            return 0;
-        a->elems = (siteEvent **)ne;
-        a->capacity += a->capacity;
-    }
-    a->elems[a->size++] = elem;
-    return 1;
-}
-
-INTERNAL uint32_t _partition(siteEvent ** elems, uint32_t left, uint32_t right) {
-    siteEvent * tmp;
-#define SWAP(i1, i2) tmp = elems[i1]; elems[i1] = elems[i2]; elems[i2] = tmp
-    siteEvent * pivot = elems[left];
-    SWAP(left, right);
-    uint32_t idx = left;
-    uint32_t i;
-    for (i = left; i < right; ++i) {
-        if (NODE_ORD_CMP(elems[i], pivot)) {
-            SWAP(i, idx);
-            ++idx;
-        }   
-    }   
-    SWAP(idx, right);
-    return idx;
-}
-
-void _qsort(siteEvent ** elems, uint32_t left, uint32_t right) {
-    if (left >= right)
-        return;
-    uint32_t i = _partition(elems, left, right);
-    if (i) 
-        _qsort(elems, left, i - 1); 
-    _qsort(elems, i + 1, right);
-}
-
-INTERNAL void se_array_sort(sevArray * a) {
-    _qsort(a->elems, 0, a->size - 1); 
-}
 
 /*********************************
  * Circle event heap
@@ -199,8 +128,6 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
 typedef struct {
     memPool ce_pool;                // memory pools
     memPool wv_pool;
-    memPool nd_pool;
-    sevArray se_array;              // as a sorted array
     cevHeap ce_heap;                // as a heap
     wave wf_head;                   // the wave front list head
 #ifndef NOT_USE_BST
@@ -211,53 +138,6 @@ typedef struct {
     trianHandler trian_handler;     // triangle handler
     void * th_param;                // param for triangle handler
 } myDtImpl;
-
-boolean dt_create(myDt * pdt) {
-    myDtImpl * ret = (myDtImpl *)malloc(sizeof(myDtImpl));
-    if (!ret)
-        return 0;
-    if (! (se_array_init(&ret->se_array) && ce_heap_init(&ret->ce_heap) &&
-            mem_pool_init(&ret->ce_pool, sizeof(cirlEvent), 128) &&
-            mem_pool_init(&ret->wv_pool, sizeof(wave), 128) &&
-            mem_pool_init(&ret->nd_pool, sizeof(node), 256)
-#ifndef NOT_USE_BST
-            && BST_INIT(&ret->bst)
-#endif
-            ))
-        return 0;
-    ret->edge_handler = NULL;
-    ret->eh_param = NULL;
-    ret->trian_handler = NULL;
-    ret->th_param = NULL;
-
-    *pdt = (void *)ret;
-    //srand(clock());
-    return 1;
-}
-
-void dt_destroy(myDt * pdt) {
-    myDtImpl * dt = (myDtImpl *)(*pdt);
-    se_array_finalize(&dt->se_array);
-    ce_heap_finalize(&dt->ce_heap);
-    mem_pool_finalize(&dt->ce_pool);
-    mem_pool_finalize(&dt->wv_pool);
-    mem_pool_finalize(&dt->nd_pool);
-#ifndef NOT_USE_BST
-    BST_FINALIZE(&dt->bst);
-#endif
-    free(dt);
-    *pdt = 0;
-}
-
-void dt_set_edge_handler(myDt dt, edgeHandler edge_handler, void * eh_param) {
-    ((myDtImpl *)dt)->edge_handler = edge_handler;
-    ((myDtImpl *)dt)->eh_param = eh_param;
-}
-
-void dt_set_trian_handler(myDt dt, trianHandler trian_handler, void * th_param) {
-    ((myDtImpl *)dt)->trian_handler = trian_handler;
-    ((myDtImpl *)dt)->th_param = th_param;
-}
 
 /*********************************
  * algorithm detail
@@ -340,9 +220,9 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
     if (wv == HEAD_WV || wv == LAST_WV) {
         return 0;
     }
-    node * a = wv->prev->focus;
-    node * b = wv->focus;
-    node * c = wv->next->focus;
+    const node * a = wv->prev->focus;
+    const node * b = wv->focus;
+    const node * c = wv->next->focus;
 
     /* if det
      * | abx cbx | 
@@ -387,7 +267,7 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
  * else
  *     right_bound = l
  */        
-INTERNAL void handle_site_event(myDtImpl * dt, siteEvent * e) {
+INTERNAL void handle_site_event(myDtImpl * dt, const siteEvent * e) {
     INIT_WV_SHORTCUT(dt);
 
     if (!HEAD_WV->focus) {                          // the first one
@@ -541,53 +421,126 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
     mem_pool_release(&dt->wv_pool, wv);
 }
 
-void dt_begin(myDt dt) {
+/*********************************
+ * APIs
+ *********************************/
+boolean dt_create(myDt * pdt) {
+    myDtImpl * ret = (myDtImpl *)malloc(sizeof(myDtImpl));
+    if (!ret)
+        return 0;
+    if (! (ce_heap_init(&ret->ce_heap) &&
+            mem_pool_init(&ret->ce_pool, sizeof(cirlEvent), 128) &&
+            mem_pool_init(&ret->wv_pool, sizeof(wave), 128)
+#ifndef NOT_USE_BST
+            && BST_INIT(&ret->bst)
+#endif
+            ))
+        return 0;
+    ret->edge_handler = NULL;
+    ret->eh_param = NULL;
+    ret->trian_handler = NULL;
+    ret->th_param = NULL;
+
+    *pdt = (void *)ret;
+    //srand(clock());
+    return 1;
+}
+
+void dt_destroy(myDt * pdt) {
+    myDtImpl * dt = (myDtImpl *)(*pdt);
+    ce_heap_finalize(&dt->ce_heap);
+    mem_pool_finalize(&dt->ce_pool);
+    mem_pool_finalize(&dt->wv_pool);
+#ifndef NOT_USE_BST
+    BST_FINALIZE(&dt->bst);
+#endif
+    free(dt);
+    *pdt = 0;
+}
+
+void dt_set_edge_handler(myDt dt, edgeHandler edge_handler, void * eh_param) {
+    ((myDtImpl *)dt)->edge_handler = edge_handler;
+    ((myDtImpl *)dt)->eh_param = eh_param;
+}
+
+void dt_set_trian_handler(myDt dt, trianHandler trian_handler, void * th_param) {
+    ((myDtImpl *)dt)->trian_handler = trian_handler;
+    ((myDtImpl *)dt)->th_param = th_param;
+}
+
+INTERNAL uint32_t _partition(const node ** elems, uint32_t left, uint32_t right) {
+    const node * tmp;
+#define SWAP(i1, i2) tmp = elems[i1]; elems[i1] = elems[i2]; elems[i2] = tmp
+    const node * pivot = elems[left];
+    SWAP(left, right);
+    uint32_t idx = left;
+    uint32_t i;
+    for (i = left; i < right; ++i) {
+        if (NODE_ORD_CMP(elems[i], pivot)) {
+            SWAP(i, idx);
+            ++idx;
+        }   
+    }   
+    SWAP(idx, right);
+    return idx;
+}
+
+INTERNAL void _qsort(const node ** elems, uint32_t left, uint32_t right) {
+    if (left >= right)
+        return;
+    uint32_t i = _partition(elems, left, right);
+    if (i) 
+        _qsort(elems, left, i - 1); 
+    _qsort(elems, i + 1, right);
+}
+
+void dt_sort_nodes(const node ** nds, uint32_t num) {
+    _qsort(nds, 0, num - 1);
+}
+
+void dt_run_nodes(myDt dt, const node ** nds, uint32_t num) {
+    dt_sort_nodes(nds, num);
+    dt_run_sorted_nodes(dt, nds, num);
+}
+
+void dt_run_sorted_nodes(myDt dt, const node ** nds, uint32_t num) {
+    dt_begin_sorted_nodes(dt);
+    uint32_t i;
+    for (i = 0; i < num; ++i)
+        dt_next_sorted_node(dt, nds[i]);
+    dt_end_sorted_nodes(dt);
+}
+
+void dt_begin_sorted_nodes(myDt dt) {
     myDtImpl * d = (myDtImpl *)dt;
     wave_init(&d->wf_head);
-    se_array_reset(&d->se_array);
     ce_heap_reset(&d->ce_heap);
     mem_pool_reset(&d->ce_pool);
     mem_pool_reset(&d->wv_pool);
-    mem_pool_reset(&d->nd_pool);
 #ifndef NOT_USE_BST
     BST_RESET(&d->bst);
 #endif
 }
 
-void dt_next(myDt dt, metric x, metric y, void * attr) {
+void dt_next_sorted_node(myDt dt, const node * nd) {
     myDtImpl * d = (myDtImpl *)dt;
-    node * n = (node *)mem_pool_get(&d->nd_pool);
-    n->x = x;
-    n->y = y;
-    n->attr = attr;
-    se_array_push_back(&d->se_array, n);
-}
-
-INTERNAL void _next_sorted(myDtImpl * d, node * nd) {
     cevHeap * heap = &d->ce_heap;
+    // run all circle events before the site event
     while (heap->size && NODE_ORD_CMP(&heap->elems[0]->coord, nd)) {
         cirlEvent * cev = ce_heap_pop(heap);
         handle_cirl_event(d, cev);
         mem_pool_release(&d->ce_pool, cev);
     }
-
     handle_site_event(d, nd);
 }
 
-INTERNAL void _end_sorted(myDtImpl * d) {
+void dt_end_sorted_nodes(myDt dt) {
+    myDtImpl * d = (myDtImpl *)dt;
     cevHeap * heap = &d->ce_heap;
+    // run the reset circle events
     while (heap->size) {
         cirlEvent * cev = ce_heap_pop(heap);
         handle_cirl_event(d, cev);
         mem_pool_release(&d->ce_pool, cev);
     }
-}
-
-void dt_end(myDt dt) {
-    myDtImpl * d = (myDtImpl *)dt;
-    se_array_sort(&d->se_array);
-    uint32_t i;
-    for (i = 0; i < d->se_array.size; ++i)
-        _next_sorted(d, d->se_array.elems[i]);
-    _end_sorted(d);
 }

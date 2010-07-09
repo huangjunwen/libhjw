@@ -11,9 +11,14 @@
 // options
 #define LOOP_NUM (1)
 
+typedef struct {
+    node coord;
+    int32_t num;
+} test_node;
+
 typedef struct output_elem {
-    int32_t n1;
-    int32_t n2;
+    int32_t num1;
+    int32_t num2;
     struct output_elem * next;
 } output_elem;
 
@@ -22,23 +27,27 @@ typedef struct {
     output_elem * prev;
 } output_struct;
 
-void pp_handler(void * extra, const node * p1, const node * p2) {
-    int32_t n1 = (uint32_t)p1->attr;
-    int32_t n2 = (uint32_t)p2->attr;
-    output_struct * st = (output_struct *)extra;
+void pp_handler(void * eh_param, const node * nd1, const node * nd2) {
+    output_struct * st = (output_struct *)eh_param;
     output_elem * elem = (output_elem *)mem_pool_get(st->pool);
-    elem->n1 = n1>n2?n2:n1;
-    elem->n2 = n1>n2?n1:n2;
+
+    int32_t num1 = ((const test_node *)nd1)->num;
+    int32_t num2 = ((const test_node *)nd2)->num;
+    elem->num1 = num1>num2?num2:num1;
+    elem->num2 = num1>num2?num1:num2;
     elem->next = 0;
+
     st->prev->next = elem;
-    st->prev = elem;
+    st->prev = elem;                // make a link list
 }
 
-void tri_handler(void * param, const node * p1, const node * p2, const node * p3, const node * cc) {
-    ++(*((int32_t *)param));
+void tri_handler(void * th_param, const node * nd1, const node * nd2, const node * nd3,
+        const node * ccc) {
+    ++(*((int32_t *)th_param));
 }
 
 int main() {
+    int retcode = 0;
 
     FILE * fp = fopen("in.node", "r");
     if (!fp) {
@@ -49,31 +58,39 @@ int main() {
     // get total number of point
     int32_t total;
     fscanf(fp, "%d 2 0 0\n", &total);
-    node * buffer = (node *)malloc(sizeof(node) * total);
+    test_node * buffer = (test_node *)malloc(sizeof(test_node) * total);
     if (!buffer) {
-        printf("can't malloc\n");
-        return 1;
+        retcode = 1;
+        goto NO_NODE_BUFFER;
     }
+
+    const node ** pbuffer = (const node **)malloc(sizeof(node *) * total);
+    if (!pbuffer) {
+        retcode = 1;
+        goto NO_PNODE_BUFFER;
+    }
+
     // get points
-    node * np = buffer;
+    test_node * np = buffer;
+    const node ** npp = pbuffer;
     int32_t r, n;
-    real x, y;
+    metric x, y;
     while (1) {
         r = fscanf(fp, "%d %f %f\n", &n, &x, &y);
         if (r == EOF)
             break;
-        np->x = x;
-        np->y = y;
-        *(int32_t*)(&np->attr) = n;
+        np->coord.x = x;
+        np->coord.y = y;
+        np->num = n;
+        *npp = (node *)np;
         ++np;
+        ++npp;
     }
 
     myDt dt;
     if (!dt_create(&dt)) {
-        printf("Bad\n");
-        free(buffer);
-        fclose(fp);
-        return 1;
+        retcode = 1;
+        goto CANT_CREATE_DT;
     }
 
     output_struct st;
@@ -91,16 +108,12 @@ int main() {
     struct timezone tz;
     gettimeofday(&tv0, &tz);
 
-    int32_t i, j;
+    int32_t i;
     for (i = 0; i < LOOP_NUM; ++i) {
         mem_pool_reset(&output_pool);
         tri_cnt = 0;
-        dt_begin(dt);
-        for (j = 0; j < total; ++j) {
-            np = &buffer[j];
-            dt_next(dt, np->x, np->y, np->attr);
-        }
-        dt_end(dt);
+        head.next = 0;
+        dt_run_nodes(dt, pbuffer, total);
     }
 
     gettimeofday(&tv1, &tz);
@@ -110,14 +123,20 @@ int main() {
     gettimeofday(&tv0, &tz);
     output_elem * e = head.next;
     while (e) {
-        printf("%d %d\n", e->n1, e->n2);
+        printf("%d %d\n", e->num1, e->num2);
         e = e->next;
     }
     gettimeofday(&tv1, &tz);
     fprintf(stderr, "output: %ld ms\n", 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l);
 
     mem_pool_finalize(&output_pool);
+
     dt_destroy(&dt);
+CANT_CREATE_DT:
+    free(pbuffer);
+NO_PNODE_BUFFER:
     free(buffer);
-    return 0;
+NO_NODE_BUFFER:
+    fclose(fp);
+    return retcode;
 }
