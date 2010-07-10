@@ -83,7 +83,7 @@ INTERNAL boolean ce_heap_push(cevHeap * h, cirlEvent * elem) {
     cirlEvent ** elems = h->elems;
     while (curr) {
         parent = (curr - 1) >> 1;
-        if (!NODE_ORD_CMP(&elem->coord, &elems[parent]->coord))
+        if (!NODE_CMP(&elem->coord, &elems[parent]->coord))
             break;
         elems[curr] = elems[parent];
         curr = parent;
@@ -109,9 +109,9 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
     cirlEvent ** elems = h->elems;
     while ((child = (curr << 1) + 1) <= last_idx){
         if (child + 1 <= last_idx && 
-                NODE_ORD_CMP(&elems[child + 1]->coord, &elems[child]->coord))
+                NODE_CMP(&elems[child + 1]->coord, &elems[child]->coord))
             ++child;
-        if (!NODE_ORD_CMP(&elems[child]->coord, &last->coord))
+        if (!NODE_CMP(&elems[child]->coord, &last->coord))
             break;
         elems[curr] = elems[child];
         curr = child;
@@ -468,34 +468,24 @@ void dt_set_trian_handler(myDt dt, trianHandler trian_handler, void * th_param) 
     ((myDtImpl *)dt)->th_param = th_param;
 }
 
-INTERNAL uint32_t _partition(const node ** elems, uint32_t left, uint32_t right) {
-    const node * tmp;
-#define SWAP(i1, i2) tmp = elems[i1]; elems[i1] = elems[i2]; elems[i2] = tmp
-    const node * pivot = elems[left];
-    SWAP(left, right);
-    uint32_t idx = left;
-    uint32_t i;
-    for (i = left; i < right; ++i) {
-        if (NODE_ORD_CMP(elems[i], pivot)) {
-            SWAP(i, idx);
-            ++idx;
-        }   
-    }   
-    SWAP(idx, right);
-    return idx;
-}
-
-INTERNAL void _qsort(const node ** elems, uint32_t left, uint32_t right) {
-    if (left >= right)
-        return;
-    uint32_t i = _partition(elems, left, right);
-    if (i) 
-        _qsort(elems, left, i - 1); 
-    _qsort(elems, i + 1, right);
+int node_cmp(const void * elem1, const void * elem2) {
+    const node * nd1 = *((const node * const *)elem1);
+    const node * nd2 = *((const node * const *)elem2);
+    // +Y to -Y
+    if (nd1->y > nd2->y)
+        return -1;
+    else if (nd1->y < nd2->y)
+        return 1;
+    // -X to +X
+    else if (nd1->x < nd2->x)
+        return -1;
+    else if (nd1->x > nd2->x)
+        return 1;
+    return 0;
 }
 
 void dt_sort_nodes(const node ** nds, uint32_t num) {
-    _qsort(nds, 0, num - 1);
+    qsort(nds, num, sizeof(const node *), node_cmp);
 }
 
 void dt_run_nodes(myDt dt, const node ** nds, uint32_t num) {
@@ -526,7 +516,7 @@ void dt_next_sorted_node(myDt dt, const node * nd) {
     myDtImpl * d = (myDtImpl *)dt;
     cevHeap * heap = &d->ce_heap;
     // run all circle events before the site event
-    while (heap->size && NODE_ORD_CMP(&heap->elems[0]->coord, nd)) {
+    while (heap->size && NODE_CMP(&heap->elems[0]->coord, nd)) {
         cirlEvent * cev = ce_heap_pop(heap);
         handle_cirl_event(d, cev);
         mem_pool_release(&d->ce_pool, cev);

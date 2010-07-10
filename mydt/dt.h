@@ -38,7 +38,7 @@ void dt_set_trian_handler(myDt dt, trianHandler trian_handler, void * th_param);
  * dt APIs
  **************************************/
 // node order: from +Y to -Y, -X to +X
-#define NODE_ORD_CMP(n1, n2) ((n1)->y > (n2)->y || ( (n1)->y == (n2)->y && (n1)->x < (n2)->x ))
+#define NODE_CMP(n1, n2) ((n1)->y > (n2)->y || ( (n1)->y == (n2)->y && (n1)->x < (n2)->x ))
 // sort an array of node pointers in place
 void dt_sort_nodes(const node ** nds, uint32_t num);
 
