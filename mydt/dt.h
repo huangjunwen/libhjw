@@ -8,11 +8,9 @@
 /**************************************
  * types
  **************************************/
-typedef real_t metric_t;
-
 typedef struct {
-    metric_t x;
-    metric_t y;
+    real_t x;
+    real_t y;
 } node;
 
 typedef void * myDt;
@@ -57,7 +55,7 @@ void dt_run_nodes(myDt dt, const node ** nds, uint32_t num);
 void dt_run_sorted_nodes(myDt dt, const node ** nds, uint32_t num);
 
 // 3. this set of API is suitable for some cases that: nodes are already stored in some ordered data structure 
-//   (like quadtree) and do not want to copy them to an array.
+//  and do not want to copy them to an array.
 void dt_begin_sorted_nodes(myDt dt);
 void dt_next_sorted_node(myDt dt, const node * nd);
 void dt_end_sorted_nodes(myDt dt);
