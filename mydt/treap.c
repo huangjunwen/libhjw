@@ -9,7 +9,7 @@ void treap_reset(treap * t) {
     t->root = 0;
 }
 
-boolean treap_init(treap * t) {
+boolean_t treap_init(treap * t) {
     if (!mem_pool_init(&t->pool, sizeof(treapNode), 128))
         return 0;
     treap_reset(t);

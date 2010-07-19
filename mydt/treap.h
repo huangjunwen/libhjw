@@ -29,7 +29,7 @@ typedef struct {
 } treap;
 
 void treap_reset(treap * t);
-boolean treap_init(treap * t);
+boolean_t treap_init(treap * t);
 void treap_finalize(treap * t);
 void * treap_insert_at(treap * t, treapIter * iter, void * val);
 void treap_delete(treap * t, void * ptr);

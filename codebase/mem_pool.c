@@ -14,7 +14,7 @@ memSeg * _new_seg(memPool * pool) {
     if (!ms)
         return 0;
     ms->next = 0;
-    ms->addr_after_last = (byte *)ms + sz;
+    ms->addr_after_last = (byte_t *)ms + sz;
     return ms;
 }
 
@@ -24,7 +24,7 @@ void mem_pool_reset(memPool * pool) {
     pool->curr_seg = &pool->head_seg;
 }
 
-boolean mem_pool_init(memPool * pool, uint32_t item_sz, uint32_t inc_sz) {
+boolean_t mem_pool_init(memPool * pool, uint32_t item_sz, uint32_t inc_sz) {
     assert(item_sz >= sizeof(void *));
     assert(inc_sz > 0);
     pool->item_sz = item_sz;

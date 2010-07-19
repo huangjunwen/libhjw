@@ -8,11 +8,11 @@
 /**************************************
  * types
  **************************************/
-typedef real metric;
+typedef real_t metric_t;
 
 typedef struct {
-    metric x;
-    metric y;
+    metric_t x;
+    metric_t y;
 } node;
 
 typedef void * myDt;
@@ -25,7 +25,7 @@ typedef void (*trianHandler)(void * th_param, const node * nd1, const node * nd2
 /**************************************
  * dt struct creation and destruction
  **************************************/
-boolean dt_create(myDt * pdt);
+boolean_t dt_create(myDt * pdt);
 void dt_destroy(myDt * pdt);
 
 /**************************************

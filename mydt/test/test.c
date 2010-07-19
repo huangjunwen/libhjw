@@ -74,7 +74,7 @@ int main() {
     test_node * np = buffer;
     const node ** npp = pbuffer;
     int32_t r, n;
-    metric x, y;
+    metric_t x, y;
     while (1) {
         r = fscanf(fp, "%d %f %f\n", &n, &x, &y);
         if (r == EOF)

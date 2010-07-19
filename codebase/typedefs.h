@@ -7,8 +7,8 @@
 // stdint.h does not exist
 #include <stdint.h>
 
-typedef unsigned char boolean;
-typedef unsigned char byte;
-typedef float real;
+typedef unsigned char boolean_t;
+typedef unsigned char byte_t;
+typedef float real_t;
 
 #endif

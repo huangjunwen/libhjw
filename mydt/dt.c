@@ -31,12 +31,12 @@ typedef struct {
 
 struct wave {
     const node * focus;              // the focus point ( the coord of site event )
-    cirlEvent * cevent;              // the candidate circle event 
+    cirlEvent * cevent;              // the candidate circle event
 #ifndef NOT_USE_BST
-    void * bst_ptr;                    
+    void * bst_ptr;
 #endif
     wave * prev;                     // double link list
-    wave * next;        
+    wave * next;
 };
 
 #define cevent_init(cev) (memset((cev), 0, sizeof(cirlEvent)))
@@ -52,7 +52,7 @@ typedef struct {
     uint32_t size;
 } cevHeap;
 
-INTERNAL boolean ce_heap_init(cevHeap * h) {
+INTERNAL boolean_t ce_heap_init(cevHeap * h) {
     if (!(h->elems = (cirlEvent **)malloc(sizeof(cirlEvent *) * INIT_HEAP_CAPACITY)))
         return 0;
     h->capacity = INIT_HEAP_CAPACITY;
@@ -68,7 +68,7 @@ INTERNAL void ce_heap_finalize(cevHeap * h) {
     free(h->elems);
 }
 
-INTERNAL boolean ce_heap_push(cevHeap * h, cirlEvent * elem) {
+INTERNAL boolean_t ce_heap_push(cevHeap * h, cirlEvent * elem) {
     if (h->size >= h->capacity) {
         void * ne;
         if ( !(ne = realloc(h->elems, sizeof(cirlEvent *) * (h->capacity + h->capacity))) )
@@ -108,21 +108,21 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
     uint32_t last_idx = h->size - 1;
     cirlEvent ** elems = h->elems;
     while ((child = (curr << 1) + 1) <= last_idx){
-        if (child + 1 <= last_idx && 
+        if (child + 1 <= last_idx &&
                 NODE_CMP(&elems[child + 1]->coord, &elems[child]->coord))
             ++child;
         if (!NODE_CMP(&elems[child]->coord, &last->coord))
             break;
         elems[curr] = elems[child];
         curr = child;
-    } 
+    }
     elems[curr] = last;
-    
+
     return ret;
 }
 
 /*********************************
- * main structure 
+ * main structure
  *********************************/
 
 typedef struct {
@@ -164,7 +164,7 @@ typedef struct {
 #define LAST_WV (head->prev)
 #define CONNECT_WV(p, n) (p)->next = n; (n)->prev = p
 
-INTERNAL boolean after_break_point(const node * s, const node * l, const node * r) {
+INTERNAL boolean_t after_break_point(const node * s, const node * l, const node * r) {
     /* after_break_point example graph
      *
      * y
@@ -174,26 +174,24 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
      * |     |   |r|
      * |    s|    -
      * |-----+--------- sweepline scan from +y to -y
-     * |    new site                     
+     * |    new site
      * +----------------> x
      *
      * return 1 if the site event is occur on the right side of the break point of the two waves
      */
     // case 1, either l or r 's y coord is the same as s
-    metric sl_y;
-    if (!(sl_y = Y_DELTA(s, l))) {
+    if (s->y == l->y)
         return s->x > l->x;
-    }
-    metric sr_y;
-    if (!(sr_y = Y_DELTA(s, r))) {
+    real_t sl_y = Y_DELTA(s, l);
+
+    if (s->y == r->y)
         return s->x > r->x;
-    }
+    real_t sr_y = Y_DELTA(s, r);
 
     // case 2, l.y == r.y
-    metric lr_y;
-    if (!(lr_y = Y_DELTA(l, r))) {
-        return s->x > X_SUM(l, r)/2;
-    }
+    if (l->y == r->y)
+        return 2*s->x > X_SUM(l, r);
+    real_t lr_y = Y_DELTA(l, r);
 
     // case 3
     // let Cl be the intersection of line x=s->x and wave l, and yl = 2*Cl.y
@@ -201,9 +199,9 @@ INTERNAL boolean after_break_point(const node * s, const node * l, const node * 
     // yl = sweepline + l->y - (s->x - l->x)*(s->x - l->x)/(sweepline - l->y);
     // yr = sweepline + r->y - (s->x - r->x)*(s->x - r->x)/(sweepline - r->y);
     // t = yl - yr
-    metric sl_x = X_DELTA(s, l);
-    metric sr_x = X_DELTA(s, r);
-    metric t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
+    real_t sl_x = X_DELTA(s, l);
+    real_t sr_x = X_DELTA(s, r);
+    real_t t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
 
     // two waves have two break points
     // the left break point
@@ -225,13 +223,13 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
     const node * c = wv->next->focus;
 
     /* if det
-     * | abx cbx | 
-     * |         | > 0, then the angle between vector b->a to b->c is less than 180 
-     * | aby cby | 
+     * | abx cbx |
+     * |         | > 0, then the angle between vector b->a to b->c is less than 180
+     * | aby cby |
      */
-    metric abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
-    metric cbx = X_DELTA(c, b), cby = Y_DELTA(c, b);
-    metric det = abx * cby - aby * cbx;
+    real_t abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
+    real_t cbx = X_DELTA(c, b), cby = Y_DELTA(c, b);
+    real_t det = abx * cby - aby * cbx;
     if (det <= 0) {
         return 0;
     }
@@ -245,15 +243,15 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
      * 2*cbx*X + 2*cby*Y = cbx * X_SUM(c, b) + cby * Y_SUM(c, b)
      */
     det *= 2;
-    metric r1 = abx * X_SUM(a, b) + aby * Y_SUM(a, b);
-    metric r2 = cbx * X_SUM(c, b) + cby * Y_SUM(c, b);
+    real_t r1 = abx * X_SUM(a, b) + aby * Y_SUM(a, b);
+    real_t r2 = cbx * X_SUM(c, b) + cby * Y_SUM(c, b);
     nd->x = (cby * r1 - aby * r2)/det;
     nd->y = (abx * r2 - cbx * r1)/det;
-    
+
     /* get the bottom point of the circle
      */
-    metric xdelta = X_DELTA(nd, a);
-    metric ydelta = Y_DELTA(nd, a);
+    real_t xdelta = X_DELTA(nd, a);
+    real_t ydelta = Y_DELTA(nd, a);
     nd->y -= sqrt(xdelta * xdelta + ydelta * ydelta);
     return res;
 }
@@ -266,7 +264,7 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
  *     left_bound = r
  * else
  *     right_bound = l
- */        
+ */
 INTERNAL void handle_site_event(myDtImpl * dt, const siteEvent * e) {
     INIT_WV_SHORTCUT(dt);
 
@@ -294,7 +292,7 @@ INTERNAL void handle_site_event(myDtImpl * dt, const siteEvent * e) {
     wave * wv;
 
 #ifndef NOT_USE_BST
-    BSTIter iter;    
+    BSTIter iter;
 
     BST_ITER_INIT(&dt->bst, &iter);
     while (BST_ITER_NOTNIL(&iter)) {
@@ -314,12 +312,12 @@ INTERNAL void handle_site_event(myDtImpl * dt, const siteEvent * e) {
 #endif
 
     wave * curr = left_bound;
-    while (curr != right_bound && 
+    while (curr != right_bound &&
             after_break_point(e, curr->focus, curr->next->focus)) {
         curr = curr->next;
     }
     // curr is the right wave
-    
+
     wave * new_wv = (wave *)mem_pool_get(&dt->wv_pool);
     wave_init(new_wv);
     new_wv->focus = e;
@@ -348,7 +346,7 @@ INTERNAL void handle_site_event(myDtImpl * dt, const siteEvent * e) {
         CONNECT_WV(new_wv, curr);
 
     }
-    
+
     // set false alarm for curr
     UNLINK_CEVENT(curr);
 
@@ -360,7 +358,7 @@ INTERNAL void handle_site_event(myDtImpl * dt, const siteEvent * e) {
         LINK_CEVENT(curr, new_cevent);
         ce_heap_push(heap, new_cevent);
     }
-    
+
     if ((new_cevent = candidate_circle_event(dt, dup_wv))) {
         LINK_CEVENT(dup_wv, new_cevent);
         ce_heap_push(heap, new_cevent);
@@ -373,7 +371,7 @@ INTERNAL void handle_site_event(myDtImpl * dt, const siteEvent * e) {
         new_wv->bst_ptr = 0;
 #endif
 
-    // edge handler 
+    // edge handler
     if (dt->edge_handler)
         dt->edge_handler(dt->eh_param, e, curr->focus);
 }
@@ -400,7 +398,7 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
     // set false alarms
     UNLINK_CEVENT(p);
     UNLINK_CEVENT(n);
-    
+
     cirlEvent * new_cevent;
     cevHeap * heap = &dt->ce_heap;
 
@@ -408,7 +406,7 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
         LINK_CEVENT(p, new_cevent);
         ce_heap_push(heap, new_cevent);
     }
-    
+
     if ((new_cevent = candidate_circle_event(dt, n))) {
         LINK_CEVENT(n, new_cevent);
         ce_heap_push(heap, new_cevent);
@@ -424,7 +422,7 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
 /*********************************
  * APIs
  *********************************/
-boolean dt_create(myDt * pdt) {
+boolean_t dt_create(myDt * pdt) {
     myDtImpl * ret = (myDtImpl *)malloc(sizeof(myDtImpl));
     if (!ret)
         return 0;
