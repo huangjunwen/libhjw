@@ -12,7 +12,6 @@
 /*****************
  * Params
  ****************/
-#define INIT_ARRAY_CAPACITY (4096)
 #define INIT_HEAP_CAPACITY (256)
 
 #endif
