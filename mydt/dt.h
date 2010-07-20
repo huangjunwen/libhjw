@@ -35,16 +35,12 @@ void dt_set_trian_handler(myDt dt, trianHandler trian_handler, void * th_param);
 /**************************************
  * dt APIs
  **************************************/
-// node order: from +Y to -Y, -X to +X
-#define NODE_CMP(n1, n2) ((n1)->y > (n2)->y || ( (n1)->y == (n2)->y && (n1)->x < (n2)->x ))
-// sort an array of node pointers in place
-void dt_sort_nodes(const node ** nds, uint32_t num);
-
 // 1. simplest API: delaunay triangulate an array of nodes.
 //      equal to:
 //          dt_sort_nodes(nds, num);
 //          dt_run_sorted_nodes(dt, nds, num);
 void dt_run_nodes(myDt dt, const node ** nds, uint32_t num);
+
 
 // 2. delaunay triangulate an array of sorted nodes.
 //      equal to:
@@ -53,6 +49,9 @@ void dt_run_nodes(myDt dt, const node ** nds, uint32_t num);
 //              dt_next_sorted_node(dt, nds[i]);
 //          dt_end_sorted_nodes(dt);
 void dt_run_sorted_nodes(myDt dt, const node ** nds, uint32_t num);
+// sort an array of node pointers in place, node order: from +Y to -Y, -X to +X
+void dt_sort_nodes(const node ** nds, uint32_t num);
+
 
 // 3. this set of API is suitable for some cases that: nodes are already stored in some ordered data structure 
 //  and do not want to copy them to an array.

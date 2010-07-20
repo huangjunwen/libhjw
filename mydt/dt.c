@@ -42,6 +42,9 @@ struct wave {
 #define cevent_init(cev) (memset((cev), 0, sizeof(cirlEvent)))
 #define wave_init(wv) (memset((wv), 0, sizeof(wave)))
 
+// node order: from +Y to -Y, -X to +X
+#define NODE_CMP(n1, n2) ((n1)->y > (n2)->y || ( (n1)->y == (n2)->y && (n1)->x < (n2)->x ))
+
 /*********************************
  * Circle event heap
  *********************************/
