@@ -12,19 +12,19 @@
 #include <time.h>
 #include "../dt.h"
 
-#define FPS (30)
+#define FPS (60)
 #define MS_PER_FRAME (1000/FPS)
 
-#define BALL_NUM (200)
+#define BALL_NUM (30)
 
 static const int height = 600;
 
 static const int width = 800;
 
 // all ball have same radius and mass
-static const float radius = 10;
+static const float radius = 16;
 
-static const float max_speed = 5;
+static const float max_speed = 4;
 
 typedef struct {
     vertex position;
@@ -38,7 +38,8 @@ void collide(Ball * a, Ball * b) {
     float dist2 = distx * distx + disty * disty;
 
     // not close enough
-    if (dist2 > (2 * radius) * (2 * radius))
+    static const float collide_dist = 2 * radius;
+    if (dist2 > collide_dist * collide_dist)
         return;
 
     float va_proj_coeff = (a->vx * distx + a->vy * disty)/dist2;
