@@ -9,6 +9,5 @@
 
 typedef unsigned char boolean_t;
 typedef unsigned char byte_t;
-typedef float real_t;
 
 #endif

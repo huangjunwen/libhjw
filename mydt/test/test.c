@@ -12,7 +12,7 @@
 #define LOOP_NUM (1)
 
 typedef struct {
-    node coord;
+    vertex coord;
     int32_t num;
 } test_node;
 
@@ -27,7 +27,7 @@ typedef struct {
     output_elem * prev;
 } output_struct;
 
-void pp_handler(void * eh_param, const node * nd1, const node * nd2) {
+void pp_handler(void * eh_param, const vertex * nd1, const vertex * nd2) {
     output_struct * st = (output_struct *)eh_param;
     output_elem * elem = (output_elem *)mem_pool_get(st->pool);
 
@@ -41,8 +41,8 @@ void pp_handler(void * eh_param, const node * nd1, const node * nd2) {
     st->prev = elem;                // make a link list
 }
 
-void tri_handler(void * th_param, const node * nd1, const node * nd2, const node * nd3,
-        const node * ccc) {
+void tri_handler(void * th_param, const vertex * nd1, const vertex * nd2, const vertex * nd3,
+        const vertex * ccc) {
     ++(*((int32_t *)th_param));
 }
 
@@ -64,7 +64,7 @@ int main() {
         goto NO_NODE_BUFFER;
     }
 
-    const node ** pbuffer = (const node **)malloc(sizeof(node *) * total);
+    const vertex ** pbuffer = (const vertex **)malloc(sizeof(vertex *) * total);
     if (!pbuffer) {
         retcode = 1;
         goto NO_PNODE_BUFFER;
@@ -72,9 +72,9 @@ int main() {
 
     // get points
     test_node * np = buffer;
-    const node ** npp = pbuffer;
+    const vertex ** npp = pbuffer;
     int32_t r, n;
-    real_t x, y;
+    float x, y;
     while (1) {
         r = fscanf(fp, "%d %f %f\n", &n, &x, &y);
         if (r == EOF)
@@ -82,7 +82,7 @@ int main() {
         np->coord.x = x;
         np->coord.y = y;
         np->num = n;
-        *npp = (node *)np;
+        *npp = (vertex *)np;
         ++np;
         ++npp;
     }
@@ -113,7 +113,7 @@ int main() {
         mem_pool_reset(&output_pool);
         tri_cnt = 0;
         head.next = 0;
-        dt_run_nodes(dt, pbuffer, total);
+        dt_run_vertexes(dt, pbuffer, total);
     }
 
     gettimeofday(&tv1, &tz);

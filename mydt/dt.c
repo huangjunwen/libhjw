@@ -22,15 +22,15 @@
 
 typedef struct wave wave;
 
-typedef node siteEvent;
+typedef vertex siteEvent;
 
 typedef struct {
-    node coord;
+    vertex coord;
     wave * wv;                       // if not null that is the disappear wave when this event occur
 } cirlEvent;
 
 struct wave {
-    const node * focus;              // the focus point ( the coord of site event )
+    const vertex * focus;            // the focus point ( the coord of site event )
     cirlEvent * cevent;              // the candidate circle event
 #ifndef NOT_USE_BST
     void * bst_ptr;
@@ -42,8 +42,8 @@ struct wave {
 #define cevent_init(cev) (memset((cev), 0, sizeof(cirlEvent)))
 #define wave_init(wv) (memset((wv), 0, sizeof(wave)))
 
-// node order: from +Y to -Y, -X to +X
-#define NODE_CMP(n1, n2) ((n1)->y > (n2)->y || ( (n1)->y == (n2)->y && (n1)->x < (n2)->x ))
+// vertex order: from +Y to -Y, -X to +X
+#define CMP_VERTEX(v1, v2) ((v1)->y > (v2)->y || ( (v1)->y == (v2)->y && (v1)->x < (v2)->x ))
 
 /*********************************
  * Circle event heap
@@ -86,7 +86,7 @@ INTERNAL boolean_t ce_heap_push(cevHeap * h, cirlEvent * elem) {
     cirlEvent ** elems = h->elems;
     while (curr) {
         parent = (curr - 1) >> 1;
-        if (!NODE_CMP(&elem->coord, &elems[parent]->coord))
+        if (!CMP_VERTEX(&elem->coord, &elems[parent]->coord))
             break;
         elems[curr] = elems[parent];
         curr = parent;
@@ -112,9 +112,9 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
     cirlEvent ** elems = h->elems;
     while ((child = (curr << 1) + 1) <= last_idx){
         if (child + 1 <= last_idx &&
-                NODE_CMP(&elems[child + 1]->coord, &elems[child]->coord))
+                CMP_VERTEX(&elems[child + 1]->coord, &elems[child]->coord))
             ++child;
-        if (!NODE_CMP(&elems[child]->coord, &last->coord))
+        if (!CMP_VERTEX(&elems[child]->coord, &last->coord))
             break;
         elems[curr] = elems[child];
         curr = child;
@@ -148,7 +148,7 @@ typedef struct {
 #define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
-/* nodes macro */
+/* vertex macro */
 #define DELTA(a, b, xory) ((a)->xory - (b)->xory)
 #define X_DELTA(a, b) DELTA(a, b, x)
 #define Y_DELTA(a, b) DELTA(a, b, y)
@@ -167,7 +167,7 @@ typedef struct {
 #define LAST_WV (head->prev)
 #define CONNECT_WV(p, n) (p)->next = n; (n)->prev = p
 
-INTERNAL boolean_t after_break_point(const node * s, const node * l, const node * r) {
+INTERNAL boolean_t after_break_point(const vertex * s, const vertex * l, const vertex * r) {
     /* after_break_point example graph
      *
      * y
@@ -185,16 +185,16 @@ INTERNAL boolean_t after_break_point(const node * s, const node * l, const node 
     // case 1, either l or r 's y coord is the same as s
     if (s->y == l->y)
         return s->x > l->x;
-    real_t sl_y = Y_DELTA(s, l);
+    float sl_y = Y_DELTA(s, l);
 
     if (s->y == r->y)
         return s->x > r->x;
-    real_t sr_y = Y_DELTA(s, r);
+    float sr_y = Y_DELTA(s, r);
 
     // case 2, l.y == r.y
     if (l->y == r->y)
         return 2*s->x > X_SUM(l, r);
-    real_t lr_y = Y_DELTA(l, r);
+    float lr_y = Y_DELTA(l, r);
 
     // case 3
     // let Cl be the intersection of line x=s->x and wave l, and yl = 2*Cl.y
@@ -202,9 +202,9 @@ INTERNAL boolean_t after_break_point(const node * s, const node * l, const node 
     // yl = sweepline + l->y - (s->x - l->x)*(s->x - l->x)/(sweepline - l->y);
     // yr = sweepline + r->y - (s->x - r->x)*(s->x - r->x)/(sweepline - r->y);
     // t = yl - yr
-    real_t sl_x = X_DELTA(s, l);
-    real_t sr_x = X_DELTA(s, r);
-    real_t t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
+    float sl_x = X_DELTA(s, l);
+    float sr_x = X_DELTA(s, r);
+    float t = lr_y - sl_x * sl_x / sl_y + sr_x * sr_x / sr_y;
 
     // two waves have two break points
     // the left break point
@@ -221,41 +221,41 @@ INTERNAL cirlEvent * candidate_circle_event(myDtImpl * dt, wave * wv) {
     if (wv == HEAD_WV || wv == LAST_WV) {
         return 0;
     }
-    const node * a = wv->prev->focus;
-    const node * b = wv->focus;
-    const node * c = wv->next->focus;
+    const vertex * a = wv->prev->focus;
+    const vertex * b = wv->focus;
+    const vertex * c = wv->next->focus;
 
     /* if det
      * | abx cbx |
      * |         | > 0, then the angle between vector b->a to b->c is less than 180
      * | aby cby |
      */
-    real_t abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
-    real_t cbx = X_DELTA(c, b), cby = Y_DELTA(c, b);
-    real_t det = abx * cby - aby * cbx;
+    float abx = X_DELTA(a, b), aby = Y_DELTA(a, b);
+    float cbx = X_DELTA(c, b), cby = Y_DELTA(c, b);
+    float det = abx * cby - aby * cbx;
     if (det <= 0) {
         return 0;
     }
 
     cirlEvent * res = (cirlEvent *)mem_pool_get(&dt->ce_pool);
     cevent_init(res);
-    node * nd= &res->coord;
+    vertex * v = &res->coord;
 
     /* get the center of circle of the three points
      * 2*abx*X + 2*aby*Y = abx * X_SUM(a, b) + aby * Y_SUM(a, b)
      * 2*cbx*X + 2*cby*Y = cbx * X_SUM(c, b) + cby * Y_SUM(c, b)
      */
     det *= 2;
-    real_t r1 = abx * X_SUM(a, b) + aby * Y_SUM(a, b);
-    real_t r2 = cbx * X_SUM(c, b) + cby * Y_SUM(c, b);
-    nd->x = (cby * r1 - aby * r2)/det;
-    nd->y = (abx * r2 - cbx * r1)/det;
+    float r1 = abx * X_SUM(a, b) + aby * Y_SUM(a, b);
+    float r2 = cbx * X_SUM(c, b) + cby * Y_SUM(c, b);
+    v->x = (cby * r1 - aby * r2)/det;
+    v->y = (abx * r2 - cbx * r1)/det;
 
     /* get the bottom point of the circle
      */
-    real_t xdelta = X_DELTA(nd, a);
-    real_t ydelta = Y_DELTA(nd, a);
-    nd->y -= sqrt(xdelta * xdelta + ydelta * ydelta);
+    float xdelta = X_DELTA(v, a);
+    float ydelta = Y_DELTA(v, a);
+    v->y -= sqrt(xdelta * xdelta + ydelta * ydelta);
     return res;
 }
 
@@ -469,40 +469,24 @@ void dt_set_trian_handler(myDt dt, trianHandler trian_handler, void * th_param) 
     ((myDtImpl *)dt)->th_param = th_param;
 }
 
-int node_cmp(const void * elem1, const void * elem2) {
-    const node * nd1 = *((const node * const *)elem1);
-    const node * nd2 = *((const node * const *)elem2);
+int cmp_vertex(const void * elem1, const void * elem2) {
+    const vertex * v1 = *((const vertex * const *)elem1);
+    const vertex * v2 = *((const vertex * const *)elem2);
     // +Y to -Y
-    if (nd1->y > nd2->y)
+    if (v1->y > v2->y)
         return -1;
-    else if (nd1->y < nd2->y)
+    else if (v1->y < v2->y)
         return 1;
     // -X to +X
-    else if (nd1->x < nd2->x)
+    else if (v1->x < v2->x)
         return -1;
-    else if (nd1->x > nd2->x)
+    else if (v1->x > v2->x)
         return 1;
     return 0;
 }
 
-void dt_sort_nodes(const node ** nds, uint32_t num) {
-    qsort(nds, num, sizeof(const node *), node_cmp);
-}
 
-void dt_run_nodes(myDt dt, const node ** nds, uint32_t num) {
-    dt_sort_nodes(nds, num);
-    dt_run_sorted_nodes(dt, nds, num);
-}
-
-void dt_run_sorted_nodes(myDt dt, const node ** nds, uint32_t num) {
-    dt_begin_sorted_nodes(dt);
-    uint32_t i;
-    for (i = 0; i < num; ++i)
-        dt_next_sorted_node(dt, nds[i]);
-    dt_end_sorted_nodes(dt);
-}
-
-void dt_begin_sorted_nodes(myDt dt) {
+INTERNAL void dt_begin_vertexes(myDt dt) {
     myDtImpl * d = (myDtImpl *)dt;
     wave_init(&d->wf_head);
     ce_heap_reset(&d->ce_heap);
@@ -513,19 +497,19 @@ void dt_begin_sorted_nodes(myDt dt) {
 #endif
 }
 
-void dt_next_sorted_node(myDt dt, const node * nd) {
+INTERNAL void dt_next_vertex(myDt dt, const vertex * v) {
     myDtImpl * d = (myDtImpl *)dt;
     cevHeap * heap = &d->ce_heap;
     // run all circle events before the site event
-    while (heap->size && NODE_CMP(&heap->elems[0]->coord, nd)) {
+    while (heap->size && CMP_VERTEX(&heap->elems[0]->coord, v)) {
         cirlEvent * cev = ce_heap_pop(heap);
         handle_cirl_event(d, cev);
         mem_pool_release(&d->ce_pool, cev);
     }
-    handle_site_event(d, nd);
+    handle_site_event(d, v);
 }
 
-void dt_end_sorted_nodes(myDt dt) {
+INTERNAL void dt_end_vertexes(myDt dt) {
     myDtImpl * d = (myDtImpl *)dt;
     cevHeap * heap = &d->ce_heap;
     // run the reset circle events
@@ -534,4 +518,14 @@ void dt_end_sorted_nodes(myDt dt) {
         handle_cirl_event(d, cev);
         mem_pool_release(&d->ce_pool, cev);
     }
+}
+
+void dt_run_vertexes(myDt dt, const vertex ** vs, uint32_t num) {
+    qsort(vs, num, sizeof(const vertex *), cmp_vertex);
+
+    dt_begin_vertexes(dt);
+    uint32_t i;
+    for (i = 0; i < num; ++i)
+        dt_next_vertex(dt, vs[i]);
+    dt_end_vertexes(dt);
 }
