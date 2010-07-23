@@ -21,10 +21,18 @@ static const int height = 600;
 
 static const int width = 800;
 
+static const int pad = 10;
+
 // all ball have same radius and mass
 static const float radius = 16;
 
+static float real_height;
+
+static float real_width;
+
 static const float max_speed = 4;
+
+static const float slow_down = 0.001;
 
 typedef struct Ball {
     vertex position;
@@ -34,7 +42,7 @@ typedef struct Ball {
 } Ball;
 
 void collide(Ball * a, Ball * b) {
-    if (a->last_collided == b || b->last_collided == a)
+    if (a->last_collided == b && b->last_collided == a)
         return;
 
     float distx = a->position.x - b->position.x;
@@ -68,12 +76,12 @@ void collide(Ball * a, Ball * b) {
 }
 
 void collide_with_edge(Ball * b) {
-    if (b->position.x < 0 || b->position.x > width - radius) {
+    if (b->position.x <= radius || b->position.x >= real_width) {
         b->vx = -b->vx;
         b->last_collided = NULL;
     }
 
-    if (b->position.y < 0 || b->position.y > height - radius) {
+    if (b->position.y <= radius || b->position.y >= real_height) {
         b->vy = -b->vy;
         b->last_collided = NULL;
     }
@@ -84,8 +92,8 @@ float random() {
 }
 
 void fill_random_ball(Ball * b) {
-    b->position.x = random() * width;
-    b->position.y = random() * height;
+    b->position.x = random() * real_width;
+    b->position.y = random() * real_height;
     b->vx = -max_speed + 2 * random() * max_speed;
     b->vy = -max_speed + 2 * random() * max_speed;
 }
@@ -106,6 +114,9 @@ void detect_collisioin(void * _, const vertex * v1, const vertex * v2) {
 
 int main ( int argc, char** argv )
 {
+    real_height = height - pad - radius;
+    real_width = width - pad - radius;
+
     int i;
     Ball * pball;
     Ball balls[BALL_NUM];
@@ -129,6 +140,8 @@ int main ( int argc, char** argv )
 
     // make sure SDL cleans up before exit
     atexit(SDL_Quit);
+
+    SDL_WM_SetCaption("Balls~~", "Balls");
 
     // create a new window
     SDL_Surface* screen = SDL_SetVideoMode(width, height, 16,
@@ -191,6 +204,14 @@ int main ( int argc, char** argv )
             pball = &balls[i];
             pball->position.x += pball->vx;
             pball->position.y += pball->vy;
+            if (pball->vx >= 0)
+                pball->vx -= slow_down;
+            else
+                pball->vx += slow_down;
+            if (pball->vy >= 0)
+                pball->vy -= slow_down;
+            else
+                pball->vy += slow_down;
         }
 
         // DRAWING STARTS HERE
