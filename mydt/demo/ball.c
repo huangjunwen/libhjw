@@ -26,13 +26,17 @@ static const float radius = 16;
 
 static const float max_speed = 4;
 
-typedef struct {
+typedef struct Ball {
     vertex position;
     float vx;
     float vy;
+    struct Ball * last_collided;
 } Ball;
 
 void collide(Ball * a, Ball * b) {
+    if (a->last_collided == b || b->last_collided == a)
+        return;
+
     float distx = a->position.x - b->position.x;
     float disty = a->position.y - b->position.y;
     float dist2 = distx * distx + disty * disty;
@@ -58,14 +62,21 @@ void collide(Ball * a, Ball * b) {
     a->vy = vay_orth + vby_proj;
     b->vx = vbx_orth + vax_proj;
     b->vy = vby_orth + vay_proj;
+
+    a->last_collided = b;
+    b->last_collided = a;
 }
 
 void collide_with_edge(Ball * b) {
-    if (b->position.x < 0 || b->position.x > width - radius)
+    if (b->position.x < 0 || b->position.x > width - radius) {
         b->vx = -b->vx;
+        b->last_collided = NULL;
+    }
 
-    if (b->position.y < 0 || b->position.y > height - radius)
+    if (b->position.y < 0 || b->position.y > height - radius) {
         b->vy = -b->vy;
+        b->last_collided = NULL;
+    }
 }
 
 float random() {
