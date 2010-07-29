@@ -9,8 +9,6 @@
 #include "../dt.h"
 
 // options
-#define LOOP_NUM (1)
-
 #define OUTPUT_BUFFER_SZ (50000)
 
 typedef struct {
@@ -56,8 +54,12 @@ void tri_handler(void * th_param, const vertex * nd1, const vertex * nd2, const 
     ++(*((uint32_t *)th_param));
 }
 
-int main() {
+int main(int argc, const char * argv[]) {
     int retcode = 0;
+    int32_t loop_num = 1;
+
+    if (argc > 1)
+        loop_num = atoi(argv[1]);
 
     FILE * fp = fopen("in.node", "r");
     if (!fp) {
@@ -122,7 +124,7 @@ int main() {
     int32_t i;
     dt_set_edge_handler(dt, 0, 0);
     dt_set_trian_handler(dt, 0, 0);
-    for (i = 0; i < LOOP_NUM - 1; ++i)
+    for (i = 0; i < loop_num - 1; ++i)
         dt_run_vertexes(dt, pbuffer, total);
 
     gettimeofday(&tv1, &tz);
@@ -130,7 +132,7 @@ int main() {
     // report
     uint32_t total_ms = 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l;
     fprintf(stderr, "%d triangles\n", tri_cnt);
-    fprintf(stderr, "dt for %d times: %d ms\n", LOOP_NUM, total_ms - output_ms);
+    fprintf(stderr, "dt for %d times: %d ms\n", loop_num, total_ms - output_ms);
     fprintf(stderr, "output: %d ms\n", output_ms);
 
     // finalize
