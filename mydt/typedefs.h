@@ -10,4 +10,6 @@
 typedef unsigned char boolean_t;
 typedef unsigned char byte_t;
 
+#define INTERNAL static inline
+
 #endif

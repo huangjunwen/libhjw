@@ -3,7 +3,8 @@
 #ifndef _TREAP_H_
 #define _TREAP_H_
 
-#include "../codebase/codebase.h"
+#include "typedefs.h"
+#include "mem_pool.h"
 #include "mydt_config.h"
 
 typedef struct treapNode treapNode;

@@ -2,7 +2,8 @@
 #ifndef _DT_H_
 #define _DT_H_
 
-#include "../codebase/codebase.h"
+#include "typedefs.h"
+#include "mem_pool.h"
 #include "mydt_config.h"
 
 /**************************************
