@@ -11,39 +11,50 @@
 // options
 #define LOOP_NUM (1)
 
+#define OUTPUT_BUFFER_SZ (50000)
+
 typedef struct {
     vertex coord;
     int32_t num;
-} test_node;
-
-typedef struct output_elem {
-    int32_t num1;
-    int32_t num2;
-    struct output_elem * next;
-} output_elem;
+} numVertex;
 
 typedef struct {
-    memPool * pool;
-    output_elem * prev;
-} output_struct;
+    int32_t num1;
+    int32_t num2;
+} outputElem;
 
-void pp_handler(void * eh_param, const vertex * nd1, const vertex * nd2) {
-    output_struct * st = (output_struct *)eh_param;
-    output_elem * elem = (output_elem *)mem_pool_get(st->pool);
+outputElem output_buffer[OUTPUT_BUFFER_SZ];
+int32_t output_buffer_used = 0;
 
-    int32_t num1 = ((const test_node *)nd1)->num;
-    int32_t num2 = ((const test_node *)nd2)->num;
-    elem->num1 = num1>num2?num2:num1;
-    elem->num2 = num1>num2?num1:num2;
-    elem->next = 0;
+void print_result(void * eh_param) {
+    struct timeval tv0, tv1;
+    struct timezone tz;
+    gettimeofday(&tv0, &tz);
 
-    st->prev->next = elem;
-    st->prev = elem;                // make a link list
+    int32_t i;
+    for (i = 0; i < output_buffer_used; ++i)
+        printf("%d %d\n", output_buffer[i].num1, output_buffer[i].num2);
+
+    gettimeofday(&tv1, &tz);
+    *(uint32_t *)eh_param += 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l;
+}
+
+void edge_handler(void * eh_param, const vertex * nd1, const vertex * nd2) {
+    if (output_buffer_used >= OUTPUT_BUFFER_SZ) {
+        print_result(eh_param);
+        output_buffer_used = 0;
+    }
+
+    int32_t num1 = ((const numVertex *)nd1)->num;
+    int32_t num2 = ((const numVertex *)nd2)->num;
+    output_buffer[output_buffer_used].num1 = num1>num2?num2:num1;
+    output_buffer[output_buffer_used].num2  = num1>num2?num1:num2;
+    ++output_buffer_used;
 }
 
 void tri_handler(void * th_param, const vertex * nd1, const vertex * nd2, const vertex * nd3,
         const vertex * ccc) {
-    ++(*((int32_t *)th_param));
+    ++(*((uint32_t *)th_param));
 }
 
 int main() {
@@ -51,14 +62,14 @@ int main() {
 
     FILE * fp = fopen("in.node", "r");
     if (!fp) {
-        printf("can't open in.node\n");
+        fprintf(stderr, "can't open in.node\n");
         return 1;
     }
 
     // get total number of point
     int32_t total;
     fscanf(fp, "%d 2 0 0\n", &total);
-    test_node * buffer = (test_node *)malloc(sizeof(test_node) * total);
+    numVertex * buffer = (numVertex *)malloc(sizeof(numVertex) * total);
     if (!buffer) {
         retcode = 1;
         goto NO_NODE_BUFFER;
@@ -71,66 +82,53 @@ int main() {
     }
 
     // get points
-    test_node * np = buffer;
-    const vertex ** npp = pbuffer;
+    numVertex * pb = buffer;
+    const vertex ** ppb = pbuffer;
     int32_t r, n;
     float x, y;
     while (1) {
         r = fscanf(fp, "%d %f %f\n", &n, &x, &y);
         if (r == EOF)
             break;
-        np->coord.x = x;
-        np->coord.y = y;
-        np->num = n;
-        *npp = (vertex *)np;
-        ++np;
-        ++npp;
+        pb->coord.x = x;
+        pb->coord.y = y;
+        pb->num = n;
+        *ppb = (vertex *)pb;
+        ++pb;
+        ++ppb;
     }
 
+    // ready to calculate
     myDt dt;
     if (!dt_create(&dt)) {
         retcode = 1;
         goto CANT_CREATE_DT;
     }
 
-    output_struct st;
-    output_elem head;
-    memPool output_pool;
-    mem_pool_init(&output_pool, sizeof(output_elem), 4096);
-    st.pool = &output_pool;
-    st.prev = &head;
-    int32_t tri_cnt;
+    uint32_t output_ms = 0;
+    uint32_t tri_cnt;
 
-    dt_set_edge_handler(dt, pp_handler, &st);
+    dt_set_edge_handler(dt, edge_handler, &output_ms);
     dt_set_trian_handler(dt, tri_handler, &tri_cnt);
 
     struct timeval tv0, tv1;
     struct timezone tz;
     gettimeofday(&tv0, &tz);
-
     int32_t i;
     for (i = 0; i < LOOP_NUM; ++i) {
-        mem_pool_reset(&output_pool);
         tri_cnt = 0;
-        head.next = 0;
         dt_run_vertexes(dt, pbuffer, total);
     }
-
+    print_result(&output_ms);
     gettimeofday(&tv1, &tz);
+
+    // report
+    uint32_t total_ms = 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l;
     fprintf(stderr, "%d triangles\n", tri_cnt);
-    fprintf(stderr, "dt: %ld ms\n", 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l);
+    fprintf(stderr, "dt: %d ms\n", total_ms - output_ms);
+    fprintf(stderr, "output: %d ms\n", output_ms);
 
-    gettimeofday(&tv0, &tz);
-    output_elem * e = head.next;
-    while (e) {
-        printf("%d %d\n", e->num1, e->num2);
-        e = e->next;
-    }
-    gettimeofday(&tv1, &tz);
-    fprintf(stderr, "output: %ld ms\n", 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l);
-
-    mem_pool_finalize(&output_pool);
-
+    // finalize
     dt_destroy(&dt);
 CANT_CREATE_DT:
     free(pbuffer);
