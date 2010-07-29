@@ -5,7 +5,7 @@
 
 #include "typedefs.h"
 #include "mem_pool.h"
-#include "mydt_config.h"
+#include "dt_config.h"
 
 typedef struct treapNode treapNode;
 

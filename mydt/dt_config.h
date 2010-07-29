@@ -1,6 +1,6 @@
 // vim:fdm=marker:nu:nowrap
-#ifndef _MYDT_CONFIG_H_
-#define _MYDT_CONFIG_H_
+#ifndef _DT_CONFIG_H_
+#define _DT_CONFIG_H_
 
 // compile configs
 

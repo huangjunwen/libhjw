@@ -1,6 +1,7 @@
 
 这是一个 Fortune 的扫描线算法的实现, 主要的参照对象是 triangle 库(http://www.cs.cmu.edu/~quake/triangle.html), 速度应该还可以, 具体对比方式见 test 目录, bug 也见 test 目录. 
 
+一些编译参数可以修改 dt_config.h.
 使用方式见 dt.h 即明.
 
 TODO:
