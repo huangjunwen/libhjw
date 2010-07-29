@@ -37,13 +37,12 @@ void print_result(void * eh_param) {
 
     gettimeofday(&tv1, &tz);
     *(uint32_t *)eh_param += 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l;
+    output_buffer_used = 0;
 }
 
 void edge_handler(void * eh_param, const vertex * nd1, const vertex * nd2) {
-    if (output_buffer_used >= OUTPUT_BUFFER_SZ) {
+    if (output_buffer_used >= OUTPUT_BUFFER_SZ)
         print_result(eh_param);
-        output_buffer_used = 0;
-    }
 
     int32_t num1 = ((const numVertex *)nd1)->num;
     int32_t num2 = ((const numVertex *)nd2)->num;
@@ -106,26 +105,32 @@ int main() {
     }
 
     uint32_t output_ms = 0;
-    uint32_t tri_cnt;
+    uint32_t tri_cnt = 0;
 
-    dt_set_edge_handler(dt, edge_handler, &output_ms);
-    dt_set_trian_handler(dt, tri_handler, &tri_cnt);
 
     struct timeval tv0, tv1;
     struct timezone tz;
     gettimeofday(&tv0, &tz);
-    int32_t i;
-    for (i = 0; i < LOOP_NUM; ++i) {
-        tri_cnt = 0;
-        dt_run_vertexes(dt, pbuffer, total);
-    }
+
+    // run one time with output
+    dt_set_edge_handler(dt, edge_handler, &output_ms);
+    dt_set_trian_handler(dt, tri_handler, &tri_cnt);
+    dt_run_vertexes(dt, pbuffer, total);
     print_result(&output_ms);
+
+    // run other without output
+    int32_t i;
+    dt_set_edge_handler(dt, 0, 0);
+    dt_set_trian_handler(dt, 0, 0);
+    for (i = 0; i < LOOP_NUM - 1; ++i)
+        dt_run_vertexes(dt, pbuffer, total);
+
     gettimeofday(&tv1, &tz);
 
     // report
     uint32_t total_ms = 1000l * (tv1.tv_sec - tv0.tv_sec) + (tv1.tv_usec - tv0.tv_usec) / 1000l;
     fprintf(stderr, "%d triangles\n", tri_cnt);
-    fprintf(stderr, "dt: %d ms\n", total_ms - output_ms);
+    fprintf(stderr, "dt for %d times: %d ms\n", LOOP_NUM, total_ms - output_ms);
     fprintf(stderr, "output: %d ms\n", output_ms);
 
     // finalize
