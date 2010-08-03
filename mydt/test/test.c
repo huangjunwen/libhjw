@@ -49,8 +49,8 @@ void edge_handler(void * eh_param, const vertex * nd1, const vertex * nd2) {
     ++output_buffer_used;
 }
 
-void tri_handler(void * th_param, const vertex * nd1, const vertex * nd2, const vertex * nd3,
-        const vertex * ccc) {
+void tri_handler(void * th_param, const vertex * nd1, const vertex * nd2, 
+        const vertex * nd3) {
     ++(*((uint32_t *)th_param));
 }
 

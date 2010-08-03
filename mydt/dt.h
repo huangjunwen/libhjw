@@ -18,8 +18,8 @@ typedef void * myDt;
 
 typedef void (*edgeHandler)(void * eh_param, const vertex * v1, const vertex * v2);
 
-typedef void (*trianHandler)(void * th_param, const vertex * v1, const vertex * v2, const vertex * v3,
-    const vertex * ccc);      // ccc for center of the circumcircle 
+typedef void (*trianHandler)(void * th_param, const vertex * v1, const vertex * v2, 
+    const vertex * v3);
 
 /**************************************
  * dt struct creation and destruction

@@ -393,7 +393,7 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
 
     // triangle handler
     if (dt->trian_handler)
-        dt->trian_handler(dt->th_param, p->focus, n->focus, wv->focus, &e->coord);
+        dt->trian_handler(dt->th_param, p->focus, n->focus, wv->focus);
 
     // remove this wave
     wv->next->prev = p;
