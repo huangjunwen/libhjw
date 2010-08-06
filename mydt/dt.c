@@ -46,32 +46,35 @@ struct wave {
 #define CMP_VERTEX(v1, v2) ((v1)->y > (v2)->y || ( (v1)->y == (v2)->y && (v1)->x < (v2)->x ))
 
 /*********************************
- * Circle event heap
+ * Circle event priority queue
  *********************************/
 
 typedef struct {
     cirlEvent ** elems;
     uint32_t capacity;
     uint32_t size;
-} cevHeap;
+} cevPq;
 
-INTERNAL boolean_t ce_heap_init(cevHeap * h) {
-    if (!(h->elems = (cirlEvent **)malloc(sizeof(cirlEvent *) * INIT_HEAP_CAPACITY)))
+#define CE_PQ_SIZE(pq) ((pq)->size)
+#define CE_PQ_HEAD(pq) ((pq)->elems[0])
+
+INTERNAL boolean_t ce_pq_init(cevPq* h) {
+    if (!(h->elems = (cirlEvent **)malloc(sizeof(cirlEvent *) * INIT_PQ_CAPACITY)))
         return 0;
-    h->capacity = INIT_HEAP_CAPACITY;
+    h->capacity = INIT_PQ_CAPACITY;
     h->size = 0;
     return 1;
 }
 
-INTERNAL void ce_heap_reset(cevHeap * h) {
+INTERNAL void ce_pq_reset(cevPq * h) {
     h->size = 0;
 }
 
-INTERNAL void ce_heap_finalize(cevHeap * h) {
+INTERNAL void ce_pq_finalize(cevPq * h) {
     free(h->elems);
 }
 
-INTERNAL boolean_t ce_heap_push(cevHeap * h, cirlEvent * elem) {
+INTERNAL boolean_t ce_pq_enqueue(cevPq * h, cirlEvent * elem) {
     if (h->size >= h->capacity) {
         void * ne;
         if ( !(ne = realloc(h->elems, sizeof(cirlEvent *) * (h->capacity + h->capacity))) )
@@ -95,7 +98,7 @@ INTERNAL boolean_t ce_heap_push(cevHeap * h, cirlEvent * elem) {
     return 1;
 }
 
-INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
+INTERNAL cirlEvent * ce_pq_dequeue(cevPq * h) {
     assert(h->size);
     cirlEvent * ret = h->elems[0];
     if (h->size == 1) {
@@ -131,7 +134,7 @@ INTERNAL cirlEvent * ce_heap_pop(cevHeap * h) {
 typedef struct {
     memPool ce_pool;                // memory pools
     memPool wv_pool;
-    cevHeap ce_heap;                // as a heap
+    cevPq ce_pq;                    // as a priority queue
     wave wf_head;                   // the wave front list head
 #ifndef NOT_USE_BST
     BST bst;
@@ -355,16 +358,16 @@ INTERNAL void handle_site_event(myDtImpl * dt, const siteEvent * e) {
 
     // recalculate candidate circle event for dup_wv and curr
     cirlEvent * new_cevent;
-    cevHeap * heap = &dt->ce_heap;
+    cevPq * pq = &dt->ce_pq;
 
     if ((new_cevent = candidate_circle_event(dt, curr))) {
         LINK_CEVENT(curr, new_cevent);
-        ce_heap_push(heap, new_cevent);
+        ce_pq_enqueue(pq, new_cevent);
     }
 
     if ((new_cevent = candidate_circle_event(dt, dup_wv))) {
         LINK_CEVENT(dup_wv, new_cevent);
-        ce_heap_push(heap, new_cevent);
+        ce_pq_enqueue(pq, new_cevent);
     }
 
 #ifndef NOT_USE_BST
@@ -403,16 +406,16 @@ INTERNAL void handle_cirl_event(myDtImpl * dt, cirlEvent * e) {
     UNLINK_CEVENT(n);
 
     cirlEvent * new_cevent;
-    cevHeap * heap = &dt->ce_heap;
+    cevPq * pq = &dt->ce_pq;
 
     if ((new_cevent = candidate_circle_event(dt, p))) {
         LINK_CEVENT(p, new_cevent);
-        ce_heap_push(heap, new_cevent);
+        ce_pq_enqueue(pq, new_cevent);
     }
 
     if ((new_cevent = candidate_circle_event(dt, n))) {
         LINK_CEVENT(n, new_cevent);
-        ce_heap_push(heap, new_cevent);
+        ce_pq_enqueue(pq, new_cevent);
     }
 
 #ifndef NOT_USE_BST
@@ -429,7 +432,7 @@ boolean_t dt_create(myDt * pdt) {
     myDtImpl * ret = (myDtImpl *)malloc(sizeof(myDtImpl));
     if (!ret)
         return 0;
-    if (! (ce_heap_init(&ret->ce_heap) &&
+    if (! (ce_pq_init(&ret->ce_pq) &&
             mem_pool_init(&ret->ce_pool, sizeof(cirlEvent), 128) &&
             mem_pool_init(&ret->wv_pool, sizeof(wave), 128)
 #ifndef NOT_USE_BST
@@ -449,7 +452,7 @@ boolean_t dt_create(myDt * pdt) {
 
 void dt_destroy(myDt * pdt) {
     myDtImpl * dt = (myDtImpl *)(*pdt);
-    ce_heap_finalize(&dt->ce_heap);
+    ce_pq_finalize(&dt->ce_pq);
     mem_pool_finalize(&dt->ce_pool);
     mem_pool_finalize(&dt->wv_pool);
 #ifndef NOT_USE_BST
@@ -489,7 +492,7 @@ int cmp_vertex(const void * elem1, const void * elem2) {
 INTERNAL void dt_begin_vertexes(myDt dt) {
     myDtImpl * d = (myDtImpl *)dt;
     wave_init(&d->wf_head);
-    ce_heap_reset(&d->ce_heap);
+    ce_pq_reset(&d->ce_pq);
     mem_pool_reset(&d->ce_pool);
     mem_pool_reset(&d->wv_pool);
 #ifndef NOT_USE_BST
@@ -499,10 +502,10 @@ INTERNAL void dt_begin_vertexes(myDt dt) {
 
 INTERNAL void dt_next_vertex(myDt dt, const vertex * v) {
     myDtImpl * d = (myDtImpl *)dt;
-    cevHeap * heap = &d->ce_heap;
+    cevPq * pq = &d->ce_pq;
     // run all circle events before the site event
-    while (heap->size && CMP_VERTEX(&heap->elems[0]->coord, v)) {
-        cirlEvent * cev = ce_heap_pop(heap);
+    while (CE_PQ_SIZE(pq) && CMP_VERTEX(&CE_PQ_HEAD(pq)->coord, v)) {
+        cirlEvent * cev = ce_pq_dequeue(pq);
         handle_cirl_event(d, cev);
         mem_pool_release(&d->ce_pool, cev);
     }
@@ -511,10 +514,10 @@ INTERNAL void dt_next_vertex(myDt dt, const vertex * v) {
 
 INTERNAL void dt_end_vertexes(myDt dt) {
     myDtImpl * d = (myDtImpl *)dt;
-    cevHeap * heap = &d->ce_heap;
+    cevPq * pq = &d->ce_pq;
     // run the reset circle events
-    while (heap->size) {
-        cirlEvent * cev = ce_heap_pop(heap);
+    while (CE_PQ_SIZE(pq)) {
+        cirlEvent * cev = ce_pq_dequeue(pq);
         handle_cirl_event(d, cev);
         mem_pool_release(&d->ce_pool, cev);
     }

@@ -12,6 +12,6 @@
 /*****************
  * Params
  ****************/
-#define INIT_HEAP_CAPACITY (256)
+#define INIT_PQ_CAPACITY (256)
 
 #endif
