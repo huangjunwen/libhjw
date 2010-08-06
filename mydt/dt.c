@@ -58,35 +58,35 @@ typedef struct {
 #define CE_PQ_SIZE(pq) ((pq)->size)
 #define CE_PQ_HEAD(pq) ((pq)->elems[0])
 
-INTERNAL boolean_t ce_pq_init(cevPq* h) {
-    if (!(h->elems = (cirlEvent **)malloc(sizeof(cirlEvent *) * INIT_PQ_CAPACITY)))
+INTERNAL boolean_t ce_pq_init(cevPq * pq) {
+    if (!(pq->elems = (cirlEvent **)malloc(sizeof(cirlEvent *) * INIT_PQ_CAPACITY)))
         return 0;
-    h->capacity = INIT_PQ_CAPACITY;
-    h->size = 0;
+    pq->capacity = INIT_PQ_CAPACITY;
+    pq->size = 0;
     return 1;
 }
 
-INTERNAL void ce_pq_reset(cevPq * h) {
-    h->size = 0;
+INTERNAL void ce_pq_reset(cevPq * pq) {
+    pq->size = 0;
 }
 
-INTERNAL void ce_pq_finalize(cevPq * h) {
-    free(h->elems);
+INTERNAL void ce_pq_finalize(cevPq * pq) {
+    free(pq->elems);
 }
 
-INTERNAL boolean_t ce_pq_enqueue(cevPq * h, cirlEvent * elem) {
-    if (h->size >= h->capacity) {
+INTERNAL boolean_t ce_pq_enqueue(cevPq * pq, cirlEvent * elem) {
+    if (pq->size >= pq->capacity) {
         void * ne;
-        if ( !(ne = realloc(h->elems, sizeof(cirlEvent *) * (h->capacity + h->capacity))) )
+        if ( !(ne = realloc(pq->elems, sizeof(cirlEvent *) * (pq->capacity + pq->capacity))) )
             return 0;
-        h->elems = (cirlEvent **)ne;
-        h->capacity += h->capacity;
+        pq->elems = (cirlEvent **)ne;
+        pq->capacity += pq->capacity;
     }
 
     // bottom to top
-    uint32_t curr = h->size++;
+    uint32_t curr = pq->size++;
     uint32_t parent;
-    cirlEvent ** elems = h->elems;
+    cirlEvent ** elems = pq->elems;
     while (curr) {
         parent = (curr - 1) >> 1;
         if (!CMP_VERTEX(&elem->coord, &elems[parent]->coord))
@@ -98,21 +98,21 @@ INTERNAL boolean_t ce_pq_enqueue(cevPq * h, cirlEvent * elem) {
     return 1;
 }
 
-INTERNAL cirlEvent * ce_pq_dequeue(cevPq * h) {
-    assert(h->size);
-    cirlEvent * ret = h->elems[0];
-    if (h->size == 1) {
-        h->size = 0;
+INTERNAL cirlEvent * ce_pq_dequeue(cevPq * pq) {
+    assert(pq->size);
+    cirlEvent * ret = pq->elems[0];
+    if (pq->size == 1) {
+        pq->size = 0;
         return ret;
     }
     // last one
-    cirlEvent * last = h->elems[--h->size];
+    cirlEvent * last = pq->elems[--pq->size];
 
     // find postion for last from top to bottom
     uint32_t child;
     uint32_t curr = 0;
-    uint32_t last_idx = h->size - 1;
-    cirlEvent ** elems = h->elems;
+    uint32_t last_idx = pq->size - 1;
+    cirlEvent ** elems = pq->elems;
     while ((child = (curr << 1) + 1) <= last_idx){
         if (child + 1 <= last_idx &&
                 CMP_VERTEX(&elems[child + 1]->coord, &elems[child]->coord))
