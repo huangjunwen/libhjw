@@ -1,0 +1,14 @@
+==== 简介 ====
+这是一个 HTML5 websocket 的 demo, 桌游 Carcassonne [http://en.wikipedia.org/wiki/Carcassonne_(board_game)]
+
+==== 安装 ====
+安装 twisted 的 websocket 分支
+svn://svn.twistedmatrix.com/svn/Twisted/branches/websocket-4173
+
+且一定要用 setuptools 安装， 否则认不出
+
+==== 运行 ====
+twistd -ny game.tac
+
+==== 操作 ====
+鼠标可以拖动小块，按 space 旋转
