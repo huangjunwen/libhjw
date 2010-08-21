@@ -1,0 +1,44 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"> 
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>~~~~~~~~~~</title>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/mootools/1.2.4/mootools-yui-compressed.js"></script>
+<script type="text/javascript" src="mootools-1.2.4.4-more.js"></script>
+<script>
+    window.addEvent("domready", function() {
+        var tile = document.getElementById("tile");
+        var ctx = tile.getContext("2d");
+        function drawTile() {
+            ctx.drawImage(tilesImg, 600, 0, 100, 100, 0, 0, 100, 100);
+        };
+        var tilesImg = new Element("img", {
+            "src": "tiles.png",
+            "events": {
+                "load": drawTile
+            }
+        });
+
+        tile.makeDraggable({
+            onStart: function() {
+                tile.setStyle("-webkit-box-shadow", "8px 8px 5px #aaaaaa");
+            },
+            onComplete: function() {
+                tile.setStyle("-webkit-box-shadow", "");
+            }
+        });
+        
+        window.addEvent("keydown", function(ev) {
+            if (ev.key == "space") {
+                ctx.translate(100, 0);
+                ctx.rotate(Math.PI * 90 / 180);
+                drawTile();
+            }
+        });
+    });
+</script>
+</head>
+<body>
+    <canvas id="tile" height="100px" width="100px"></canvas>
+</body>
+</html>
