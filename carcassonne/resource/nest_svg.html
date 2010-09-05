@@ -10,25 +10,31 @@
 // instead
 var jQ = jQuery;
 jQ(function() {
-        var svg = jQ("#cont").svg().svg("get");
-        svg.configure({"width": "600px", "height": "480px"});
-        // ref
-        // http://forum.jquery.com/topic/using-svg-to-create-a-grid-using-load-for-external-svg-files
-        $.get('01.svg', null, function(data) {
-            svg.add(data.documentElement);
-            svg.change($('svg', svg.root())[0], {
-                "x": "200px"
-            });
-        }, 'xml');
-        $.get('02.svg', null, function(data) {
-            svg.add(data.documentElement);
-        }, 'xml');
+    var svg = jQ("#cont").svg().svg("get");
+    svg.configure({"width": "600px", "height": "480px"});
+    // ref
+    // http://forum.jquery.com/topic/using-svg-to-create-a-grid-using-load-for-external-svg-files
+    $.get('tile01.svg', null, function(data) {
+        svg.add(data.documentElement);
+        svg.change($('svg', svg.root())[0], {
+            "x": "400px"
+        });
+    }, 'xml');
+    $.get('tile02.svg', null, function(data) {
+        svg.add(data.documentElement);
+    }, 'xml');
         
+    $("#rotate").click(function() {
+        $('svg > g', svg.root()).each(function() {
+            svg.change(this, {transform: "translate(100,0) rotate(90)"});
+        });
+    });
 });
 </script>
 </head>
 <body>
     <div id="cont"></div>
+    <input type="button" id="rotate" value="rotate" />
 </body>
 </html>
 
