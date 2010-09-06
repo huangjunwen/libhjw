@@ -25,8 +25,8 @@ jQ(function() {
     }, 'xml');
         
     $("#rotate").click(function() {
-        $('svg > g', svg.root()).each(function() {
-            svg.change(this, {transform: "translate(100,0) rotate(90)"});
+        $('svg>g', svg.root()).each(function() {
+            svg.change(this, {transform: "rotate(90,50,50)"});
         });
     });
 });
