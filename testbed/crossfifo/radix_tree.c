@@ -1,62 +1,49 @@
-#include <stdlib.h>
+#include <assert.h>
 #include <string.h>
+#include "ref_obj.h"
 #include "radix_tree.h"
 
-#define INIT_NODE(n,i,l,r,k,v) {(n)->bit_idx=i;\
-    (n)->left=l;\
-    (n)->right=r;\
-    (n)->key=(k)?strdup(k):NULL;\
-    (n)->val=v;}
-
-typedef struct _link_node_t {
-    rt_node_t node;
-    struct _link_node_t * next;
-    struct _link_node_t * prev;
-} _link_node_t;
-
-static rt_node_t * _malloc_node(struct radix_tree_t * tree) {
-    _link_node_t * ret;
-    if (!(ret = (_link_node_t *)malloc(sizeof(_link_node_t))))
+kv_list_t * kv_list_create(unsigned int elem_size) {
+    if (elem_size < sizeof(kv_t))
         return NULL;
-
-    // link list for all nodes of this tree
-    _link_node_t * head = (_link_node_t *)tree->root;
-    if (!head) {
-        ret->next = ret->prev = ret;
-        return (rt_node_t *)ret;
-    }
-    ret->next = head->next;
-    ret->prev = head;
-    head->next->prev = ret;
-    head->next = ret;
-    return (rt_node_t *)ret;
+    kv_list_t * ret = (kv_list_t *)malloc(sizeof(kv_list_t));
+    if (!ret)
+        return NULL;
+    kv_t * head = &ret->head;
+    head->next = head->prev = head;
+    ret->length = 0;
+    ret->elem_size = elem_size;
+    return ret;
 }
 
-static void _free_node(rt_node_t * node) {
-    // also need to free key's mem
-    // since strdup (or NULL)
-    free((void *)node->key);
-    _link_node_t * n = (_link_node_t *)node;
-    n->next->prev = n->prev;
-    n->prev->next = n->next;
-    free(n);
+kv_t * kv_list_insert(kv_list_t * list, const char * key, void * val) {
+    kv_t * ret = (kv_t *)malloc(list->elem_size);
+    if (!ret)
+        return NULL;
+    ref_obj_incref(key);
+    ret->key = key;
+    ref_obj_incref(val);
+    ret->val = val;
+    ret->next = list->head.next;
+    ret->prev = &list->head;
+    list->head.next->prev = ret;
+    list->head.next = ret;
+    ++list->length;
+    return ret;
 }
 
-static void _free_all_nodes(struct radix_tree_t * tree) {
-    _link_node_t * head = (_link_node_t *)tree->root;
-    while (head->next != head)
-        _free_node((rt_node_t *)head->next);
-    _free_node((rt_node_t *)head);
+void kv_list_remove(kv_list_t * list, kv_t * kv) {
+    assert(kv != &list->head);
+    ref_obj_decref(kv->key);
+    ref_obj_decref(kv->val);
+    kv->prev->next = kv->next;
+    kv->next->prev = kv->prev;
+    free(kv);
+    --list->length;
 }
 
-void radix_tree_init(struct radix_tree_t * tree) {
-    memset(tree, 0, sizeof(struct radix_tree_t));
-    rt_node_t * root = tree->root = _malloc_node(tree);
-    INIT_NODE(root, -1, root, root, NULL, NULL);
-}
+void kv_list_destory(kv_list_t * list) {
+    while (list->length)
+        kv_list_remove(list, list->head.next);
+} 
 
-rt_node_t * radix_tree_insert(struct radix_tree_t * tree, 
-        const char * key, 
-        void * val) {
-    return NULL;
-}
