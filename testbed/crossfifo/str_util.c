@@ -18,6 +18,11 @@ void ref_str_incref(const char * rs) {
 
 void ref_str_decref(const char * rs) {
     ref_str_t * ref_str = (ref_str_t *)(rs - REF_STR_BASE_SIZE);
-    if (--ref_str->ref_count <= 0)
+    if (--ref_str->ref_count <= 0) {
         free(ref_str);
+    }
+}
+
+unsigned int ref_str_len(const char * rs) {
+    return ((ref_str_t *)(rs - REF_STR_BASE_SIZE))->length;
 }
