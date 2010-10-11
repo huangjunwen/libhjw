@@ -3,7 +3,7 @@
 
 typedef struct ref_obj_t {
     unsigned int ref_count;             // ref count of this NULL-term string
-    unsigned int obj_size;              // whole ref_obj_t size
+    unsigned int obj_size;              // obj's size
     char obj[1];                        // dyn-length struct
 } ref_obj_t;
 

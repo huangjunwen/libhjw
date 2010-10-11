@@ -11,7 +11,7 @@ void * malloc_ref_obj(unsigned int size) {
     if (!ro)
         return NULL;
     ro->ref_count = 1;
-    ro->obj_size = REF_OBJ_BASE_SIZE + size;
+    ro->obj_size = size;
     return (void *)ro->obj;
 }
 
