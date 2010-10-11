@@ -13,11 +13,11 @@ typedef struct ref_obj_t {
 void * malloc_ref_obj(unsigned int size);
 
 // increase reference count
-void ref_obj_incref(void * obj);
+void ref_obj_incref(const void * obj);
 
 // one should call 'ref_obj_decref' for each 'malloc_ref_obj' and 
 // 'ref_obj_incref'
-void ref_obj_decref(void * obj);
+void ref_obj_decref(const void * obj);
 
 // make a 'referenced' copy of string s
 const char * make_ref_str(const char * s);
