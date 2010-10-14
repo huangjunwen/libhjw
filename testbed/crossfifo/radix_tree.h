@@ -4,8 +4,8 @@
 /* kv_list_t stands for a group of key-value pairs */
 
 typedef struct kv_t {
-    const char * key;           // NULL-term referenced string
-    void * val;                 // referenced object
+    const char * key;                   // NULL-term string
+    void * val
     struct kv_t * next;
     struct kv_t * prev;
 } kv_t;
@@ -21,8 +21,8 @@ typedef struct kv_list_t {
 typedef struct radix_tree_node_t {
     kv_t kv;
     int bit_idx;
-    struct radix_tree_node_t * left;
-    struct radix_tree_node_t * right;
+    struct radix_tree_node_t * left;    // zero branch
+    struct radix_tree_node_t * right;   // none zero branch
 } rt_node_t;
 
 typedef struct radix_tree_t {
@@ -46,17 +46,16 @@ radix_tree_t * radix_tree_create();
 
 void radix_tree_destory(radix_tree_t * tree);
 
-rt_node_t * radix_tree_find(radix_tree_t * tree, const char * key);
+void * radix_tree_lookup(radix_tree_t * tree, const char * key);
 
-rt_node_t * radix_tree_insert(struct radix_tree_t * tree, 
+int radix_tree_insert(struct radix_tree_t * tree, 
         const char * key, 
         void * val);
 
+int radix_tree_replace(struct radix_tree_t * tree, 
+        const char * key, 
+        void * val);
 #if 0
-rt_node_t * radix_tree_insert(struct radix_tree_t * tree, 
-        const char * key, 
-        void * val);
-
 void radix_tree_remove(struct radix_tree_t * tree, const char * key);
 #endif
 

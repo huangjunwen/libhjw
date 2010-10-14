@@ -1,6 +1,5 @@
 #include <assert.h>
 #include <string.h>
-#include "str_util.h"
 #include "radix_tree.h"
 
 static const unsigned char _bit_mask[8] = {128,64,32,16,8,4,2,1};
@@ -27,7 +26,7 @@ static unsigned int _diff_bit_idx(const char * s1, const char * s2) {
     }
     i <<= 3;                    // *= 8
 
-    c = (*p1) ^ (*p2);
+    c = (*p1) ^ (*p2);          // find the first bit diff
     while ((c & 128) == 0) {
         c <<= 1;
         ++i;
@@ -35,36 +34,95 @@ static unsigned int _diff_bit_idx(const char * s1, const char * s2) {
     return i;
 }
 
+// 1: found, 0: not found, -1: error
+static int _radix_tree_find(struct radix_tree_t * tree, 
+        const char * key, 
+        int create_if_not_exists,
+        rt_node_t ** res) {
+    // parent, child, new_node
+    rt_node_t * p, *c, *n;
+    unsigned int klen, bit_idx;
+    
+    // first find exist ones
+    p = tree->root;
+    c = p->left;
+    klen = strlen(key);
+
+    while (c->bit_idx > p->bit_idx) {
+        p = c;
+        c = _get_bit(key, klen, c->bit_idx) ? c->right : c->left;
+    }
+
+    // found
+    if (strcmp(key, c->kv.key) == 0) {
+        *res = c;
+        return 1;
+    }
+
+    // not found
+    if (!create_if_not_exists)
+        return 0;
+
+    // find a proper place to insert new node
+    bit_idx = _diff_bit_idx(key, c->kv.key);
+    p = tree->root;
+    c = p->left;
+    while (c->bit_idx > p->bit_idx && c->bit_idx < bit_idx) {
+        p = c;
+        c = _get_bit(key, klen, c->bit_idx) ? c->right : c->left;
+    }
+
+    // fill new node
+    n = (rt_node_t *)kv_list_insert(tree->node_list, key, NULL);
+    if (!n)
+        return -1;
+    n->bit_idx = bit_idx;
+    if (_get_bit(key, klen, bit_idx)) {
+        n->left = c;
+        n->right = n;
+    }
+    else {
+        n->left = n;
+        n->right = c;
+    }
+
+    // link
+    if (_get_bit(key, klen, p->bit_idx))
+        p->right = n;
+    else
+        p->left = n;
+
+    *res = n;
+    return 1;
+}
+
 kv_list_t * kv_list_create(unsigned int elem_size) {
-    if (elem_size < sizeof(kv_t))
+    assert (elem_size < sizeof(kv_t))
+    kv_list_t * list = (kv_list_t *)malloc(sizeof(kv_list_t));
+    if (!list)
         return NULL;
-    kv_list_t * ret = (kv_list_t *)malloc(sizeof(kv_list_t));
-    if (!ret)
-        return NULL;
-    kv_t * head = &ret->head;
+    kv_t * head = &list->head;
     head->next = head->prev = head;
-    ret->length = 0;
-    ret->elem_size = elem_size;
-    return ret;
+    list->length = 0;
+    list->elem_size = elem_size;
+    return list;
 }
 
 kv_t * kv_list_insert(kv_list_t * list, const char * key, void * val) {
-    kv_t * ret = (kv_t *)malloc(list->elem_size);
-    if (!ret)
+    kv_t * kv = (kv_t *)malloc(list->elem_size);
+    if (!kv)
         return NULL;
-    ref_str_incref(key);
-    ret->key = key;
-    ret->val = val;
-    ret->next = list->head.next;
-    ret->prev = &list->head;
-    list->head.next->prev = ret;
-    list->head.next = ret;
+    kv->key = key;
+    kv->val = val;
+    kv->next = list->head.next;
+    kv->prev = &list->head;
+    list->head.next->prev = kv;
+    list->head.next = kv;
     ++list->length;
-    return ret;
+    return kv;
 }
 
 void kv_list_remove(kv_list_t * list, kv_t * kv) {
-    ref_str_decref(kv->key);
     kv->prev->next = kv->next;
     kv->next->prev = kv->prev;
     free(kv);
@@ -77,51 +135,38 @@ void kv_list_destory(kv_list_t * list) {
 } 
 
 radix_tree_t * radix_tree_create() {
-    radix_tree_t * ret = (radix_tree_t *)malloc(sizeof(radix_tree_t));
-    if (!ret)
-        return NULL;
-    ret->node_list = kv_list_create(sizeof(rt_node_t));
-    if (!ret->node_list) {
-        free(ret);
-        return NULL;
-    }
-    ret->root = NULL;
-    return ret;
+    radix_tree_t * tree = (radix_tree_t *)malloc(sizeof(radix_tree_t));
+    if (!tree)
+        goto RET_NULL;
+
+    tree->node_list = kv_list_create(sizeof(rt_node_t));
+    if (!tree->node_list)
+        goto FREE_TREE;
+
+    // pre insert an empty string key
+    tree->root = (rt_node_t *)kv_list_insert(tree->node_list, "", NULL);
+    tree->root->bit_idx = -1;
+    tree->root->left = tree->root;
+    tree->root->right = tree->root;
+    return tree;
+
+FREE_NODE_LIST:
+    kv_list_destory(tree->node_list);
+FREE_TREE:
+    free(tree);
+RET_NULL:
+    return NULL;
 }
 
 void radix_tree_destory(radix_tree_t * tree) {
+    kv_list_destory(tree->node_list);
+    free(tree);
 }
 
-rt_node_t * radix_tree_find(radix_tree_t * tree, const char * key) {
-    rt_node_t * p;  // parent
-    rt_node_t * c;  // child
-    
-    // ...
-
-    unsigned int klen = strlen(key);
-    while (c->bit_idx > p->bit_idx) {
-        p = c;
-        c = _get_bit(key, klen, c->bit_idx) ? c->right : c->left;
-    }
-    if (strncmp(key, c->kv.key))
+void * radix_tree_lookup(radix_tree_t * tree, const char * key) {
+    rt_node_t * node;
+    if (!_radix_tree_find(tree, key, 0, &node))
         return NULL;
-    return c;
+    return node->kv.val;
 }
 
-rt_node_t * radix_tree_insert(struct radix_tree_t * tree, 
-        const char * key, 
-        void * val) {
-    rt_node_t * p;  // parent
-    rt_node_t * c;  // child
-    
-    // ...
-
-    unsigned int klen = strlen(key);
-    while (c->bit_idx > p->bit_idx) {
-        p = c;
-        c = _get_bit(key, klen, c->bit_idx) ? c->right : c->left;
-    }
-    if (strcmp(key, c->kv.key))
-        return NULL;
-    return c;
-}
