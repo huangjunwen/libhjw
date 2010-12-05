@@ -34,9 +34,7 @@ body {
 }
 
 #loginPanel {
-    position: fixed;
-    top: 100px;
-    left: 400px;
+    margin:0px auto;
     padding: 10px;
     width: 600px;
     font-weight: bold;
