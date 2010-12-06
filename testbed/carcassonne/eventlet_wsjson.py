@@ -15,27 +15,32 @@ class JsonRPCErr(Exception):
             ret['data'] = self.args[0]
         return ret;
 
+class JsonRPCClientErr(JsonRPCErr):
+    pass
 
-class ParseErr(JsonRPCErr):
+class JsonRPCServerErr(JsonRPCErr):
+    pass
+
+class ParseErr(JsonRPCClientErr):
     code = -32700
     message = "Parse error."
 
 
-class InvalidReq(JsonRPCErr):
+class InvalidReq(JsonRPCClientErr):
     code = -32600
     message = "Invalid Request."
 
 
-class MethodNotFound(JsonRPCErr):
+class MethodNotFound(JsonRPCClientErr):
     code = -32601
     message = "Method not found."
 
 
-class InvalidParams(JsonRPCErr):
+class InvalidParams(JsonRPCClientErr):
     code = -32602
     message = "Invalid params."
 
-class InternalError(JsonRPCErr):
+class InternalError(JsonRPCServerErr):
     code = -32603
     message = "Internal error."
 
@@ -47,9 +52,6 @@ class WSJsonRPCHandler(object):
 
     def __init__(self, ws):
         self._ws = ws
-
-    def log(self, msg):
-        pass
 
     def _writer_func(self, queue):
         while True:
@@ -64,57 +66,52 @@ class WSJsonRPCHandler(object):
             if frame is None:
                 break
 
-            self._handle_frame(frame)
+            try:
+                call_id, res = self._handle_frame(frame)
+            except JsonRPCClientErr, e:
+                self.close()
+                break
+
+            if call_id is not None:
+
     
     def _handle_frame(self, frame)
+        call_id = None
         try:
-            call_id = None
-            try:
-                acall = loads(frame)
-            except ValueError:
-                raise ParseErr()
+            acall = loads(frame)
+            if type(acall) is not dict:
+                raise ValueError()
+        except ValueError:
+            return call_id, ParseErr()
+        
+        try:
+            # get call id first (more friendly to the client)
+            call_id = acall.get('id', None)                 
+            version = acall['jsonrpc']
+            method = acall['method']
+            params = acall.get('params', [])
+        except KeyError:
+            return call_id, InvalidReq()
+        
+        if version != '2.0':
+            return call_id, InvalidReq()
+        if type(method) not in (unicode, str) or not self.method_re(method):
+            return call_id, InvalidReq()
+
+        # TODO need log
+        method = self.dispatch(method)
+        if method is None:
+            return call_id, MethodNotFound()
             
-            try:
-                call_id = acall.get('id', None)                 # get call id first (more friendly to the client)
-                version = acall['jsonrpc']
-                method = acall['method']
-                params = acall.get('params', [])
-            except KeyError:
-                raise InvalidReq()
-            
-            if version != '2.0':
-                raise InvalidReq()
-            if type(method) not in (unicode, str) or not self.method_re(method):
-                raise InvalidReq()
+        # run (no dict params support here)
+        if type(params) is not list:
+            return call_id, InvalidParams()
 
-            self.log.msg("m: %s, p: %r" % (method, params))
-
-            method = self.dispatch(method)
-            if method is None:
-                raise MethodNotFound()
-                
-            # run
-            t = type(params)
-            if t is list:
-                res = method(*params)
-            elif t is dict:
-                res = method(**params)
-            else:
-                raise InvalidParams()
-                
-                # no need to response
-                if call_id is None:
-                    continue
-
-                self.
-                if isinstance(res, Deferred):
-                    res.addBoth(self.respAny, call_id)
-                    return
-
+        try:
+            return call_id, method(*params)
         except Exception, e:
-            res = e
-
-        self.respAny(res, call_id)
+            # TODO need log
+            return call_id, InternalError(e)
 
     def respAny(self, val, call_id):
         if not isinstance(val, failure.Failure) and not isinstance(val, Exception):
