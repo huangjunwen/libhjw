@@ -127,8 +127,6 @@ zipimport zipimport.c
 SSL_INCS=/usr/include/openssl
 SSL_LIBS=/usr/lib
 
-_jail _jailmodule.c
-
 _bisect _bisectmodule.c
 
 # CSV file helper

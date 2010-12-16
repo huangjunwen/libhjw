@@ -3,7 +3,6 @@
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
 #include "structmember.h"
-#include "_pyjail.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -172,10 +171,14 @@ _PyFile_SanitizeMode(char *mode)
 			memmove(mode+2, mode+1, strlen(mode));
 			mode[1] = 'b';
 		}
-	} else if (_jail_enabled() && mode[0] != 'r') {
-		PyErr_Format(PyExc_ValueError, "not allow to write file in jail");
+	} 
+
+    if (_PySys_IsInJail() && mode[0] != 'r') {
+		PyErr_SetString(PyExc_ValueError, "permission denied: file read-only");
 		return -1;
-	} else if (mode[0] != 'r' && mode[0] != 'w' && mode[0] != 'a') {
+	} 
+
+    if (mode[0] != 'r' && mode[0] != 'w' && mode[0] != 'a') {
 		PyErr_Format(PyExc_ValueError, "mode string must begin with "
 	        	    "one of 'r', 'w', 'a' or 'U', not '%.200s'", mode);
 		return -1;
