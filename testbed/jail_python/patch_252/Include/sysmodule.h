@@ -24,6 +24,7 @@ PyAPI_DATA(int) _PySys_CheckInterval;
 PyAPI_FUNC(void) PySys_ResetWarnOptions(void);
 PyAPI_FUNC(void) PySys_AddWarnOption(char *);
 
+PyAPI_FUNC(int) _PySys_SetJailMethods(void);
 PyAPI_FUNC(int) _PySys_IsInJail(void);
 
 #ifdef __cplusplus

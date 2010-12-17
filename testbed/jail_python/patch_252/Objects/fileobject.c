@@ -174,7 +174,7 @@ _PyFile_SanitizeMode(char *mode)
 	} 
 
     if (_PySys_IsInJail() && mode[0] != 'r') {
-		PyErr_SetString(PyExc_ValueError, "permission denied: file read-only");
+		PyErr_SetString(PyExc_RuntimeError, "permission denied: file read-only");
 		return -1;
 	} 
 

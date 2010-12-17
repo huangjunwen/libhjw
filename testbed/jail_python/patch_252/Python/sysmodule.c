@@ -727,29 +727,46 @@ static PyObject * sys_enter_jail(PyObject * self, PyObject * noused) {
         return NULL;
     }
 
-    PyObject * v;
-
-    // change sys content
-#define SET_SYS_KV(key, value) \
-    v = value; \
-    if (v != NULL) \
-        PySys_SetObject(key, v); \
-    Py_XDECREF(v);
-
-    // set sys.argv to ['',]
-    SET_SYS_KV("argv", Py_BuildValue("[s]", ""));
-    // set sys.executable to ''
-    SET_SYS_KV("executable", PyString_FromString(""));
-#undef SET_SYS_KV
-
     // remove self
     PySys_SetObject("_enter_jail", NULL);
-    
+
     // set the flag
     _in_jail = 1;
     Py_RETURN_NONE;
 }
 
+static PyMethodDef _sys_jail_methods[] = {
+    {"_enter_jail", sys_enter_jail, METH_NOARGS, ""},
+    {NULL, NULL}
+};
+
+int _PySys_SetJailMethods() {
+    PyObject * mod_name;
+    PyObject * m;
+    PyMethodDef * ml;
+    int err;
+
+    mod_name = PyString_FromString("sys");
+    if (mod_name == NULL)
+        return -1;
+
+    for (ml = _sys_jail_methods; ml->ml_name != NULL; ml++) {
+        m = PyCFunction_NewEx(ml, NULL, mod_name);
+        if (m == NULL) {
+            Py_DECREF(mod_name);
+            return -1;
+        }
+        
+        err = PySys_SetObject(ml->ml_name, m);
+        Py_DECREF(m);
+        if (err != 0) {
+            Py_DECREF(mod_name);
+            return err;
+        }
+    }
+    Py_DECREF(mod_name);
+    return 0;
+}
 
 #ifdef __cplusplus
 extern "C" {
@@ -835,7 +852,6 @@ static PyMethodDef sys_methods[] = {
 #endif
 	{"settrace",	sys_settrace, METH_O, settrace_doc},
 	{"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
-    {"_enter_jail", sys_enter_jail, METH_NOARGS, ""},
 	{NULL,		NULL}		/* sentinel */
 };
 
