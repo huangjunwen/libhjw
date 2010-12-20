@@ -741,6 +741,13 @@ static PyMethodDef _sys_jail_methods[] = {
 };
 
 int _PySys_SetJailMethods() {
+    // this function should be called only once
+    // after _PySys_Init and _PyImport_FixupExtension("sys", "sys");
+    static int _jail_methods_already_set = 0;
+    if (_jail_methods_already_set != 0)
+        return -1;
+    _jail_methods_already_set = 1;
+
     PyObject * mod_name;
     PyObject * m;
     PyMethodDef * ml;
