@@ -32,7 +32,8 @@ _PyImport_LoadDynamicModule(char *name, char *pathname, FILE *fp)
 
     // we don't interfere reload (see above)
     if (_PySys_IsInJail()) {
-		PyErr_SetString(PyExc_RuntimeError, "permission denied: load dso");
+		PyErr_SetString(PyExc_RuntimeError, 
+                "permission denied: import dso extension");
 		return NULL;
     }
 
