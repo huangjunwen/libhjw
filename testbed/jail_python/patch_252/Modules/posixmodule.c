@@ -298,6 +298,9 @@ static PyObject *
 convertenviron(void)
 {
 	PyObject *d;
+    PyObject * mod;
+    PyObject * filter;
+    PyObject * result;
 	char **e;
 	d = PyDict_New();
 	if (d == NULL)
@@ -308,6 +311,15 @@ convertenviron(void)
 #endif
 	if (environ == NULL)
 		return d;
+
+    /* get env filter */
+    mod = PyImport_ImportModuleLevel("env_filter", NULL, NULL, NULL, 0);
+    if (mod == NULL)
+        return d;
+    filter = PyObject_GetAttrString(mod, "env_filter");
+    if (filter == NULL || !PyCallable_Check(filter))
+        return d;
+
 	/* This part ignores errors */
 	for (e = environ; *e != NULL; e++) {
 		PyObject *k;
@@ -352,7 +364,13 @@ convertenviron(void)
         }
     }
 #endif
-	return d;
+    
+    /* filter */
+    result = PyObject_CallFunctionObjArgs(filter, d, NULL);
+    Py_XDECREF(d);
+    if (result == NULL)
+        return Py_BuildValue("{}");
+    return result;
 }
 
 
