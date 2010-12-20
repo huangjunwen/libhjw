@@ -163,9 +163,13 @@ initsignal(void)
 	DefaultHandler = PyLong_FromVoidPtr((void *)SIG_DFL);
 	IgnoreHandler = PyLong_FromVoidPtr((void *)SIG_IGN);
 	IntHandler = PyDict_GetItemString(d, "default_int_handler");
-    if (!IntHandler)
-            goto finally;
-	Py_INCREF(IntHandler);
+	if (!DefaultHandler || !IgnoreHandler || !IntHandler) {
+		Py_XDECREF(DefaultHandler);
+		Py_XDECREF(IgnoreHandler);
+		Py_XDECREF(IntHandler);
+		goto finally;
+    }
+	Py_INCREF(IntHandler); // PyDict_GetItemString: borrowed ref
     PyDict_DelItemString(d, "default_int_handler");
 
 	Handlers[0].tripped = 0;
