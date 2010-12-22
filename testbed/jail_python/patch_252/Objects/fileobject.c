@@ -173,17 +173,10 @@ _PyFile_SanitizeMode(char *mode)
 		}
 	} 
 
-    if (_PySys_IsInJail() && mode[0] != 'r') {
+    if (mode[0] != 'r') {
 		PyErr_SetString(PyExc_RuntimeError, "permission denied: file read-only");
 		return -1;
 	} 
-
-    if (mode[0] != 'r' && mode[0] != 'w' && mode[0] != 'a') {
-		PyErr_Format(PyExc_ValueError, "mode string must begin with "
-	        	    "one of 'r', 'w', 'a' or 'U', not '%.200s'", mode);
-		return -1;
-	}
-
 
 	return 0;
 }
