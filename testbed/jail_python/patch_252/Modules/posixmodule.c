@@ -313,12 +313,15 @@ convertenviron(void)
 		return d;
 
     /* get env filter */
-    mod = PyImport_ImportModuleLevel("env_filter", NULL, NULL, NULL, 0);
+    mod = PyImport_ImportModuleLevel("__startup", NULL, NULL, NULL, 0);
     if (mod == NULL)
         return d;
     filter = PyObject_GetAttrString(mod, "env_filter");
-    if (filter == NULL || !PyCallable_Check(filter))
+    Py_XDECREF(mod);
+    if (filter == NULL || !PyCallable_Check(filter)) {
+        Py_XDECREF(filter);
         return d;
+    }
 
 	/* This part ignores errors */
 	for (e = environ; *e != NULL; e++) {
@@ -367,6 +370,7 @@ convertenviron(void)
     
     /* filter */
     result = PyObject_CallFunctionObjArgs(filter, d, NULL);
+    Py_XDECREF(filter);
     Py_XDECREF(d);
     if (result == NULL)
         return Py_BuildValue("{}");
