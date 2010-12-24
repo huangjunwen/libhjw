@@ -121,7 +121,7 @@ zipimport zipimport.c
 # ======================================================================
 # some more static libs, base on inspect/gae_modules
 # req:
-#   apt-get install -y libexpat1-dev libssl-dev
+#   apt-get install -y libexpat1-dev libssl-dev libbz2-dev
 # ======================================================================
 
 SSL_INCS=/usr/include/openssl
