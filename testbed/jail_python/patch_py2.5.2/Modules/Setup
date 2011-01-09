@@ -176,7 +176,7 @@ cmath cmathmodule.c # -lm # complex math library functions
 
 collections collectionsmodule.c # Container types
 
-datetime datetimemodule.c timemodule.c
+datetime datetimemodule.c
 
 itertools itertoolsmodule.c	# Functions creating iterators for efficient looping 
 
