@@ -24,16 +24,24 @@ typedef struct rdx_tree_t {
     rdx_node_t root;
 } rdx_tree_t;
 
+/* init/fini */
+
 extern rdx_tree_t * rdx_tree_create(void);
 
 extern void rdx_tree_destory(rdx_tree_t *);
+
+
+/* manuplate functions */
+
+extern rdx_node_t * rdx_tree_find(rdx_node_t *, const char *);
+
+extern rdx_node_t * rdx_tree_insert(rdx_tree_t *, const char *, void *);
 
 
 /* iter functions, don't modify tree during iteration */
 
 extern rdx_node_t * rdx_iter_begin(rdx_iter_t * iter, rdx_node_t * root);
 
-extern rdx_node_t * rdx_iter_next(rdx_iter_t * iter);
-
+extern rdx_node_t * rdx_iter_next(rdx_iter_t * iter);       // return NULL when end
 
 #endif // _RADIX_H_

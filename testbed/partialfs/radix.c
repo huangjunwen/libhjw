@@ -148,3 +148,37 @@ ITER_END:
     memset(iter, 0, sizeof(rdx_iter_t));
     return NULL;
 }
+
+rdx_node_t * _search_leaf(const char * key, size_t keybitlen,
+        rdx_node_t * root, rdx_node_t ** inner) {
+
+    rdx_node_t * p, * c;
+
+    c = root;
+    do {
+        p = c;
+        c = _get_bit(key, keybitlen, p->bitidx) ? c->right : c->left;
+    }
+    while (c->bitidx > p->bitidx);
+
+    if (inner)
+        *inner = p;
+    return c;
+}
+
+rdx_node_t * rdx_tree_find(rdx_node_t * tree, const char * key) {
+
+    rdx_node_t * node;
+    size_t keybitlen;
+
+    keybitlen = (strlen(key) << 3);
+    node = _search_leaf(key, keybitlen, &tree->root, 0);
+
+    if (strcmp(key, node->key) == 0)
+        return node;
+    return NULL;
+}
+
+rdx_node_t * rdx_tree_insert(rdx_tree_t * tree, const char * key, void * val) {
+
+}
