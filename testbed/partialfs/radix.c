@@ -1,10 +1,14 @@
+#define _GNU_SOURCE
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include "radix.h"
 
-#define IS_INNER(node, p) ((node)->bitidx < (p)->bitidx)
-#define IS_LEAF(node, p) ((node)->bitidx >= (p)->bitidx)
+#define IS_INNER(node, parent) ((node)->bitidx > (parent)->bitidx)
+#define IS_LEAF(node, parent) ((node)->bitidx <= (parent)->bitidx)
+
+static char * EMPTY_STR = "";
 
 // _get_bit("ab", 0..7) -> 10000110 (97)
 unsigned char _get_bit(const char * s, size_t bitlen, int bitidx) {
@@ -51,7 +55,7 @@ rdx_tree_t * rdx_tree_create() {
     if ((ret = (rdx_tree_t *)malloc(sizeof(rdx_tree_t))) == NULL)
         return NULL;
     root = &ret->root;
-    root->key = "";
+    root->key = EMPTY_STR;
     root->val = NULL;
     root->bitidx = -1;
     root->left = root;
@@ -87,8 +91,8 @@ void rdx_tree_destory(rdx_tree_t * tree) {
     free(tree);
 }
     
-void rdx_iter_begin(rdx_iter_t * iter, rdx_node_t * root) {
-    rdx_iter_t * p, * c;
+rdx_node_t * rdx_iter_begin(rdx_iter_t * iter, rdx_node_t * root) {
+    rdx_node_t * p, * c;
     int bitidx;
     
     bitidx = root->bitidx;
@@ -105,11 +109,14 @@ void rdx_iter_begin(rdx_iter_t * iter, rdx_node_t * root) {
     iter->inner = p;
     iter->leaf = c;
 
+    // "" is not part of the tree
+    if (iter->leaf->key == EMPTY_STR)
+        return rdx_iter_next(iter);
     return iter->leaf;
 }
 
 rdx_node_t * rdx_iter_next(rdx_iter_t * iter) {
-    rdx_iter_t * p, * c, * r;
+    rdx_node_t * p, * c, * r;
     int bitidx;
 
     // already end
@@ -157,16 +164,18 @@ ITER_END:
 //  0: not found
 //  1: found
 //  2: insert (create_if_not_exists)
-int _rdx_tree_lookup(rdx_tree_t * tree, const char * key, 
+static int _rdx_tree_lookup(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
         int create_if_not_exists,
         rdx_node_t ** res) {
 
     // parent, child, new_node, point_to_child
     rdx_node_t * p, * c, * n, ** pc;
-    size_t keylen, keybitlen;
+    size_t keybitlen;
     int bitidx;
 
-    keylen = strlen(key);
+    if (!keylen)
+        keylen = strlen(key);
     keybitlen = (keylen << 3);
     p = &tree->root;
     c = p->left;
@@ -177,7 +186,7 @@ int _rdx_tree_lookup(rdx_tree_t * tree, const char * key,
         c = _get_bit(key, keybitlen, c->bitidx) ? c->right : c->left;
     }
 
-    // now c is the leaf node and found
+    // now p is the inner node, c is the leaf node
     if (strcmp(key, c->key) == 0) {
         *res = c;
         return 1;
@@ -189,7 +198,7 @@ int _rdx_tree_lookup(rdx_tree_t * tree, const char * key,
 
     // find proper place to insert new node
     bitidx = _diff_bitidx(key, c->key);
-    p = tree->root;
+    p = &(tree->root);
     pc = &(p->left);
     c = *pc;
     while (IS_INNER(c, p) && c->bitidx < bitidx) {
@@ -223,16 +232,37 @@ int _rdx_tree_lookup(rdx_tree_t * tree, const char * key,
     *pc = n;
 
     *res = n;
-    return 1;
+    return 2;
 }
 
-rdx_node_t * rdx_tree_find(rdx_node_t * tree, const char * key) {
-    int ret;
+rdx_node_t * rdx_tree_find(rdx_tree_t * tree, const char * key, 
+        size_t keylen, 
+        int * err) {
     rdx_node_t * node;
 
-    ret = _rdx_tree_lookup(tree, key, 0, &node);
-    if (ret <= 0)
+    if (!key[0]) {
+        *err = -1;
+        return NULL;
+    }
+
+    *err = _rdx_tree_lookup(tree, key, keylen, 0, &node);
+    if (*err <= 0) 
         return NULL;
     return node;
 }
 
+rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
+        int * err) {
+    rdx_node_t * node;
+
+    if (!key[0]) {
+        *err = -1;
+        return NULL;
+    }
+
+    *err = _rdx_tree_lookup(tree, key, keylen, 1, &node);
+    if (*err <= 0)
+        return NULL;
+    return node;
+}

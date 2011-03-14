@@ -1,6 +1,8 @@
 #ifndef _RADIX_H_
 #define _RADIX_H_
 
+#include <stddef.h>
+
 /* radix tree */
 
 typedef struct rdx_node_t {
@@ -24,6 +26,10 @@ typedef struct rdx_tree_t {
     rdx_node_t root;
 } rdx_tree_t;
 
+/* this implementation doesn't support '\x00' in string
+ * and can't insert empty string in it
+ */
+
 /* init/fini */
 
 extern rdx_tree_t * rdx_tree_create(void);
@@ -33,10 +39,13 @@ extern void rdx_tree_destory(rdx_tree_t *);
 
 /* manuplate functions */
 
-extern rdx_node_t * rdx_tree_find(rdx_node_t *, const char *);
+extern rdx_node_t * rdx_tree_find(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
+        int * err);
 
-extern rdx_node_t * rdx_tree_insert(rdx_tree_t *, const char *, void *);
-
+extern rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
+        int * err);
 
 /* iter functions, don't modify tree during iteration */
 
