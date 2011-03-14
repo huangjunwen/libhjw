@@ -6,7 +6,6 @@
 #include "radix.h"
 
 #define IS_INNER(node, parent) ((node)->bitidx > (parent)->bitidx)
-#define IS_LEAF(node, parent) ((node)->bitidx <= (parent)->bitidx)
 
 static char * EMPTY_STR = "";
 
@@ -266,3 +265,73 @@ rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key,
         return NULL;
     return node;
 }
+
+#ifdef _RDX_DEBUG_
+
+#include <stdio.h>
+
+int check_node(rdx_node_t * node, int isleft, char * ident) {
+    char * new_ident;
+    int i;
+    // check pointers
+    if (node->parent) {
+        if (isleft) {
+            if (node != node->parent->left) {
+                printf("node %p 's parent is %p but %p 's left child is %p\n",
+                    node, node->parent, node->parent, node->parent->left);
+                return 0;
+            }
+        }
+        else {
+            if (node != node->parent->right) {
+                printf("node %p 's parent is %p but %p 's rigth child is %p\n",
+                    node, node->parent, node->parent, node->parent->right);
+                return 0;
+            }
+        }
+    }
+
+    // also print
+    if (ident) {
+        printf("%s%d\n", ident, node->bitidx);
+    }
+
+    // check left
+    if (IS_INNER(node->left, node)) {
+        if (ident)
+            asprintf(&new_ident, "%s%c-- ", ident, node->right?'|':' ');
+        else
+            new_ident = 0;
+        if (!check_node(node->left, 1, new_ident))
+            return 0;
+        free(new_ident);
+    }
+    else if (ident){
+        printf("%s%s\n", ident, node->left->key);
+    }
+
+    // check right
+    if (node->right) {
+        if (IS_INNER(node->right, node)) {
+            if (ident)
+                asprintf(&new_ident, "%s`-- ", ident);
+            else
+                new_ident = 0;
+            if (!check_node(node->right, 0, ident))
+                return 0;
+            free(new_ident);
+        }
+        else if (ident){
+            printf("%s%s\n", ident, node->right->key);
+        }
+    }
+
+    return 1;
+}
+
+int check_tree(rdx_tree_t * tree, int print) {
+
+    return check_node(&tree->root, 0, print ? "" : NULL);
+}
+
+#endif
