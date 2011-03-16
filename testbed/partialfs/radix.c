@@ -183,6 +183,10 @@ static int _rdx_tree_lookup(rdx_tree_t * tree, const char * key,
     size_t keybitlen;
     int bitidx;
 
+    // empty string is reserved
+    if (!key[0])
+        return -1;
+
     if (!keylen)
         keylen = strlen(key);
     keybitlen = (keylen << 3);
@@ -249,11 +253,6 @@ rdx_node_t * rdx_tree_find(rdx_tree_t * tree, const char * key,
         int * err) {
     rdx_node_t * node;
 
-    if (!key[0]) {
-        *err = -1;
-        return NULL;
-    }
-
     *err = _rdx_tree_lookup(tree, key, keylen, 0, &node);
     if (*err <= 0) 
         return NULL;
@@ -264,11 +263,6 @@ rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key,
         size_t keylen,
         int * err) {
     rdx_node_t * node;
-
-    if (!key[0]) {
-        *err = -1;
-        return NULL;
-    }
 
     *err = _rdx_tree_lookup(tree, key, keylen, 1, &node);
     if (*err <= 0)
