@@ -9,28 +9,40 @@
 
 static char * EMPTY_STR = "";
 
-// _get_bit("ab", 0..7) -> 10000110 (97)
-unsigned char _get_bit(const char * s, size_t bitlen, int bitidx) {
+#define _2x(c) (c), (c)
+#define _4x(c) _2x(c), _2x(c)
+#define _8x(c) _4x(c), _4x(c)
+#define _16x(c) _8x(c), _8x(c)
+#define _32x(c) _16x(c), _16x(c)
+#define _64x(c) _32x(c), _32x(c)
+#define _128x(c) _64x(c), _64x(c)
+
+// examples:
+//
+// HIGHEST_DIFF_BIT[35]   = HIGHEST_DIFF_BIT[00100011] = 2
+//                                         ^
+//
+// HIGHEST_DIFF_BIT[129]  = HIGHEST_DIFF_BIT[10000001] = 0
+//                                       ^
+//
+static int HIGHEST_DIFF_BIT[256] = {/*impossible*/-1, 7, 
+    _2x(6), 
+    _4x(5),
+    _8x(4),
+    _16x(3),
+    _32x(2),
+    _64x(1),
+    _128x(0)
+};
+
+static inline unsigned char _get_bit(const char * s, size_t bitlen, int bitidx) {
     return (bitidx < 0 || bitidx >= bitlen) ? 0 :
-        (s[bitidx >> 3] & (1 << (bitidx & 15)));
+        (s[bitidx >> 3] & (0x80 >> ((uint8_t)(bitidx & 0x7))));
 }
 
-int _diff_bitidx(const char * s1, const char * s2) {
-    // ref:
-    //  http://www.matrix67.com/blog/archives/3985
-    //  http://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightMultLookup
-    //  http://en.wikipedia.org/wiki/De_Bruijn_sequence
-    // we need 8-bits seq, how to get it:
-    // B(2, 3): 00010111   (0x17)
-    //   000, 001, 010, 101, 011, 111, 110, 100
-    //   0, 1, 2, 5, 3, 7, 6, 4
-    //   m[0] = 0, m[1] = 1, m[2] = 2, m[5] = 3,
-    //   m[3] = 4, m[7] = 5, m[6] = 6, m[4] = 7
-    static const int _DeBruijinBitPos[8] = {
-        0, 1, 2, 4, 7, 3, 6, 5
-    };
+// s1 and s2 must not be the same
+static inline int _diff_bitidx(const char * s1, const char * s2) {
     const char * p1, * p2;
-    int8_t c;
     int r;
 
     p1 = s1;
@@ -43,9 +55,7 @@ int _diff_bitidx(const char * s1, const char * s2) {
     }
     r <<= 3;                // *= 8
 
-    c = (*p1) ^ (*p2);      // xor, so the first diff bit will the
-                            // first 1 from the low end
-    return r + _DeBruijinBitPos[((uint8_t)((c & -c) * 0x17)) >> 5];
+    return r + HIGHEST_DIFF_BIT[(*p1) ^ (*p2)];
 }
 
 rdx_tree_t * rdx_tree_create() {
@@ -265,73 +275,3 @@ rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key,
         return NULL;
     return node;
 }
-
-#ifdef _RDX_DEBUG_
-
-#include <stdio.h>
-
-int check_node(rdx_node_t * node, int isleft, char * ident) {
-    char * new_ident;
-    int i;
-    // check pointers
-    if (node->parent) {
-        if (isleft) {
-            if (node != node->parent->left) {
-                printf("node %p 's parent is %p but %p 's left child is %p\n",
-                    node, node->parent, node->parent, node->parent->left);
-                return 0;
-            }
-        }
-        else {
-            if (node != node->parent->right) {
-                printf("node %p 's parent is %p but %p 's rigth child is %p\n",
-                    node, node->parent, node->parent, node->parent->right);
-                return 0;
-            }
-        }
-    }
-
-    // also print
-    if (ident) {
-        printf("%s%d\n", ident, node->bitidx);
-    }
-
-    // check left
-    if (IS_INNER(node->left, node)) {
-        if (ident)
-            asprintf(&new_ident, "%s%c-- ", ident, node->right?'|':' ');
-        else
-            new_ident = 0;
-        if (!check_node(node->left, 1, new_ident))
-            return 0;
-        free(new_ident);
-    }
-    else if (ident){
-        printf("%s%s\n", ident, node->left->key);
-    }
-
-    // check right
-    if (node->right) {
-        if (IS_INNER(node->right, node)) {
-            if (ident)
-                asprintf(&new_ident, "%s`-- ", ident);
-            else
-                new_ident = 0;
-            if (!check_node(node->right, 0, ident))
-                return 0;
-            free(new_ident);
-        }
-        else if (ident){
-            printf("%s%s\n", ident, node->right->key);
-        }
-    }
-
-    return 1;
-}
-
-int check_tree(rdx_tree_t * tree, int print) {
-
-    return check_node(&tree->root, 0, print ? "" : NULL);
-}
-
-#endif

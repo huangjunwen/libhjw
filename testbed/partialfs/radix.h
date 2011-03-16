@@ -53,8 +53,4 @@ extern rdx_node_t * rdx_iter_begin(rdx_iter_t * iter, rdx_node_t * root);
 
 extern rdx_node_t * rdx_iter_next(rdx_iter_t * iter);       // return NULL when end
 
-#ifdef _RDX_DEBUG_
-extern int check_tree(rdx_tree_t * tree, int print);
-#endif
-
 #endif // _RADIX_H_
