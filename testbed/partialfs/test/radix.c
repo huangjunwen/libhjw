@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "extend_printf.h"
-#include "radix.h"
+#include "../radix.h"
 
 #define IS_INNER(node, parent) ((node)->bitidx > (parent)->bitidx)
 
@@ -109,7 +108,6 @@ int check_tree_err(rdx_tree_t * tree) {
 
 
 int main() {
-    extend_printf();
     char * s1;
     size_t l1, sl1;
     int err;
