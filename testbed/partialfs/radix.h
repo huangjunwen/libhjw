@@ -47,6 +47,7 @@ extern rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key,
         size_t keylen,
         int * err);
 
+
 /* iter functions, don't modify tree during iteration */
 
 extern rdx_node_t * rdx_iter_begin(rdx_iter_t * iter, rdx_node_t * root);
