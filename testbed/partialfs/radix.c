@@ -119,7 +119,7 @@ rdx_node_t * rdx_iter_begin(rdx_iter_t * iter, rdx_node_t * root) {
     iter->leaf = c;
 
     // "" is not part of the tree
-    if (iter->leaf->key == EMPTY_STR)
+    if (!iter->leaf->key[0])
         return rdx_iter_next(iter);
     return iter->leaf;
 }
@@ -279,4 +279,88 @@ rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key,
     return n;
 }
 
+#if 0
 
+int rdx_tree_remove(rdx_tree_t * tree, const char * key,
+        size_t keylen) {
+    rdx_node_t * leaf;
+    int err;
+
+    leaf = rdx_tree_find(tree, key, keylen, &err);
+    if (err)
+        return 1;
+    if (leaf == NULL)
+        return 0;
+
+    return rdx_tree_unlink(tree, leaf);
+
+}
+
+static inline rdx_node_t * _find_parent(rdx_node_t * leaf) {
+    rdx_node_t * parent, * child;
+    const char * key;
+    size_t keybitlen;
+
+    key = leaf->key;
+    keybitlen = (strlen(key) << 3);
+
+    child = leaf;
+    do {
+        parent = child;
+        child = _get_bit(key, keybitlen, parent->bitidx) ? 
+            parent->right : parent->left;
+    } while (child != leaf);
+
+    return parent;
+}
+
+int rdx_tree_unlink(rdx_tree_t * tree, rdx_node_t * leaf) {
+    rdx_node_t * parent, * grandparent, ** pparent, * sibling;
+    rdx_node_t * node;
+    const char * key;
+    size_t keybitlen;
+
+    if (!leaf->key[0])
+        return 1;
+
+    // node's parent, node's grandparent, pointer to parent
+    parent = _find_parent(leaf);
+    grandparent = parent->parent;
+    pparent = NULL;
+    if (grandparent)
+        pparent = (grandparent->left == parent) ? &(grandparent->left) :
+            &(grandparent->right);
+
+    // save parent's key/val
+    if (parent != leaf) {
+        // leaf's key/val is to be remove
+        // and parent is also to be remove
+        // but need to preserve parent's key/val
+        // so REPLACE leaf's key/val with parent's key/val
+
+        // firstly find who is pointing to parent's key/val
+        node = _find_parent(parent);
+
+        // replace
+        free(leaf->key);
+        leaf->key = parent->key;
+        leaf->val = parent->val;
+        if (node->left = parent)
+            node->left = leaf;
+        else
+            node->right = leaf;
+    }
+
+    // leaf's sibling
+    sibling = (parent->left == leaf) ? parent->right: parent->left;
+
+    // link grandparent and sibling
+    if (IS_INNER(sibling, parent))
+        sibling->parent = grandparent;
+    if (grandparent)
+        *pparent = sibling;
+
+    free(parent);
+    return 0;
+}
+#endif
