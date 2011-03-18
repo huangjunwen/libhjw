@@ -3,7 +3,10 @@
 
 #include <stddef.h>
 
-/* radix tree */
+/* radix tree
+ * support only NULL-terminated string as key
+ * support only find and insert operations (but no remove)
+ */
 
 typedef struct rdx_node_t {
     // leaf node content
@@ -26,31 +29,29 @@ typedef struct rdx_tree_t {
     rdx_node_t root;
 } rdx_tree_t;
 
-/* this implementation doesn't support '\x00' in string
- * and can't insert empty string in it
- */
 
 /* init/fini */
 
-extern rdx_tree_t * rdx_tree_create(void);
+extern void rdx_tree_init(rdx_tree_t *);
 
-extern void rdx_tree_destory(rdx_tree_t *);
+extern void rdx_tree_fini(rdx_tree_t *);
 
-
-/* manuplate functions */
-
-extern rdx_node_t * rdx_tree_find(rdx_tree_t * tree, const char * key, 
-        size_t keylen,
-        int * err);
-
-extern rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key, 
-        size_t keylen,
-        int * err);
 
 /* iter functions, don't modify tree during iteration */
 
 extern rdx_node_t * rdx_iter_begin(rdx_iter_t * iter, rdx_node_t * root);
 
 extern rdx_node_t * rdx_iter_next(rdx_iter_t * iter);       // return NULL when end
+
+
+/* manuplate functions */
+
+extern rdx_node_t * rdx_tree_lookup(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
+        int * err);
+
+extern rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
+        int * err);
 
 #endif // _RADIX_H_
