@@ -1,8 +1,112 @@
-//#include <fuse.h>
-#include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
+#include "partialfs.h"
+
+extern path_operations_t default_path_operations;
+
+/* hier_t is organized hierarchically
+ */
+#define VIS_INVISIBLE (0)
+#define VIS_INHERIT (1)
+#define VIS_VISIBLE (2)
+
+struct hier_node_t {
+    rdx_tree_t sub_paths;
+    int visibility;
+    path_operations_t * ops;    // when this sub path is visible and the remaining
+                                // sub path is not found in sub_paths
+                                // operations will be handle to this 'ops'
+};
+
+
+static hier_node_t * hier_node_create(int visibility, path_operations_t * ops) {
+    hier_node_t * ret;
+    ret = (hier_node_t *)malloc(sizeof(hier_node_t));
+    if (!ret)
+        return NULL;
+    rdx_tree_init(&ret->sub_paths);
+    ret->visibility = visibility;
+    ret->ops = ops ? ops : &default_path_operations;
+    return ret;
+}
+
+static void hier_node_destory(hier_node_t * node) {
+    rdx_iter_t iter;
+    rdx_node_t * sub;
+
+    sub = rdx_iter_begin(&iter, &node->sub_paths);
+    while (sub) {
+        hier_node_destory((hier_node_t *)sub->val);
+        sub = rdx_iter_next(&iter);
+    }
+
+    rdx_tree_fini(&node->sub_paths);
+}
+
+void * hier_create(int visible, path_operations_t * ops) {
+    if (visible != VIS_INVISIBLE && visible != VIS_VISIBLE)
+        return NULL;
+    return (void *)hier_node_create(visible, ops);
+}
+
+void hier_destroy(void * hier) {
+    hier_node_destory((hier_node_t *)hier);
+}
+
+int hier_add_path(void * hier_root, const char * full_path, int visible,
+        path_operations_t * ops) {
+
+    hier_node_t * hier_node;
+    const char * full_path_end;
+    char * sub_begin, * sub_end;
+    size_t full_path_len;
+    rdx_node_t * n;
+    int err;
+    
+
+    if (full_path[0] != '/')
+        return -1;
+    if (visible != VIS_INVISIBLE && visible != VIS_VISIBLE)
+        return -1;
+    ops = ops ? ops : &default_path_operations;
+
+    hier_node = (hier_node_t *)hier_root;
+    full_path_end = full_path + strlen(full_path);
+
+    if (visible) {
+        sub_end = full_path;
+        // make each sub path visible
+        do {
+            sub_begin = sub_end + 1;
+            sub_end = strchr(sub_begin, '/');
+            if (!sub_end)
+                sub_end = full_path_end;
+
+            // empty
+            if (sub_begin >= sub_end)
+                continue;
+
+            n = rdx_tree_ensure(&hier_node->sub_paths, sub_begin,
+                    sub_end - sub_begin, 
+                    &err);
+            if (err || !n)
+                return -1;
+
+            // make sure the sub node exists
+            if (!n->val) {
+                n->val = hier_node_create(VIS_VISIBLE, ops);
+                if (!n->val)
+                    return -1;
+            }
+            else {
+                n->val.visibility = VIS_VISIBLE;
+                n->val.ops = ops;
+            }
+        } while (sub_end != full_path_end);
+    } else {
+    }
+
+}
 
 #if 0
 
@@ -118,42 +222,3 @@ int partial_utimens(const char * path, const struct timespec tv[2]) {
 struct fuse_operations partialfs_oper;
 
 #endif
-
-int main() {
-    int ret;
-    rdx_node_t * node;
-    rdx_tree_t * tree = rdx_tree_create();
-    if (!tree) {
-        printf("Bad tree\n");
-        return 1;
-    }
-    
-    ret = rdx_tree_find_or_insert(tree, "hello", 0, 1, &node);
-    if (ret != 2)
-        goto err;
-    node->val = (void *)1;
-
-    ret = rdx_tree_find_or_insert(tree, "world", 0, 1, &node);
-    if (ret != 2)
-        goto err;
-    node->val = (void *)2;
-
-    ret = rdx_tree_find_or_insert(tree, "he", 0, 1, &node);
-    if (ret != 2)
-        goto err;
-    node->val = (void *)3;
-
-    ret = rdx_tree_find_or_insert(tree, "abc", 0, 1, &node);
-    if (ret != 2)
-        goto err;
-    node->val = (void *)4;
-
-    ret = rdx_tree_find_or_insert(tree, "he", 0, 0, &node);
-    if (ret != 1)
-        goto err;
-    printf("Found he: %d\n", (int)node->val);
-err:
-    printf("bad insert %d\n", ret);
-    rdx_tree_destroy(tree);
-    return 1;
-}
