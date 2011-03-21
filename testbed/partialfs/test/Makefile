@@ -1,2 +1,2 @@
 radix: radix.c ../radix.c
-	gcc -o $@ $^ 
+	gcc -Wall -o $@ $^ 

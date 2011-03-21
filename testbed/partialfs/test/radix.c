@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,7 +52,6 @@ static void print_node(const char * titile, rdx_node_t * node) {
 
 static int check_node_err(rdx_node_t * node, int islastchild, char * ident) {
     char * childident, * tmp;
-    int i;
     int ret;
     ret = 1;
     asprintf(&childident, "%s%c   ", ident, islastchild ? ' ' : '|');
