@@ -112,7 +112,7 @@ rdx_node_t * rdx_iter_begin(rdx_tree_t * tree,
     iter->inner = p;
     iter->leaf = c;
 
-    // "" is not part of the tree
+    // empty str is preserved
     if (!iter->leaf->key[0])
         return rdx_iter_next(iter);
     return iter->leaf;
@@ -189,10 +189,8 @@ rdx_node_t * rdx_prefix_iter_next(rdx_prefix_iter_t * iter) {
         return NULL;
 
     p = iter->branch;
-    
-    // not start yet
     if (iter->leaf == NULL)
-        c = p->left;
+        c = p->left;            // not start yet
     else
         c = p->right;
 
@@ -222,8 +220,8 @@ rdx_node_t * rdx_prefix_iter_next(rdx_prefix_iter_t * iter) {
 
         // c's key is a prefix of key only when:
         //      c->key is not empty str
-        //      c->key[branch->bitidx >> 3] == '\0'
-        //      c->key == key[:c->keylen]
+        //      c->key == key[:c->keylen] which implies:
+        //          c->key[branch->bitidx >> 3] == '\0'
         if (c->keylen && c->keylen == (iter->branch->bitidx >> 3)) {
             // cmp
             checked = iter->checked;
@@ -270,7 +268,6 @@ static inline rdx_node_t * _rdx_lookup_leaf(rdx_tree_t * tree,
 
     // parent, child
     rdx_node_t * p, * c;
-    int bitidx;
 
     p = &tree->root;
     c = p->left;
