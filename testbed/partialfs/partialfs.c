@@ -1,183 +1,251 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include "radix.h"
 #include "partialfs.h"
 
-extern path_operations_t default_path_operations;
+typedef struct file_handler_t {
+    uint64_t fh;                    // the original
+    path_operations_t * ops;
+    off_t rel_off;                  // path's relative part offset
+} file_handler_t;
 
-/* hier_t is organized hierarchically
+static rdx_tree_t hier;
+
+/* APIs
  */
-#define VIS_INVISIBLE (0)
-#define VIS_INHERIT (1)
-#define VIS_VISIBLE (2)
 
-struct hier_node_t {
-    rdx_tree_t sub_paths;
-    int visibility;
-    path_operations_t * ops;    // when this sub path is visible and the remaining
-                                // sub path is not found in sub_paths
-                                // operations will be handle to this 'ops'
-};
-
-
-static hier_node_t * hier_node_create(int visibility, path_operations_t * ops) {
-    hier_node_t * ret;
-    ret = (hier_node_t *)malloc(sizeof(hier_node_t));
-    if (!ret)
-        return NULL;
-    rdx_tree_init(&ret->sub_paths);
-    ret->visibility = visibility;
-    ret->ops = ops ? ops : &default_path_operations;
-    return ret;
+void partialfs_init() {
+    rdx_tree_init(&hier);
+    // deny all by default
+    partialfs_mount_path("/", &path_deny_ops);
 }
 
-static void hier_node_destory(hier_node_t * node) {
-    rdx_iter_t iter;
-    rdx_node_t * sub;
-
-    sub = rdx_iter_begin(&iter, &node->sub_paths);
-    while (sub) {
-        hier_node_destory((hier_node_t *)sub->val);
-        sub = rdx_iter_next(&iter);
-    }
-
-    rdx_tree_fini(&node->sub_paths);
-}
-
-void * hier_create(int visible, path_operations_t * ops) {
-    if (visible != VIS_INVISIBLE && visible != VIS_VISIBLE)
-        return NULL;
-    return (void *)hier_node_create(visible, ops);
-}
-
-void hier_destroy(void * hier) {
-    hier_node_destory((hier_node_t *)hier);
-}
-
-int hier_add_path(void * hier_root, const char * full_path, int visible,
-        path_operations_t * ops) {
-
-    hier_node_t * hier_node;
-    const char * full_path_end;
-    char * sub_begin, * sub_end;
-    size_t full_path_len;
-    rdx_node_t * n;
+int partialfs_mount_path(const char * path, path_operations_t * ops) {
     int err;
+    rdx_node_t * node;
+
+    if (!ops)
+        return -1;
+
+    node = rdx_tree_ensure(&tree, path, &err);
+    if (err || !node)
+        return -1;
     
-
-    if (full_path[0] != '/')
-        return -1;
-    if (visible != VIS_INVISIBLE && visible != VIS_VISIBLE)
-        return -1;
-    ops = ops ? ops : &default_path_operations;
-
-    hier_node = (hier_node_t *)hier_root;
-    full_path_end = full_path + strlen(full_path);
-
-    if (visible) {
-        sub_end = full_path;
-        // make each sub path visible
-        do {
-            sub_begin = sub_end + 1;
-            sub_end = strchr(sub_begin, '/');
-            if (!sub_end)
-                sub_end = full_path_end;
-
-            // empty
-            if (sub_begin >= sub_end)
-                continue;
-
-            n = rdx_tree_ensure(&hier_node->sub_paths, sub_begin,
-                    sub_end - sub_begin, 
-                    &err);
-            if (err || !n)
-                return -1;
-
-            // make sure the sub node exists
-            if (!n->val) {
-                n->val = hier_node_create(VIS_VISIBLE, ops);
-                if (!n->val)
-                    return -1;
-            }
-            else {
-                n->val.visibility = VIS_VISIBLE;
-                n->val.ops = ops;
-            }
-        } while (sub_end != full_path_end);
-    } else {
-    }
+    node->val = ops;
+    return 0;
 
 }
 
-#if 0
+extern int partialfs_main(int argc, char * argv);
+
+/* help functions
+ */
+static path_operations_t * get_path_ops(const char * path, 
+        path_info_t * pi) {
+
+    path_operations_t * ops;
+    rdx_node_t * node;
+    rdx_prefix_iter_t pfx_iter;
+
+    if (path[0] != '/')
+        return NULL;
+    
+    ops = NULL;
+    node = rdx_prefix_iter_begin(&hier, path, &pfx_iter);
+    while (node) {
+        ops = (path_operations_t *)node->val;
+        pi->rel_part = path + node->keylen;
+        node = rdx_prefix_iter_next(&pfx_iter);
+    }
+
+    if (ops)
+        pi->full_path = path;
+
+    return ops;
+}
+
+/* fuse ops 
+ */
+
+
+#define SAVE_FH(fuse_file, file_handler) fuse_file->fh = (uint64_t)file_handler;
+
+#define RESTORE_FH(path, fuse_file, path_info, file_handler) \
+    file_handler = (file_handler_t *)((fuse_file)->fh); \
+    path_info.full_path = path; \
+    path_info.rel_part = path + file_handler->rel_off; \
+    fuse_file->fh = file_handler->fh;
+
 
 int partial_getattr(const char * path, struct stat * stbuf) {
+    path_info_t pi;
+    path_operations_t * ops;
+
+    ops = get_path_ops(path, &pi);
+    assert(ops);
+
+    return (ops->getattr)(&pi, stbuf);
 }
 
 int partial_readlink(const char * path, char * buf, size_t sz) {
+    path_info_t pi;
+    path_operations_t * ops;
+
+    ops = get_path_ops(path, &pi);
+    assert(ops);
+
+    return (ops->readlink)(&pi, buf, sz);
 }
 
 int partial_mknod(const char * path, mode_t mode, dev_t dev) {
+    return EROFS;
 }
 
 int partial_mkdir(const char * path, mode_t mode) {
+    return EROFS;
 }
 
 int partial_unlink(const char * path) {
+    return EROFS;
 }
 
 int partial_rmdir(const char * path) {
+    return EROFS;
 }
 
 int partial_symlink(const char * path, const char * link) {
+    return EROFS;
 }
 
 int partial_rename(const char * path, const char * newpath) {
+    return EROFS;
 }
 
 int partial_link(const char * path, const char * link) {
+    return EROFS;
 }
 
 int partial_chmod(const char * path, mode_t mode) {
+    return EROFS;
 }
 
 int partial_chown(const char * path, uid_t uid, gid_t gid) {
+    return EROFS;
 }
 
 int partial_truncate(const char * path, off_t off) {
+    return EROFS;
 }
 
 int partial_open(const char * path, struct fuse_file_info * fi) {
+
+    path_info_t pi;
+    path_operations_t * ops;
+    int fd;
+    file_handler_t * fh;
+    static int allow_mask = ~(O_RDONLY | O_EXCL | O_NONBLOCK | 
+        O_DSYNC | O_RSYNC | O_SYNC);
+    
+    if (fi->flags & allow_mask)
+        return EROFS;
+
+    ops = get_path_ops(path, &pi);
+    assert(ops);
+
+    fd = (ops->open)(&pi, fi);
+    if (fd < 0)
+        return fd;
+    
+    // overwrite fi->fh to store more data
+    fh = (file_handler_t *)malloc(sizeof(file_handler_t));
+    if (!fh) {
+        (ops->release)(&pi, fi);
+        return -1;
+    }
+    fh->fh = fi->fh;
+    fh->ops = ops;
+    fh->rel_off = pi.rel_part - pi.full_path;
+    SAVE_FH(fi, fh);
+
+    return fd;
 }
 
 int partial_read(const char * path, char * buf, size_t size, off_t off,
          struct fuse_file_info * fi) {
+
+    path_info_t pi;
+    file_handler_t * fh;
+    int ret;
+
+    RESTORE_FH(path, fi, pi, fh);
+    ret = (fh->ops->read)(&pi, buf, size, off, fi);
+    SAVE_FH(fi, fh);
+    return ret;
 }
+
 int partial_write(const char * path, const char * buf, size_t size, off_t off,
           struct fuse_file_info * fi) {
+    return EROFS;
 }
+
 int partial_statfs(const char * path, struct statvfs * stat) {
+    path_info_t pi;
+    path_operations_t * ops;
+
+    ops = get_path_ops(path, &pi);
+    assert(ops);
+
+    return (ops->statfs)(&pi, stat);
 }
 
 int partial_flush(const char * path, struct fuse_file_info * fi) {
+    return 0;
 }
 
 int partial_release(const char * path, struct fuse_file_info * fi) {
+    path_info_t pi;
+    file_handler_t * fh;
+    int ret;
+
+    RESTORE_FH(path, fi, pi, fh);
+    ret = (fh->ops->release)(&pi, fi);
+    free(fh);
+    return ret;
 }
 
 int partial_fsync(const char * path, int datasync, struct fuse_file_info * fi) {
+    return 0;
 }
 
 int partial_setxattr(const char * path, const char * name, const char * value, 
         size_t size, int flags) {
+    return EROFS;
 }
 
 int partial_getxattr(const char * path, const char * name, char * value, size_t size) {
+    path_info_t pi;
+    path_operations_t * ops;
+
+    ops = get_path_ops(path, &pi);
+    assert(ops);
+
+    return (ops->getxattr)(&pi, name, value, size);
 }
 
 int partial_listxattr(const char * path, char * list, size_t size) {
+    path_info_t pi;
+    path_operations_t * ops;
+
+    ops = get_path_ops(path, &pi);
+    assert(ops);
+
+    return (ops->listxattr)(&pi, list, size);
 }
 
 int partial_removexattr(const char * path, const char * name) {
+    return EROFS;
 }
 
 int partial_opendir(const char * path, struct fuse_file_info * fi) {
@@ -221,4 +289,3 @@ int partial_utimens(const char * path, const struct timespec tv[2]) {
 
 struct fuse_operations partialfs_oper;
 
-#endif

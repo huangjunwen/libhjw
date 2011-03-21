@@ -295,8 +295,6 @@ rdx_node_t * rdx_tree_lookup(rdx_tree_t * tree, const char * key,
         return NULL;
 
     leaf = _rdx_lookup_leaf(tree, key, keylen << 3);
-    if (!leaf)
-        return NULL;
     
     *err = 0;
 
@@ -322,8 +320,6 @@ rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key,
 
     keybitlen = (keylen << 3);
     leaf = _rdx_lookup_leaf(tree, key, keybitlen);
-    if (!leaf)
-        return NULL;
     
     // found
     if (strcmp(key, leaf->key) == 0) {
