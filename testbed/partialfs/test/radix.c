@@ -114,6 +114,7 @@ int main() {
     rdx_tree_t tree;
     rdx_node_t * node, * root;
     rdx_iter_t iter;
+    rdx_prefix_iter_t pfx_iter;
 
     rdx_tree_init(&tree);
 
@@ -129,19 +130,10 @@ int main() {
             free(s1);
             break;
         }
-        node = rdx_tree_ensure(&tree, s1, sl1, &err);
+        node = rdx_tree_ensure(&tree, s1, &err);
         if (!node)
             printf("can't insert %s\n", s1);
         else {
-#if 0
-            print_node(    "inserted", node);
-            if (node->parent);
-                print_node("parent  ", node->parent);
-            if (node->left);
-                print_node("left    ", node->left);
-            if (node->right);
-                print_node("right   ", node->right);
-#endif
             err = check_tree_err(&tree);
             printf("check tree %s\n", err ? "failed" : "ok");
         }
@@ -151,10 +143,32 @@ int main() {
             break;
     }
 
-    node = rdx_iter_begin(&iter, &tree.root);
+    printf("all values: \n");
+    node = rdx_iter_begin(&tree, &iter);
     while (node) {
         printf("%s\n", node->key);
         node = rdx_iter_next(&iter);
+    }
+
+    printf("\nprefix searching\n");
+    while (1) {
+        s1 = NULL;
+        if ((sl1 = getline(&s1, &l1, stdin)) < 0)
+            break;
+        s1[--sl1] = '\0';
+        if (!sl1) {
+            free(s1);
+            break;
+        }
+
+        printf("%s 's prefix: \n", s1);
+        node = rdx_prefix_iter_begin(&tree, s1, &pfx_iter);
+        while (node) {
+            printf("%s\n", node->key);
+            node = rdx_prefix_iter_next(&pfx_iter);
+        }
+        printf("\n");
+
     }
 
     rdx_tree_fini(&tree);
