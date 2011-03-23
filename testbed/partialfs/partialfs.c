@@ -1,92 +1,169 @@
+#define _GNU_SOURCE
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include "radix.h"
 #include "partialfs.h"
 
-typedef struct file_handler_t {
-    uint64_t fh;                    // the original
-    path_operations_t * ops;
-    off_t rel_off;                  // path's relative part offset
-} file_handler_t;
+/* a path is a 'file path' if it not ends with '/', such:
+ *      /usr/local
+ *      /home
+ * a path is a 'dir path' if it ends with '/', such:
+ *      /
+ *      /home/
+ *
+ * a 'file path' is visible means:
+ *      the node pointed by the path is visible
+ * a 'dir path' is visible means:
+ *      its sub nodes (recursivly) are visible by default
+ *      for example:
+ *          if /home/ is visible
+ *          then /home/jayven, /home/jayven/abc is visible by default
+ */
 
-static rdx_tree_t hier;
+
+// path control
+typedef struct path_ctl_t {
+    int is_fpath;                   // is it a file path (or else dir path)
+    int vis;
+    path_operations_t * ops;        // only for dir path
+    void * args;
+} path_ctl_t;
+
+static rdx_tree_t hier_ctl;
 
 /* APIs
  */
 
-void partialfs_init() {
-    rdx_tree_init(&hier);
-    // deny all by default
-    partialfs_mount_path("/", &path_deny_ops);
-}
-
-int partialfs_mount_path(const char * path, path_operations_t * ops) {
-    int err;
-    rdx_node_t * node;
-
-    if (!ops)
-        return -1;
-
-    node = rdx_tree_ensure(&tree, path, &err);
-    if (err || !node)
-        return -1;
+int dcl_path_visibility(const char * path, size_t path_len,
+        int vis,
+        path_operations_t * ops,
+        void * args,
+        char ** err_msg) {
     
-    node->val = ops;
-    return 0;
+    rdx_node_t * node;
+    path_ctl_t * pctl;
+    const char * e;
+    int err;
+
+    err_msg = NULL;
+
+    if (!path_len)
+        path_len = strlen(path);
+    if (!path_len) {
+        asprintf(err_msg, "empty path");
+        return -1;
+    }
+    if (path[0] != '/') {
+        asprintf(err_msg, "path must starts with '/'");
+        return -1;
+    }
+
+    if (!vis) {
+        node = rdx_tree_ensure(&hier_ctl, path, path_len, &err);
+        if (err) {
+            asprintf(err_msg, "not enough mem (rdx node)");
+            return -1;
+        }
+
+        pctl = node->val ? (path_ctl_t *)node->val : 
+            (path_ctl_t *)malloc(sizeof(path_ctl_t));
+        if (!pctl) {
+            asprintf(err_msg, "not enough mem (path ctl)");
+            return -1;
+        }
+
+        pctl->is_fpath = (path[path_len - 1] != '/');
+        pctl->vis = 0;
+        pctl->ops = NULL;
+        pctl->args = NULL;
+        node->val = (void *)pctl;
+        return 0;
+    }
+
+    // if ops or args, path should convert to a dir path
+    if (ops || args) {
+        if (path[path_len - 1] != '/') {
+            ++path_len;
+            char dpath[path_len + 1];
+            strncpy(dpath, path, path_len - 1);
+            dpath[path_len - 1] = '/';
+            dpath[path_len] = '\0';
+            path = dpath;
+        }
+    }
+
+    // also add each of its parent file path
+    e = path;
+    while (*e) {
+        e = strchr(e + 1, '/');
+        if (!e)
+            break;
+        // already visible
+        if (get_path_visibility(path, e - path, NULL, NULL))
+            continue;
+    }
+
+
 
 }
 
-extern int partialfs_main(int argc, char * argv);
+int get_path_visibility(const char * path, size_t path_len, 
+        path_operations_t ** pops,
+        void ** pargs) {
 
-/* help functions
- */
-static path_operations_t * get_path_ops(const char * path, 
-        path_info_t * pi) {
-
+    int vis;
     path_operations_t * ops;
+    void * args;
+    char c;
+    path_ctl_t * pctl;
     rdx_node_t * node;
     rdx_prefix_iter_t pfx_iter;
 
-    if (path[0] != '/')
-        return NULL;
-    
+    vis = 0;
     ops = NULL;
-    node = rdx_prefix_iter_begin(&hier, path, &pfx_iter);
+    args = NULL;
+    node = rdx_prefix_iter_begin(&hier_ctl, path, path_len, &pfx_iter);
     while (node) {
-        ops = (path_operations_t *)node->val;
-        pi->rel_part = path + node->keylen;
+        pctl = (path_ctl_t *)node->val;
+        if (pctl->is_fpath) {
+            // make sure a prefix is a parent file path, for example:
+            //      /usr is a prefix of /usr1/local but not a parent file path
+            if (path[node->keylen] == '/' || node->keylen == path_len) {
+                // if any parent path is invisible explicit
+                // the path is invisible
+                if (!pctl->vis)
+                    return 0;
+            }
+        }
+        else {
+            // inherit the longest parent dir path's visibility and operators
+            vis = pctl->vis;
+            if (pctl->ops)
+                ops = pctl->ops;
+            if (pctl->args)
+                args = pctl->args;
+        }
         node = rdx_prefix_iter_next(&pfx_iter);
     }
 
-    if (ops)
-        pi->full_path = path;
-
-    return ops;
+    if (pops)
+        *pops = ops;
+    if (pargs)
+        *pargs = args;
+    return vis;
 }
+
 
 /* fuse ops 
  */
 
-
-#define SAVE_FH(fuse_file, file_handler) fuse_file->fh = (uint64_t)file_handler;
-
-#define RESTORE_FH(path, fuse_file, path_info, file_handler) \
-    file_handler = (file_handler_t *)((fuse_file)->fh); \
-    path_info.full_path = path; \
-    path_info.rel_part = path + file_handler->rel_off; \
-    fuse_file->fh = file_handler->fh;
+#if 0
 
 
 int partial_getattr(const char * path, struct stat * stbuf) {
-    path_info_t pi;
-    path_operations_t * ops;
-
-    ops = get_path_ops(path, &pi);
-    assert(ops);
-
-    return (ops->getattr)(&pi, stbuf);
 }
 
 int partial_readlink(const char * path, char * buf, size_t sz) {
@@ -288,4 +365,6 @@ int partial_utimens(const char * path, const struct timespec tv[2]) {
 }
 
 struct fuse_operations partialfs_oper;
+
+#endif
 
