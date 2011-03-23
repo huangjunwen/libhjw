@@ -45,9 +45,11 @@ extern void rdx_tree_init(rdx_tree_t *);
 extern void rdx_tree_fini(rdx_tree_t *);
 
 extern rdx_node_t * rdx_tree_lookup(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
         int * err);
 
 extern rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
         int * err);
 
 /* iter functions, don't modify tree during iteration */
@@ -59,8 +61,9 @@ extern rdx_node_t * rdx_iter_begin(rdx_tree_t * tree,
 extern rdx_node_t * rdx_iter_next(rdx_iter_t * iter);       // return NULL when end
 
 
-// get all values that is prefix of a key (from shortest to longest)
+// get all keys that are prefix of a key (from shortest to longest)
 extern rdx_node_t * rdx_prefix_iter_begin(rdx_tree_t * tree, const char * key,
+        size_t keylen,
         rdx_prefix_iter_t * iter);
 
 extern rdx_node_t * rdx_prefix_iter_next(rdx_prefix_iter_t * iter);

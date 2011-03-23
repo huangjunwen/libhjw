@@ -163,13 +163,14 @@ ITER_END:
 }
 
 rdx_node_t * rdx_prefix_iter_begin(rdx_tree_t * tree, const char * key,
+        size_t keylen,
         rdx_prefix_iter_t * iter) {
 
     if (!key[0])
         return NULL;
 
     iter->key = key;
-    iter->keylen = strlen(key);
+    iter->keylen = keylen ? keylen : strlen(key);
     iter->checked = 0;
     iter->branch = &tree->root;
     iter->leaf = NULL;
@@ -208,6 +209,7 @@ rdx_node_t * rdx_prefix_iter_next(rdx_prefix_iter_t * iter) {
         }
 
         // the key ready to go right
+        // this implies the key is not end
 
         // save state
         // and go to the left most of the sibling
@@ -282,13 +284,14 @@ static inline rdx_node_t * _rdx_lookup_leaf(rdx_tree_t * tree,
 }
 
 rdx_node_t * rdx_tree_lookup(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
         int * err) {
 
-    size_t keylen;
     rdx_node_t * leaf;
 
     *err = 1;
-    keylen = strlen(key);
+    if (!keylen)
+        keylen = strlen(key);
 
     // empty str is preserved
     if (keylen == 0)
@@ -306,13 +309,15 @@ rdx_node_t * rdx_tree_lookup(rdx_tree_t * tree, const char * key,
 }
 
 rdx_node_t * rdx_tree_ensure(rdx_tree_t * tree, const char * key, 
+        size_t keylen,
         int * err) {
     rdx_node_t * p, * c, * n, * leaf;
-    size_t keylen, keybitlen;
+    size_t keybitlen;
     int bitidx;
 
     *err = 1;
-    keylen = strlen(key);
+    if (!keylen)
+        keylen = strlen(key);
 
     // empty str is preserved
     if (keylen == 0)

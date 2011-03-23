@@ -130,7 +130,7 @@ int main() {
             free(s1);
             break;
         }
-        node = rdx_tree_ensure(&tree, s1, &err);
+        node = rdx_tree_ensure(&tree, s1, 0, &err);
         if (!node)
             printf("can't insert %s\n", s1);
         else {
@@ -162,7 +162,7 @@ int main() {
         }
 
         printf("%s 's prefix: \n", s1);
-        node = rdx_prefix_iter_begin(&tree, s1, &pfx_iter);
+        node = rdx_prefix_iter_begin(&tree, s1, 4, &pfx_iter);
         while (node) {
             printf("%s\n", node->key);
             node = rdx_prefix_iter_next(&pfx_iter);
