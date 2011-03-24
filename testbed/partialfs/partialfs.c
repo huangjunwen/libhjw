@@ -50,11 +50,12 @@ int dcl_path_visibility(const char * path, size_t path_len,
     int err;
     int is_fpath, path_level;
 
-    err_msg = NULL;
+    *err_msg = NULL;
 
     /* check args
      */
-    path_len = path_len ? path_len : strlen(path);
+    if (!path_len)
+        path_len = strlen(path);
     if (!path_len) {
         asprintf(err_msg, "empty path");
         return -1;
