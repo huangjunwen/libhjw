@@ -7,51 +7,54 @@
 #include "radix.h"
 #include "partialfs.h"
 
-/* a path is a 'file path' if it not ends with '/', such:
- *      /usr/local
- *      /home
- * a path is a 'dir path' if it ends with '/', such:
- *      /
- *      /home/
- *
- * a 'file path' is visible means:
- *      the node pointed by the path is visible
- * a 'dir path' is visible means:
- *      its sub nodes (recursivly) are visible by default
- *      for example:
- *          if /home/ is visible
- *          then /home/jayven, /home/jayven/abc is visible by default
- */
-
-
 // path control
 typedef struct path_ctl_t {
-    int is_fpath;                   // is it a file path (or else dir path)
+    /* both is_fpath and path_level can be
+     * calculated from the key itself
+     * but record here for convience
+     */
+    // is it a file path (not ends with '/')
+    int is_fpath;                   
+    // for '/' and '/usr' path_level is 1
+    // for '/usr/' and '/usr/local' path_level is 2
+    int path_level;                     
+
+    /* visibility
+     */
     int vis;
-    path_operations_t * ops;        // only for dir path
-    void * args;
+    /* if this path is dir path and visble one can
+     * specify another ops
+     */
+    path_operations_t * ops;
 } path_ctl_t;
 
 static rdx_tree_t hier_ctl;
 
-/* APIs
- */
+void partialfs_init() {
+    int r;
+    char * err_msg;
+
+    rdx_tree_init(&hier_ctl);
+    r = dcl_path_visibility("/", 1, 0, 0, &err_msg);
+    assert(r == 0);
+}
 
 int dcl_path_visibility(const char * path, size_t path_len,
         int vis,
         path_operations_t * ops,
-        void * args,
         char ** err_msg) {
     
     rdx_node_t * node;
     path_ctl_t * pctl;
-    const char * e;
+    const char * p, * e;
     int err;
+    int is_fpath, path_level;
 
     err_msg = NULL;
 
-    if (!path_len)
-        path_len = strlen(path);
+    /* check args
+     */
+    path_len = path_len ? path_len : strlen(path);
     if (!path_len) {
         asprintf(err_msg, "empty path");
         return -1;
@@ -61,99 +64,236 @@ int dcl_path_visibility(const char * path, size_t path_len,
         return -1;
     }
 
-    if (!vis) {
-        node = rdx_tree_ensure(&hier_ctl, path, path_len, &err);
-        if (err) {
-            asprintf(err_msg, "not enough mem (rdx node)");
-            return -1;
-        }
-
-        pctl = node->val ? (path_ctl_t *)node->val : 
-            (path_ctl_t *)malloc(sizeof(path_ctl_t));
-        if (!pctl) {
-            asprintf(err_msg, "not enough mem (path ctl)");
-            return -1;
-        }
-
-        pctl->is_fpath = (path[path_len - 1] != '/');
-        pctl->vis = 0;
-        pctl->ops = NULL;
-        pctl->args = NULL;
-        node->val = (void *)pctl;
-        return 0;
+    is_fpath = (path[path_len - 1] != '/');
+    if (ops && (!vis || is_fpath)) {
+        asprintf(err_msg, "only visible dir path can use another path"
+                " operations");
+        return -1;
+    }
+    
+    p = path;
+    e = path + path_len;
+    path_level = 0;
+    while (p < e) {
+        if (*p == '/')
+            ++path_level;
+        ++p;
+    }
+    
+    /* insert into the radix tree
+     */
+    node = rdx_tree_ensure(&hier_ctl, path, path_len, &err);
+    if (err) {
+        asprintf(err_msg, "not enough mem (rdx node)");
+        return -1;
     }
 
-    // if ops or args, path should convert to a dir path
-    if (ops || args) {
-        if (path[path_len - 1] != '/') {
-            ++path_len;
-            char dpath[path_len + 1];
-            strncpy(dpath, path, path_len - 1);
-            dpath[path_len - 1] = '/';
-            dpath[path_len] = '\0';
-            path = dpath;
-        }
+    pctl = node->val ? (path_ctl_t *)node->val : 
+        (path_ctl_t *)malloc(sizeof(path_ctl_t));
+    if (!pctl) {
+        asprintf(err_msg, "not enough mem (path ctl)");
+        return -1;
     }
 
-    // also add each of its parent file path
-    e = path;
-    while (*e) {
-        e = strchr(e + 1, '/');
-        if (!e)
-            break;
-        // already visible
-        if (get_path_visibility(path, e - path, NULL, NULL))
-            continue;
-    }
-
-
+    pctl->is_fpath = is_fpath;
+    pctl->path_level = path_level;
+    pctl->vis = vis;
+    pctl->ops = ops;
+    node->val = (void *)pctl;
+    return 0;
 
 }
 
-int get_path_visibility(const char * path, size_t path_len, 
-        path_operations_t ** pops,
-        void ** pargs) {
+// iternal used only
+static inline int _prefix_is_path_prefix(rdx_node_t * pfx, 
+        const char * path) {
 
-    int vis;
-    path_operations_t * ops;
-    void * args;
-    char c;
     path_ctl_t * pctl;
-    rdx_node_t * node;
-    rdx_prefix_iter_t pfx_iter;
+    char e;
 
-    vis = 0;
-    ops = NULL;
-    args = NULL;
-    node = rdx_prefix_iter_begin(&hier_ctl, path, path_len, &pfx_iter);
-    while (node) {
-        pctl = (path_ctl_t *)node->val;
-        if (pctl->is_fpath) {
-            // make sure a prefix is a parent file path, for example:
-            //      /usr is a prefix of /usr1/local but not a parent file path
-            if (path[node->keylen] == '/' || node->keylen == path_len) {
-                // if any parent path is invisible explicit
-                // the path is invisible
-                if (!pctl->vis)
-                    return 0;
-            }
-        }
-        else {
-            // inherit the longest parent dir path's visibility and operators
-            vis = pctl->vis;
-            if (pctl->ops)
-                ops = pctl->ops;
-            if (pctl->args)
-                args = pctl->args;
-        }
-        node = rdx_prefix_iter_next(&pfx_iter);
+    pctl = (path_ctl_t *)pfx->val;
+    if (!pctl->is_fpath)
+        return 1;
+    // '/usr' is a prefix of '/usr1/local' 
+    // but not a path prefix of it
+    e = path[pfx->keylen];
+    if (e == '/' || e == '\0')
+        return 1;
+    return 0;
+}
+
+static rdx_node_t * _path_prefix_iter_begin(const char * path, 
+        size_t path_len,
+        rdx_prefix_iter_t * iter) {
+
+    rdx_node_t * pfx;
+
+    pfx = rdx_prefix_iter_begin(&hier_ctl, path, path_len, iter);
+    while (pfx) {
+        if (_prefix_is_path_prefix(pfx, path))
+            return pfx;
+        pfx = rdx_prefix_iter_next(iter);
+    }
+    return NULL;
+}
+
+static rdx_node_t * _path_prefix_iter_next(rdx_prefix_iter_t * iter) {
+
+    rdx_node_t * pfx;
+    const char * path;
+
+    path = iter->key;
+    while (1) {
+        pfx = rdx_prefix_iter_next(iter);
+        if (!pfx)
+            break;
+        if (_prefix_is_path_prefix(pfx, path))
+            return pfx;
+    }
+    return NULL;
+}
+
+
+int get_dpath_visibility(const char * path, size_t path_len, 
+        path_operations_t ** pops) {
+
+    rdx_prefix_iter_t iter;
+    rdx_node_t * pfx;
+    path_ctl_t * pctl;
+    int dir_vis;
+    path_operations_t * ops;
+
+    if (!path_len)
+        path_len = strlen(path);
+    if (!path_len)
+        return -1;
+    if (path[0] != '/')
+        return -1;
+
+    // must be a dpath
+    if (path[path_len - 1] != '/')
+        return -1;
+
+    pfx = _path_prefix_iter_begin(path, path_len, &iter);
+    assert(pfx);
+    pctl = (path_ctl_t *)pfx->val;
+    assert(!pctl->is_fpath);
+
+    dir_vis = pctl->vis;
+    ops = pctl->ops;
+
+    // get the longest dpath's visibility and operations
+    while (1) {
+        pfx = _path_prefix_iter_next(&iter);
+        if (!pfx)
+            break;
+        pctl = (path_ctl_t *)pfx->val;
+
+        if (pctl->is_fpath)
+            continue;
+
+        dir_vis = pctl->vis;
+        if (pctl->ops)
+            ops = pctl->ops;
     }
 
+    if (!dir_vis)
+        return 0;
     if (pops)
         *pops = ops;
-    if (pargs)
-        *pargs = args;
-    return vis;
+    return 1;
+}
+
+
+int get_fpath_visibility(const char * path, size_t path_len,
+        path_operations_t ** pops) {
+
+    rdx_prefix_iter_t iter;
+    rdx_node_t * pfx;
+    path_ctl_t * pctl;
+    int vis, dir_vis, expect_level;
+    path_operations_t * ops;
+    const char * remain;
+
+    if (!path_len)
+        path_len = strlen(path);
+    if (!path_len)
+        return -1;
+    if (path[0] != '/')
+        return -1;
+
+    // must be a fpath
+    if (path[path_len - 1] == '/')
+        return -1;
+
+    // '/' should always here
+    pfx = _path_prefix_iter_begin(path, path_len, &iter);
+    assert(pfx);
+    pctl = (path_ctl_t *)pfx->val;
+    assert(!pctl->is_fpath);
+
+    dir_vis = pctl->vis;
+    ops = pctl->ops;
+    expect_level = pctl->path_level;
+    remain = path + pfx->keylen;
+
+    while (1) {
+        pfx = _path_prefix_iter_next(&iter);
+        if (!pfx)
+            break;
+        pctl = (path_ctl_t *)pfx->val;
+        remain = path + pfx->keylen;
+        vis = pctl->vis;
+
+        if (dir_vis) {
+            // file path
+            if (pctl->is_fpath) {
+                if (!pctl->vis)
+                    goto INVIS;
+                continue;
+            }
+
+            // dir path
+            if (pctl->ops)
+                ops = pctl->ops;
+            dir_vis = vis;
+            expect_level = pctl->path_level;
+        }
+        else {
+            if (pctl->path_level != expect_level)
+                goto INVIS;
+
+            // file path
+            if (pctl->is_fpath) {
+                if (!pctl->vis)
+                    goto INVIS;
+                ++expect_level;
+                continue;
+            }
+
+            // dir path
+            if (pctl->ops)
+                ops = pctl->ops;
+            dir_vis = vis;
+        }
+    }
+
+    // the last dir path is visible
+    if (dir_vis)
+        goto VIS;
+
+    // the last is a file path and visible and no remain
+    if (vis && remain[0] == '\0')
+        goto VIS;
+
+    goto INVIS;
+
+VIS:
+    if (pops)
+        *pops = ops;
+    return 1;
+INVIS:
+    return 0;
 }
 
 
