@@ -7,9 +7,8 @@
 
 
 /* mostly the same as READ operations in fuse_operations
- * but replace `const char *` with `path_info_t` 
  */
-typedef struct path_operations_t {
+typedef struct subfs_operations_t {
 #if 0
     int (*getattr) (path_info_t *, struct stat *);
 	int (*readlink) (path_info_t *, char *, size_t);
@@ -25,11 +24,26 @@ typedef struct path_operations_t {
 	int (*releasedir) (path_info_t *, struct fuse_file_info *);
 	int (*access) (path_info_t *, int);
 	int (*fgetattr) (path_info_t *, struct stat *, struct fuse_file_info *);
-#else
-    int used;
 #endif
-} path_operations_t;
 
+    int (*init) (int argc, const char * argv[], void ** data);
+    void (*fini) (void * data);
+
+} subfs_operations_t;
+
+
+/* export symbols
+ */
+extern subfs_operations_t default_subfs_ops;
+
+
+/* API
+ */
+
+/* init partialfs
+ * return 0 on success, -1 if failed
+ */
+extern int pfs_init(void);
 
 /* a path is a 'file path' if it doesn't ends with '/', such:
  *      /usr/local
@@ -38,25 +52,48 @@ typedef struct path_operations_t {
  *      /
  *      /home/
  *
- * a 'file path' is visible means:
- *      the node pointed by the path is visible
- * a 'dir path' is visible means:
- *      its sub nodes (recursivly) are visible by default
+ * a 'file path' is 'allow' means:
+ *      the path is visible if its dir is visible
+ *
+ * a 'dir path' is 'allow' means:
+ *      its sub paths (recursivly) are allowed by default
  *      for example:
- *          if /home/ is visible
+ *          if /home/ is allow
  *          then /home/jayven, /home/jayven/abc is visible by default
+ * 
+ * return 0 on success, -1 if failed
  */
-extern void partialfs_init(void);
+extern int pfs_allow_path(const char * path, size_t path_len);
 
-extern int dcl_path_visibility(const char * path, size_t path_len,
-        int vis,
-        path_operations_t * ops,
-        char ** err_msg);
+/* a 'file path' is 'deny' means:
+ *      the path is invisible event its dir is visible
+ *
+ * a 'dir path' is 'deny' means:
+ *      its sub paths (recursivly) are deny by default
+ *
+ * return 0 on success, -1 if failed
+ */
+extern int pfs_deny_path(const char * path, size_t path_len);
 
-extern int get_dpath_visibility(const char * path, size_t path_len, 
-        path_operations_t ** pops);
+/* a subfs can only mount at a dpath
+ * it also implies 'pfs_allow_path(dpath, dpath_len)'
+ *
+ * return 0 on success, -1 if failed
+ */
+extern int pfs_mount_subfs(const char * dpath, size_t dpath_len, 
+        int subfs_argc,
+        const char * subfs_argv[],
+        subfs_operations_t * subfs_ops);
 
-extern int get_fpath_visibility(const char * path, size_t path_len,
-        path_operations_t ** pops);
+/* get a path's visibility
+ *
+ * return 1 if it is visible, 0 if invisible and -1 on err
+ * when the path is visible, subfs_* will be filled
+ * subfs_path points to path's memory so no need to free
+ */
+extern int pfs_get_path_visibility(const char * path, size_t path_len,
+        const char ** psubfs_path,
+        subfs_operations_t ** psubfs_ops,
+        void ** psubfs_data);
 
 #endif

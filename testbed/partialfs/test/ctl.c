@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,11 +9,15 @@
 int main() {
     char * s;
     size_t l, zero;
-    int r, vis;
-    char * err_msg;
-    path_operations_t * ops;
+    int r;
+    const char * subfs_path;
+    subfs_operations_t * subfs_ops;
+    void * subfs_data;
 
-    partialfs_init();
+    r = pfs_init();
+    assert(r >= 0);
+
+    printf("default subfs ops %p\n", &default_subfs_ops);
 
     zero = 0;
     while (1) {
@@ -25,20 +30,21 @@ int main() {
             break;
         }
         switch (s[0]) {
-        case '+': vis = 1; break;
-        case '-': vis = 0; break;
+        case '+': 
+            r = pfs_allow_path(s + 1, l - 1);
+            if (r < 0)
+                printf("can't allow '%*.s' \n", l - 1, s + 1);
+            break;
+        case '-': 
+            r = pfs_deny_path(s + 1, l - 1);
+            if (r < 0)
+                printf("can't deny '%*.s' \n", l - 1, s + 1);
+            break;
         default:
             printf("bad rule, +/- missing\n");
-            free(s);
-            continue;
+            break;
         }
-
-        err_msg = NULL;
-        r = dcl_path_visibility(s + 1, l - 1, vis, 0, &err_msg);
-        if (r < 0)
-            printf("bad rule: %s\n", err_msg);
         free(s);
-        free(err_msg);
     }
 
     printf("\nvisibility testing\n");
@@ -53,14 +59,19 @@ int main() {
             break;
         }
 
-        if (s[l - 1] == '/') {
-            r = get_dpath_visibility(s, l, &ops);
-            printf("visibility: %d\n\n", r);
-        }
+        r = pfs_get_path_visibility(s, l,
+                &subfs_path,
+                &subfs_ops,
+                &subfs_data);
+        if (r < 0)
+            printf("bad input\n");
         else {
-            r = get_fpath_visibility(s, l, &ops);
-            printf("visibility: %d\n\n", r);
+            printf("'%.*s' %s, subfs: ('%.*s', %p, %p)\n",
+                l, s, r ? "visible" : "invisible",
+                l - (subfs_path - s), subfs_path, 
+                subfs_ops, subfs_data);
         }
+
         free(s);
     }
 

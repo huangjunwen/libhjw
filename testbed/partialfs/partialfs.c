@@ -7,100 +7,125 @@
 #include "radix.h"
 #include "partialfs.h"
 
-// path control
-typedef struct path_ctl_t {
-    /* both is_fpath and path_level can be
-     * calculated from the key itself
-     * but record here for convience
+#define CHECK_PATH(path, path_len) \
+    if (!(path_len)) (path_len) = strlen((path)); \
+    if (!(path_len)) return -1; \
+    if ((path)[0] != '/') return -1;
+
+#define IS_FPATH(path, path_len) ((path)[(path_len) - 1] != '/')
+
+/* path control 
+ */
+typedef struct path_ctrl_t {
+    /* these attributes are used both by file path and dir path
      */
     // is it a file path (not ends with '/')
     int is_fpath;                   
+
     // for '/' and '/usr' path_level is 1
     // for '/usr/' and '/usr/local' path_level is 2
     int path_level;                     
 
-    /* visibility
+    // is it allowed
+    int allow;
+
+    /* these attributes are used only by dir path
      */
-    int vis;
-    /* if this path is dir path and visble one can
-     * specify another ops
-     */
-    path_operations_t * ops;
-} path_ctl_t;
+    subfs_operations_t * subfs_ops;
 
-static rdx_tree_t hier_ctl;
+    void * subfs_data;
 
-void partialfs_init() {
-    int r;
-    char * err_msg;
+} path_ctrl_t;
 
-    rdx_tree_init(&hier_ctl);
-    r = dcl_path_visibility("/", 1, 0, 0, &err_msg);
-    assert(r == 0);
+static rdx_tree_t hier_ctrl;
+
+int pfs_init() {
+    rdx_tree_init(&hier_ctrl);
+    return pfs_mount_subfs("/", 1, 0, NULL, &default_subfs_ops);
 }
 
-int dcl_path_visibility(const char * path, size_t path_len,
-        int vis,
-        path_operations_t * ops,
-        char ** err_msg) {
-    
+static int _pfs_ctrl_path(const char * path, size_t path_len, int allow) {
+
     rdx_node_t * node;
-    path_ctl_t * pctl;
-    const char * p, * e;
+    path_ctrl_t * pctl;
+    const char * p;
     int err;
-    int is_fpath, path_level;
 
-    *err_msg = NULL;
+    CHECK_PATH(path, path_len);
 
-    /* check args
-     */
-    if (!path_len)
-        path_len = strlen(path);
-    if (!path_len) {
-        asprintf(err_msg, "empty path");
-        return -1;
-    }
-    if (path[0] != '/') {
-        asprintf(err_msg, "path must starts with '/'");
-        return -1;
-    }
+    // insert
+    node = rdx_tree_ensure(&hier_ctrl, path, path_len, &err);
+    if (err)
+        return -1;      // not enough memory
 
-    is_fpath = (path[path_len - 1] != '/');
-    if (ops && (!vis || is_fpath)) {
-        asprintf(err_msg, "only visible dir path can use another path"
-                " operations");
-        return -1;
-    }
-    
-    p = path;
-    e = path + path_len;
-    path_level = 0;
-    while (p < e) {
-        if (*p == '/')
-            ++path_level;
-        ++p;
-    }
-    
-    /* insert into the radix tree
-     */
-    node = rdx_tree_ensure(&hier_ctl, path, path_len, &err);
-    if (err) {
-        asprintf(err_msg, "not enough mem (rdx node)");
-        return -1;
-    }
-
-    pctl = node->val ? (path_ctl_t *)node->val : 
-        (path_ctl_t *)malloc(sizeof(path_ctl_t));
+    pctl = (path_ctrl_t *)node->val;
     if (!pctl) {
-        asprintf(err_msg, "not enough mem (path ctl)");
-        return -1;
+        pctl = (path_ctrl_t *)malloc(sizeof(path_ctrl_t));
+        if (!pctl)
+            return -1;
+        pctl->subfs_ops = NULL;
+        pctl->subfs_data = NULL;
     }
 
-    pctl->is_fpath = is_fpath;
-    pctl->path_level = path_level;
-    pctl->vis = vis;
-    pctl->ops = ops;
+    // fill
+    pctl->is_fpath = IS_FPATH(path, path_len);
+    pctl->path_level = 0;
+    p = path;
+    while (p < path + path_len) {
+        if (*p++ == '/')
+            ++pctl->path_level;
+    }
+    pctl->allow = allow ? 1 : 0;
     node->val = (void *)pctl;
+    return 0;
+}
+
+int pfs_allow_path(const char * path, size_t path_len) {
+    return _pfs_ctrl_path(path, path_len, 1);
+}
+
+int pfs_deny_path(const char * path, size_t path_len) {
+    return _pfs_ctrl_path(path, path_len, 0);
+}
+
+int pfs_mount_subfs(const char * dpath, size_t dpath_len, 
+        int subfs_argc,
+        const char * subfs_argv[],
+        subfs_operations_t * subfs_ops) {
+
+    rdx_node_t * node;
+    path_ctrl_t * pctl;
+    int r;
+    void * subfs_data;
+
+    CHECK_PATH(dpath, dpath_len);
+
+    if (IS_FPATH(dpath, dpath_len))
+        return -1;
+
+    if (pfs_allow_path(dpath, dpath_len) < 0)
+        return -1;
+
+    node = rdx_tree_lookup(&hier_ctrl, dpath, dpath_len, &r);
+    assert(node);
+    pctl = (path_ctrl_t *)node->val;
+    assert(pctl);
+
+    // unmount the previous subfs if exists
+    if (pctl->subfs_ops && pctl->subfs_ops->fini)
+        (pctl->subfs_ops->fini)(pctl->subfs_data);
+    pctl->subfs_ops = NULL;
+    pctl->subfs_data = NULL;
+
+    // init subfs
+    subfs_data = NULL;
+    if (subfs_ops->init) {
+        r = (subfs_ops->init)(subfs_argc, subfs_argv, &subfs_data);
+        if (r < 0)
+            return -1;
+    }
+    pctl->subfs_ops = subfs_ops;
+    pctl->subfs_data = subfs_data;
     return 0;
 
 }
@@ -109,10 +134,10 @@ int dcl_path_visibility(const char * path, size_t path_len,
 static inline int _prefix_is_path_prefix(rdx_node_t * pfx, 
         const char * path) {
 
-    path_ctl_t * pctl;
+    path_ctrl_t * pctl;
     char e;
 
-    pctl = (path_ctl_t *)pfx->val;
+    pctl = (path_ctrl_t *)pfx->val;
     if (!pctl->is_fpath)
         return 1;
     // '/usr' is a prefix of '/usr1/local' 
@@ -129,7 +154,7 @@ static rdx_node_t * _path_prefix_iter_begin(const char * path,
 
     rdx_node_t * pfx;
 
-    pfx = rdx_prefix_iter_begin(&hier_ctl, path, path_len, iter);
+    pfx = rdx_prefix_iter_begin(&hier_ctrl, path, path_len, iter);
     while (pfx) {
         if (_prefix_is_path_prefix(pfx, path))
             return pfx;
@@ -154,148 +179,78 @@ static rdx_node_t * _path_prefix_iter_next(rdx_prefix_iter_t * iter) {
     return NULL;
 }
 
-
-int get_dpath_visibility(const char * path, size_t path_len, 
-        path_operations_t ** pops) {
-
-    rdx_prefix_iter_t iter;
-    rdx_node_t * pfx;
-    path_ctl_t * pctl;
-    int dir_vis;
-    path_operations_t * ops;
-
-    if (!path_len)
-        path_len = strlen(path);
-    if (!path_len)
-        return -1;
-    if (path[0] != '/')
-        return -1;
-
-    // must be a dpath
-    if (path[path_len - 1] != '/')
-        return -1;
-
-    pfx = _path_prefix_iter_begin(path, path_len, &iter);
-    assert(pfx);
-    pctl = (path_ctl_t *)pfx->val;
-    assert(!pctl->is_fpath);
-
-    dir_vis = pctl->vis;
-    ops = pctl->ops;
-
-    // get the longest dpath's visibility and operations
-    while (1) {
-        pfx = _path_prefix_iter_next(&iter);
-        if (!pfx)
-            break;
-        pctl = (path_ctl_t *)pfx->val;
-
-        if (pctl->is_fpath)
-            continue;
-
-        dir_vis = pctl->vis;
-        if (pctl->ops)
-            ops = pctl->ops;
-    }
-
-    if (!dir_vis)
-        return 0;
-    if (pops)
-        *pops = ops;
-    return 1;
-}
-
-
-int get_fpath_visibility(const char * path, size_t path_len,
-        path_operations_t ** pops) {
+int pfs_get_path_visibility(const char * path, size_t path_len,
+        const char ** subfs_path,
+        subfs_operations_t ** subfs_ops,
+        void ** subfs_data) {
 
     rdx_prefix_iter_t iter;
     rdx_node_t * pfx;
-    path_ctl_t * pctl;
-    int vis, dir_vis, expect_level;
-    path_operations_t * ops;
-    const char * remain;
+    path_ctrl_t * pctl;
+    int allow, next_level;
+    int remain;
 
-    if (!path_len)
-        path_len = strlen(path);
-    if (!path_len)
-        return -1;
-    if (path[0] != '/')
-        return -1;
-
-    // must be a fpath
-    if (path[path_len - 1] == '/')
-        return -1;
+    CHECK_PATH(path, path_len);
 
     // '/' should always here
     pfx = _path_prefix_iter_begin(path, path_len, &iter);
-    assert(pfx);
-    pctl = (path_ctl_t *)pfx->val;
-    assert(!pctl->is_fpath);
+    assert(pfx && pfx->key[0] == '/' && pfx->keylen == 1);
+    pctl = (path_ctrl_t *)pfx->val;
+    remain = path_len - pfx->keylen;
 
-    dir_vis = pctl->vis;
-    ops = pctl->ops;
-    expect_level = pctl->path_level;
-    remain = path + pfx->keylen;
+    allow = pctl->allow;
+    next_level = pctl->path_level;
+    *subfs_path = path;
+    *subfs_ops = pctl->subfs_ops;
+    *subfs_data = pctl->subfs_data;
 
     while (1) {
         pfx = _path_prefix_iter_next(&iter);
         if (!pfx)
             break;
-        pctl = (path_ctl_t *)pfx->val;
-        remain = path + pfx->keylen;
-        vis = pctl->vis;
+        pctl = (path_ctrl_t *)pfx->val;
+        remain = path_len - pfx->keylen;
 
-        if (dir_vis) {
-            // file path
-            if (pctl->is_fpath) {
-                if (!pctl->vis)
-                    goto INVIS;
-                continue;
-            }
+        // we are under an invisible dir
+        // and at least one intermediate path is not in 
+        // hier_ctrl so by default its invisible
+        if (!allow && pctl->path_level != next_level)
+            return 0;
 
-            // dir path
-            if (pctl->ops)
-                ops = pctl->ops;
-            dir_vis = vis;
-            expect_level = pctl->path_level;
+        // file path
+        if (pctl->is_fpath) {
+            // explicit deny
+            if (!pctl->allow)
+                return 0;
+            ++next_level;
+            continue;
         }
-        else {
-            if (pctl->path_level != expect_level)
-                goto INVIS;
 
-            // file path
-            if (pctl->is_fpath) {
-                if (!pctl->vis)
-                    goto INVIS;
-                ++expect_level;
-                continue;
-            }
-
-            // dir path
-            if (pctl->ops)
-                ops = pctl->ops;
-            dir_vis = vis;
+        // dir path
+        allow = pctl->allow;
+        next_level = pctl->path_level;
+        if (pctl->subfs_ops) {
+            *subfs_path = path + pfx->keylen - 1;
+            *subfs_ops = pctl->subfs_ops;
+            *subfs_data = pctl->subfs_data;
         }
     }
 
-    // the last dir path is visible
-    if (dir_vis)
-        goto VIS;
+    // in a visible dir
+    // or no remain
+    // or remain == 1, the only case is ('/usr', '/usr/')
+    if (allow || remain <= 1)
+        return 1;
 
-    // the last is a file path and visible and no remain
-    if (vis && remain[0] == '\0')
-        goto VIS;
-
-    goto INVIS;
-
-VIS:
-    if (pops)
-        *pops = ops;
-    return 1;
-INVIS:
     return 0;
+
 }
+
+
+subfs_operations_t default_subfs_ops = {
+    .init = NULL,
+    .fini = NULL
+};
 
 
 /* fuse ops 
