@@ -10,14 +10,9 @@ int main() {
     char * s;
     size_t l, zero;
     int r;
-    const char * subfs_path;
-    subfs_operations_t * subfs_ops;
-    void * subfs_data;
 
     r = pfs_init();
     assert(r >= 0);
-
-    printf("default subfs ops %p\n", &default_subfs_ops);
 
     zero = 0;
     while (1) {
@@ -59,17 +54,12 @@ int main() {
             break;
         }
 
-        r = pfs_get_path_visibility(s, l,
-                &subfs_path,
-                &subfs_ops,
-                &subfs_data);
+        r = pfs_get_path_visibility(s, l);
         if (r < 0)
             printf("bad input\n");
         else {
-            printf("'%.*s' %s, subfs: ('%.*s', %p, %p)\n",
-                l, s, r ? "visible" : "invisible",
-                l - (subfs_path - s), subfs_path, 
-                subfs_ops, subfs_data);
+            printf("'%.*s' %s\n",
+                l, s, r ? "visible" : "invisible");
         }
 
         free(s);

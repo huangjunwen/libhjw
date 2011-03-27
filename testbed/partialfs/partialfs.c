@@ -29,19 +29,13 @@ typedef struct path_ctrl_t {
     // is it allowed
     int allow;
 
-    /* these attributes are used only by dir path
-     */
-    subfs_operations_t * subfs_ops;
-
-    void * subfs_data;
-
 } path_ctrl_t;
 
 static rdx_tree_t hier_ctrl;
 
 int pfs_init() {
     rdx_tree_init(&hier_ctrl);
-    return pfs_mount_subfs("/", 1, 0, NULL, &default_subfs_ops);
+    return pfs_deny_path("/", 1);
 }
 
 static int _pfs_ctrl_path(const char * path, size_t path_len, int allow) {
@@ -63,8 +57,6 @@ static int _pfs_ctrl_path(const char * path, size_t path_len, int allow) {
         pctl = (path_ctrl_t *)malloc(sizeof(path_ctrl_t));
         if (!pctl)
             return -1;
-        pctl->subfs_ops = NULL;
-        pctl->subfs_data = NULL;
     }
 
     // fill
@@ -86,48 +78,6 @@ int pfs_allow_path(const char * path, size_t path_len) {
 
 int pfs_deny_path(const char * path, size_t path_len) {
     return _pfs_ctrl_path(path, path_len, 0);
-}
-
-int pfs_mount_subfs(const char * dpath, size_t dpath_len, 
-        int subfs_argc,
-        const char * subfs_argv[],
-        subfs_operations_t * subfs_ops) {
-
-    rdx_node_t * node;
-    path_ctrl_t * pctl;
-    int r;
-    void * subfs_data;
-
-    CHECK_PATH(dpath, dpath_len);
-
-    if (IS_FPATH(dpath, dpath_len))
-        return -1;
-
-    if (pfs_allow_path(dpath, dpath_len) < 0)
-        return -1;
-
-    node = rdx_tree_lookup(&hier_ctrl, dpath, dpath_len, &r);
-    assert(node);
-    pctl = (path_ctrl_t *)node->val;
-    assert(pctl);
-
-    // unmount the previous subfs if exists
-    if (pctl->subfs_ops && pctl->subfs_ops->fini)
-        (pctl->subfs_ops->fini)(pctl->subfs_data);
-    pctl->subfs_ops = NULL;
-    pctl->subfs_data = NULL;
-
-    // init subfs
-    subfs_data = NULL;
-    if (subfs_ops->init) {
-        r = (subfs_ops->init)(subfs_argc, subfs_argv, &subfs_data);
-        if (r < 0)
-            return -1;
-    }
-    pctl->subfs_ops = subfs_ops;
-    pctl->subfs_data = subfs_data;
-    return 0;
-
 }
 
 // iternal used only
@@ -179,10 +129,8 @@ static rdx_node_t * _path_prefix_iter_next(rdx_prefix_iter_t * iter) {
     return NULL;
 }
 
-int pfs_get_path_visibility(const char * path, size_t path_len,
-        const char ** subfs_path,
-        subfs_operations_t ** subfs_ops,
-        void ** subfs_data) {
+int pfs_get_path_visibility(const char * path, 
+        size_t path_len) {
 
     rdx_prefix_iter_t iter;
     rdx_node_t * pfx;
@@ -200,9 +148,6 @@ int pfs_get_path_visibility(const char * path, size_t path_len,
 
     allow = pctl->allow;
     next_level = pctl->path_level;
-    *subfs_path = path;
-    *subfs_ops = pctl->subfs_ops;
-    *subfs_data = pctl->subfs_data;
 
     while (1) {
         pfx = _path_prefix_iter_next(&iter);
@@ -229,11 +174,6 @@ int pfs_get_path_visibility(const char * path, size_t path_len,
         // dir path
         allow = pctl->allow;
         next_level = pctl->path_level;
-        if (pctl->subfs_ops) {
-            *subfs_path = path + pfx->keylen - 1;
-            *subfs_ops = pctl->subfs_ops;
-            *subfs_data = pctl->subfs_data;
-        }
     }
 
     // in a visible dir
@@ -246,11 +186,6 @@ int pfs_get_path_visibility(const char * path, size_t path_len,
 
 }
 
-
-subfs_operations_t default_subfs_ops = {
-    .init = NULL,
-    .fini = NULL
-};
 
 
 /* fuse ops 

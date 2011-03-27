@@ -1,0 +1,35 @@
++/
+-/usr
+-/home/
++/home/jayven
++/home/jayven/abc
+
+
+visibility testing
+/
+'/' visible
+/u
+'/u' visible
+/usr
+'/usr' invisible
+/usr/local
+'/usr/local' invisible
+/home
+'/home' visible
+/home/
+'/home/' visible
+/home/a
+'/home/a' visible
+/home/jayven
+'/home/jayven' visible
+/home/abc
+'/home/abc' invisible
+/home/
+'/home/' visible
+/home/a
+'/home/a' visible
+/home/b
+'/home/b' visible
+/home/aa
+'/home/aa' invisible
+
