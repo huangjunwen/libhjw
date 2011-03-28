@@ -33,7 +33,7 @@ typedef struct rdx_iter_t {
 typedef struct rdx_prefix_iter_t {
     const char * key;
     size_t keylen;
-    off_t checked;                      // key[:checked] is checked
+    size_t checked;                     // key[:checked] is checked
     rdx_node_t * branch;                // not NULL: itering, NULL: end
     rdx_node_t * leaf;                  // not NULL: itering, NULL: not start
 } rdx_prefix_iter_t;

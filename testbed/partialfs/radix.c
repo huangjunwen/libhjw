@@ -183,7 +183,7 @@ rdx_node_t * rdx_prefix_iter_next(rdx_prefix_iter_t * iter) {
     const char * key;
     size_t keylen;
     size_t keybitlen;
-    off_t checked;
+    size_t checked;
 
     // already end;
     if (iter->branch == NULL)
@@ -250,6 +250,9 @@ rdx_node_t * rdx_prefix_iter_next(rdx_prefix_iter_t * iter) {
     iter->branch = NULL;
 
     // finally check the leaf node
+    // it may longer than key
+    if (c->keylen > keylen)
+        return NULL;
     checked = iter->checked;
     if (strncmp(c->key + checked, key + checked, 
             c->keylen - checked))

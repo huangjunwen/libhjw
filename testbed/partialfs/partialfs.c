@@ -13,6 +13,7 @@
     if ((path)[0] != '/') return -1;
 
 #define IS_FPATH(path, path_len) ((path)[(path_len) - 1] != '/')
+#define IS_DPATH(path, path_len) ((path)[(path_len) - 1] == '/')
 
 /* path control 
  */
@@ -135,19 +136,28 @@ int pfs_get_path_visibility(const char * path,
     rdx_prefix_iter_t iter;
     rdx_node_t * pfx;
     path_ctrl_t * pctl;
-    int allow, next_level;
+    int default_allow, expect_level;
     int remain;
 
     CHECK_PATH(path, path_len);
+
+    // convert a dir path to file path
+    if (IS_DPATH(path, path_len)) {
+        --path_len;
+        // root always visible
+        if (!path_len)
+            return 1;
+    }
 
     // '/' should always here
     pfx = _path_prefix_iter_begin(path, path_len, &iter);
     assert(pfx && pfx->key[0] == '/' && pfx->keylen == 1);
     pctl = (path_ctrl_t *)pfx->val;
-    remain = path_len - pfx->keylen;
 
-    allow = pctl->allow;
-    next_level = pctl->path_level;
+    remain = path_len - pfx->keylen;
+    default_allow = pctl->allow;
+    expect_level = pctl->path_level;
+    assert(expect_level == 1);
 
     while (1) {
         pfx = _path_prefix_iter_next(&iter);
@@ -159,7 +169,7 @@ int pfs_get_path_visibility(const char * path,
         // we are under an invisible dir
         // and at least one intermediate path is not in 
         // hier_ctrl so by default its invisible
-        if (!allow && pctl->path_level != next_level)
+        if (!default_allow && pctl->path_level != expect_level)
             return 0;
 
         // file path
@@ -167,19 +177,18 @@ int pfs_get_path_visibility(const char * path,
             // explicit deny
             if (!pctl->allow)
                 return 0;
-            ++next_level;
+            ++expect_level;
             continue;
         }
 
         // dir path
-        allow = pctl->allow;
-        next_level = pctl->path_level;
+        default_allow = pctl->allow;
+        expect_level = pctl->path_level;
     }
 
     // in a visible dir
     // or no remain
-    // or remain == 1, the only case is ('/usr', '/usr/')
-    if (allow || remain <= 1)
+    if (default_allow|| !remain)
         return 1;
 
     return 0;
