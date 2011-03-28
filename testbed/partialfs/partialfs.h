@@ -4,8 +4,6 @@
 #define FUSE_USE_VERSION 26
 
 #include <fuse.h>
-#include <stddef.h>
-#include <stdint.h>
 
 /* a path is a 'file path' if it doesn't ends with '/', such:
  *      /usr/local

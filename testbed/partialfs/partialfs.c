@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include <fuse.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -197,6 +196,11 @@ static inline int pfs_err() {
     return -errno;
 }
 
+typedef union {
+    int i;
+    void * ptr;
+    uint64_t u64;
+} fh_t;
 
 /* fuse ops 
  */
@@ -330,13 +334,16 @@ int partialfs_fsync(const char * path, int datasync, struct fuse_file_info * fi)
 
 int partialfs_opendir(const char * path, struct fuse_file_info * fi) {
     DIR * dp;
+    fh_t * pfh;
 
     if (!pfs_get_path_visibility(path, 0))
         return -ENOENT;
     dp = opendir(path);
     if (dp == NULL)
         return pfs_err();
-    fi->fh = (uint64_t)dp;
+    pfh = (fh_t *)&fi->fh;
+    pfh->ptr = (void *)dp;
+    
     return 0;
 }
 
@@ -353,7 +360,7 @@ int partialfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler,
     if (IS_DPATH(path, path_len))
         --path_len;
 
-    dp = (DIR *)fi->fh;
+    dp = (DIR *)((fh_t)fi->fh).ptr;
 
     errno = 0;
 
@@ -390,7 +397,7 @@ int partialfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler,
 int partialfs_releasedir(const char * path, struct fuse_file_info * fi) {
     int r;
 
-    r = closedir((DIR *)fi->fh);
+    r = closedir((DIR *)((fh_t)fi->fh).ptr);
     if (r < 0)
         return pfs_err();
     return r;
