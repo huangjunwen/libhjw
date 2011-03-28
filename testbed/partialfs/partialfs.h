@@ -1,13 +1,11 @@
 #ifndef _PARTIALFS_H_
 #define _PARTIALFS_H_
 
+#define FUSE_USE_VERSION 26
+
+#include <fuse.h>
 #include <stddef.h>
 #include <stdint.h>
-
-/* init partialfs
- * return 0 on success, -1 if failed
- */
-extern int pfs_init(void);
 
 /* a path is a 'file path' if it doesn't ends with '/', such:
  *      /usr/local
@@ -45,5 +43,7 @@ extern int pfs_deny_path(const char * path, size_t path_len);
  */
 extern int pfs_get_path_visibility(const char * path, 
         size_t path_len); 
+
+extern struct fuse_operations partialfs_oper;
 
 #endif

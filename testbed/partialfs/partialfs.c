@@ -1,9 +1,12 @@
 #define _GNU_SOURCE
+#include <fuse.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
+#include <dirent.h>
 #include "radix.h"
 #include "partialfs.h"
 
@@ -33,11 +36,6 @@ typedef struct path_ctrl_t {
 } path_ctrl_t;
 
 static rdx_tree_t hier_ctrl;
-
-int pfs_init() {
-    rdx_tree_init(&hier_ctrl);
-    return pfs_deny_path("/", 1);
-}
 
 static int _pfs_ctrl_path(const char * path, size_t path_len, int allow) {
 
@@ -195,216 +193,288 @@ int pfs_get_path_visibility(const char * path,
 
 }
 
+static inline int pfs_err() {
+    return -errno;
+}
 
 
 /* fuse ops 
  */
 
-#if 0
 
+int partialfs_getattr(const char * path, struct stat * stbuf) {
+    int r;
 
-int partial_getattr(const char * path, struct stat * stbuf) {
+    if (!pfs_get_path_visibility(path, 0))
+        return -ENOENT;
+
+    r = lstat(path, stbuf);
+    if (r < 0)
+        r = pfs_err();
+    return r;
 }
 
-int partial_readlink(const char * path, char * buf, size_t sz) {
-    path_info_t pi;
-    path_operations_t * ops;
+int partialfs_readlink(const char * path, char * buf, size_t sz) {
+    int r;
 
-    ops = get_path_ops(path, &pi);
-    assert(ops);
-
-    return (ops->readlink)(&pi, buf, sz);
-}
-
-int partial_mknod(const char * path, mode_t mode, dev_t dev) {
-    return EROFS;
-}
-
-int partial_mkdir(const char * path, mode_t mode) {
-    return EROFS;
-}
-
-int partial_unlink(const char * path) {
-    return EROFS;
-}
-
-int partial_rmdir(const char * path) {
-    return EROFS;
-}
-
-int partial_symlink(const char * path, const char * link) {
-    return EROFS;
-}
-
-int partial_rename(const char * path, const char * newpath) {
-    return EROFS;
-}
-
-int partial_link(const char * path, const char * link) {
-    return EROFS;
-}
-
-int partial_chmod(const char * path, mode_t mode) {
-    return EROFS;
-}
-
-int partial_chown(const char * path, uid_t uid, gid_t gid) {
-    return EROFS;
-}
-
-int partial_truncate(const char * path, off_t off) {
-    return EROFS;
-}
-
-int partial_open(const char * path, struct fuse_file_info * fi) {
-
-    path_info_t pi;
-    path_operations_t * ops;
-    int fd;
-    file_handler_t * fh;
-    static int allow_mask = ~(O_RDONLY | O_EXCL | O_NONBLOCK | 
-        O_DSYNC | O_RSYNC | O_SYNC);
-    
-    if (fi->flags & allow_mask)
-        return EROFS;
-
-    ops = get_path_ops(path, &pi);
-    assert(ops);
-
-    fd = (ops->open)(&pi, fi);
-    if (fd < 0)
-        return fd;
-    
-    // overwrite fi->fh to store more data
-    fh = (file_handler_t *)malloc(sizeof(file_handler_t));
-    if (!fh) {
-        (ops->release)(&pi, fi);
-        return -1;
+    if (!pfs_get_path_visibility(path, 0))
+        return -ENOENT;
+    r = readlink(path, buf, sz - 1);
+    if (r < 0)
+        r = pfs_err();
+    else {
+        buf[r] = '\0';
+        r = 0;
     }
-    fh->fh = fi->fh;
-    fh->ops = ops;
-    fh->rel_off = pi.rel_part - pi.full_path;
-    SAVE_FH(fi, fh);
+    return r;
+}
 
+int partialfs_mknod(const char * path, mode_t mode, dev_t dev) {
+    return -EROFS;
+}
+
+int partialfs_mkdir(const char * path, mode_t mode) {
+    return -EROFS;
+}
+
+int partialfs_unlink(const char * path) {
+    return -EROFS;
+}
+
+int partialfs_rmdir(const char * path) {
+    return -EROFS;
+}
+
+int partialfs_symlink(const char * path, const char * link) {
+    return -EROFS;
+}
+
+int partialfs_rename(const char * path, const char * newpath) {
+    return -EROFS;
+}
+
+int partialfs_link(const char * path, const char * link) {
+    return -EROFS;
+}
+
+int partialfs_chmod(const char * path, mode_t mode) {
+    return -EROFS;
+}
+
+int partialfs_chown(const char * path, uid_t uid, gid_t gid) {
+    return -EROFS;
+}
+
+int partialfs_truncate(const char * path, off_t off) {
+    return -EROFS;
+}
+
+int partialfs_open(const char * path, struct fuse_file_info * fi) {
+
+    static int allow_mask = ~(O_RDONLY | O_EXCL 
+        | O_NOCTTY
+        | O_NONBLOCK
+        | O_NDELAY
+        | O_ASYNC
+#ifdef __USE_GNU
+        | O_DIRECTORY
+        | O_NOFOLLOW
+        | O_NOATIME
+        | O_CLOEXEC
+#endif
+        );
+    int fd;
+
+    if (fi->flags & allow_mask)
+        return -EROFS;
+    if (!pfs_get_path_visibility(path, 0))
+        return -ENOENT;
+    fd = open(path, fi->flags);
+    if (fd < 0)
+        fd = pfs_err();
+    else
+        fi->fh = (uint64_t)fd;
     return fd;
 }
 
-int partial_read(const char * path, char * buf, size_t size, off_t off,
+int partialfs_read(const char * path, char * buf, size_t size, off_t off,
          struct fuse_file_info * fi) {
+    int r;
 
-    path_info_t pi;
-    file_handler_t * fh;
-    int ret;
-
-    RESTORE_FH(path, fi, pi, fh);
-    ret = (fh->ops->read)(&pi, buf, size, off, fi);
-    SAVE_FH(fi, fh);
-    return ret;
+    r = pread(fi->fh, buf, size, off);
+    if (r < 0)
+        r = pfs_err();
+    return r;
 }
 
-int partial_write(const char * path, const char * buf, size_t size, off_t off,
+int partialfs_write(const char * path, const char * buf, size_t size, off_t off,
           struct fuse_file_info * fi) {
-    return EROFS;
+    return -EROFS;
 }
 
-int partial_statfs(const char * path, struct statvfs * stat) {
-    path_info_t pi;
-    path_operations_t * ops;
-
-    ops = get_path_ops(path, &pi);
-    assert(ops);
-
-    return (ops->statfs)(&pi, stat);
+int partialfs_statfs(const char * path, struct statvfs * stat) {
+    return -ENOSYS;
 }
 
-int partial_flush(const char * path, struct fuse_file_info * fi) {
+int partialfs_flush(const char * path, struct fuse_file_info * fi) {
     return 0;
 }
 
-int partial_release(const char * path, struct fuse_file_info * fi) {
-    path_info_t pi;
-    file_handler_t * fh;
-    int ret;
-
-    RESTORE_FH(path, fi, pi, fh);
-    ret = (fh->ops->release)(&pi, fi);
-    free(fh);
-    return ret;
+int partialfs_release(const char * path, struct fuse_file_info * fi) {
+    return close(fi->fh);
 }
 
-int partial_fsync(const char * path, int datasync, struct fuse_file_info * fi) {
+int partialfs_fsync(const char * path, int datasync, struct fuse_file_info * fi) {
     return 0;
 }
 
-int partial_setxattr(const char * path, const char * name, const char * value, 
-        size_t size, int flags) {
-    return EROFS;
+int partialfs_opendir(const char * path, struct fuse_file_info * fi) {
+    DIR * dp;
+
+    if (!pfs_get_path_visibility(path, 0))
+        return -ENOENT;
+    dp = opendir(path);
+    if (dp == NULL)
+        return pfs_err();
+    fi->fh = (uint64_t)dp;
+    return 0;
 }
 
-int partial_getxattr(const char * path, const char * name, char * value, size_t size) {
-    path_info_t pi;
-    path_operations_t * ops;
-
-    ops = get_path_ops(path, &pi);
-    assert(ops);
-
-    return (ops->getxattr)(&pi, name, value, size);
-}
-
-int partial_listxattr(const char * path, char * list, size_t size) {
-    path_info_t pi;
-    path_operations_t * ops;
-
-    ops = get_path_ops(path, &pi);
-    assert(ops);
-
-    return (ops->listxattr)(&pi, list, size);
-}
-
-int partial_removexattr(const char * path, const char * name) {
-    return EROFS;
-}
-
-int partial_opendir(const char * path, struct fuse_file_info * fi) {
-}
-
-int partial_readdir(const char * path, void * buf, fuse_fill_dir_t filler, 
+int partialfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler, 
         off_t off,
         struct fuse_file_info * fi) {
+    DIR * dp;
+    struct dirent * de;
+    const char * dname;
+    size_t path_len, dname_len, sub_path_len;
+
+    // make it a file path
+    path_len = strlen(path);
+    if (IS_DPATH(path, path_len))
+        --path_len;
+
+    dp = (DIR *)fi->fh;
+
+    errno = 0;
+
+    while ((de = readdir(dp)) != NULL) {
+        if (strcmp(dname, ".") != 0 && strcmp(dname, "..") != 0) {
+            dname = de->d_name;
+            dname_len = strlen(dname);
+
+            // sub_path: "path/dname"
+            sub_path_len = path_len + dname_len + 1;
+            char sub_path[sub_path_len + 1];
+
+            strncpy(sub_path, path, path_len);
+            sub_path[path_len] = '/';
+            strncpy(sub_path + path_len + 1, dname, dname_len);
+            sub_path[sub_path_len - 1] = '\0';
+
+            // check visibility
+            if (!pfs_get_path_visibility(sub_path, sub_path_len))
+                continue;
+        }
+        if (filler(buf, dname, NULL, 0) != 0)
+            return -ENOMEM;
+    }
+
+    // err
+    if (errno > 0)
+        return pfs_err();
+
+    return 0;
+
 }
 
-int partial_releasedir(const char * path, struct fuse_file_info * fi) {
+int partialfs_releasedir(const char * path, struct fuse_file_info * fi) {
+    int r;
+
+    r = closedir((DIR *)fi->fh);
+    if (r < 0)
+        return pfs_err();
+    return r;
 }
 
-int partial_fsyncdir(const char * path, int datasync, struct fuse_file_info * fi) {
+int partialfs_fsyncdir(const char * path, int datasync, struct fuse_file_info * fi) {
+    return 0;
 }
 
-void *partial_init(struct fuse_conn_info * conn) {
+void * partialfs_init(struct fuse_conn_info * conn) {
+    rdx_tree_init(&hier_ctrl);
+    pfs_deny_path("/", 1);
+
+    return NULL;
 }
 
-void partial_destroy(void * userdata) {
+void partialfs_destroy(void * userdata) {
+    rdx_tree_fini(&hier_ctrl);
 }
 
-int partial_access(const char * path, int mask) {
+int partialfs_access(const char * path, int mask) {
+    int r;
+
+    if (!pfs_get_path_visibility(path, 0))
+        return -ENOENT;
+    r = access(path, mask);
+    if (r < 0)
+        return pfs_err();
+    return r;
 }
 
-int partial_create(const char * path, mode_t mode, struct fuse_file_info * fi) {
+int partialfs_create(const char * path, mode_t mode, struct fuse_file_info * fi) {
+    return -EROFS;
 }
 
-int partial_ftruncate(const char * path, off_t off, struct fuse_file_info * fi) {
+int partialfs_ftruncate(const char * path, off_t off, struct fuse_file_info * fi) {
+    return -EROFS;
 }
 
-int partial_fgetattr(const char * path, struct stat * statbuf, struct fuse_file_info * fi) {
+int partialfs_fgetattr(const char * path, struct stat * statbuf, struct fuse_file_info * fi) {
+    int r;
+
+    r = fstat(fi->fh, statbuf);
+    if (r < 0)
+        return pfs_err();
+    return r;
 }
 
-int partial_lock(const char * path, struct fuse_file_info * fi, int cmd,
-         struct flock * fl) {
-}
-
-int partial_utimens(const char * path, const struct timespec tv[2]) {
-}
-
-struct fuse_operations partialfs_oper;
-
+struct fuse_operations partialfs_oper = {
+    .getattr        = partialfs_getattr,
+    .readlink       = partialfs_readlink,
+    .mknod          = partialfs_mknod,
+    .mkdir          = partialfs_mkdir,
+    .unlink         = partialfs_unlink,
+    .rmdir          = partialfs_rmdir,
+    .symlink        = partialfs_symlink,
+    .rename         = partialfs_rename,
+    .link           = partialfs_link,
+    .chmod          = partialfs_chmod,
+    .chown          = partialfs_chown,
+    .truncate       = partialfs_truncate,
+    .open           = partialfs_open,
+    .read           = partialfs_read,
+    .write          = partialfs_write,
+    .statfs         = partialfs_statfs,
+    .flush          = partialfs_flush,
+    .release        = partialfs_release,
+    .fsync          = partialfs_fsync,
+#if 0
+    .setxattr       = partialfs_setxattr,
+    .getxattr       = partialfs_getxattr,
+    .listxattr      = partialfs_listxattr,
+    .removexattr    = partialfs_removexattr,
 #endif
+    .opendir        = partialfs_opendir,
+    .readdir        = partialfs_readdir,
+    .releasedir     = partialfs_releasedir,
+    .fsyncdir       = partialfs_fsyncdir,
+    .init           = partialfs_init,
+    .destroy        = partialfs_destroy,
+    .access         = partialfs_access,
+    .create         = partialfs_create,
+    .ftruncate      = partialfs_ftruncate,
+    .fgetattr       = partialfs_fgetattr
+};
+
 
