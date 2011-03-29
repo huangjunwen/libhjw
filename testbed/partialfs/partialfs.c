@@ -202,6 +202,11 @@ typedef union {
     uint64_t u64;
 } fh_t;
 
+#define FH_STORE_INT(fh, _i) ((fh_t *)(&(fh)))->i= (int)(_i)
+#define FH_STORE_PTR(fh, _ptr) ((fh_t *)(&(fh)))->ptr = (void *)(_ptr)
+#define FH_AS_INT(fh) (((fh_t *)(&(fh)))->i)
+#define FH_AS_PTR(fh) (((fh_t *)(&(fh)))->ptr)
+
 /* fuse ops 
  */
 
@@ -297,7 +302,7 @@ int partialfs_open(const char * path, struct fuse_file_info * fi) {
     if (fd < 0)
         fd = pfs_err();
     else
-        fi->fh = (uint64_t)fd;
+        FH_STORE_INT(fi->fh, fd);
     return fd;
 }
 
@@ -305,7 +310,7 @@ int partialfs_read(const char * path, char * buf, size_t size, off_t off,
          struct fuse_file_info * fi) {
     int r;
 
-    r = pread(fi->fh, buf, size, off);
+    r = pread(FH_AS_INT(fi->fh), buf, size, off);
     if (r < 0)
         r = pfs_err();
     return r;
@@ -325,7 +330,7 @@ int partialfs_flush(const char * path, struct fuse_file_info * fi) {
 }
 
 int partialfs_release(const char * path, struct fuse_file_info * fi) {
-    return close(fi->fh);
+    return close(FH_AS_INT(fi->fh));
 }
 
 int partialfs_fsync(const char * path, int datasync, struct fuse_file_info * fi) {
@@ -334,15 +339,13 @@ int partialfs_fsync(const char * path, int datasync, struct fuse_file_info * fi)
 
 int partialfs_opendir(const char * path, struct fuse_file_info * fi) {
     DIR * dp;
-    fh_t * pfh;
 
     if (!pfs_get_path_visibility(path, 0))
         return -ENOENT;
     dp = opendir(path);
     if (dp == NULL)
         return pfs_err();
-    pfh = (fh_t *)&fi->fh;
-    pfh->ptr = (void *)dp;
+    FH_STORE_PTR(fi->fh, dp);
     
     return 0;
 }
@@ -360,7 +363,7 @@ int partialfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler,
     if (IS_DPATH(path, path_len))
         --path_len;
 
-    dp = (DIR *)((fh_t)fi->fh).ptr;
+    dp = (DIR *)FH_AS_PTR(fi->fh);
 
     errno = 0;
 
@@ -397,7 +400,7 @@ int partialfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler,
 int partialfs_releasedir(const char * path, struct fuse_file_info * fi) {
     int r;
 
-    r = closedir((DIR *)((fh_t)fi->fh).ptr);
+    r = closedir((DIR *)FH_AS_PTR(fi->fh));
     if (r < 0)
         return pfs_err();
     return r;
