@@ -6,13 +6,20 @@
 #include <errno.h>
 #include <unistd.h>
 #include <dirent.h>
+#include "log.h"
 #include "radix.h"
 #include "partialfs.h"
 
 #define CHECK_PATH(path, path_len) \
     if (!(path_len)) (path_len) = strlen((path)); \
-    if (!(path_len)) return -1; \
-    if ((path)[0] != '/') return -1;
+    if (!(path_len)) { \
+        pfs_log_err(("empty path")); \
+        return -1; \
+    } \
+    if ((path)[0] != '/') { \
+        pfs_log_err(("'%.*s' not starts with '/'", path_len, path)); \
+        return -1; \
+    }
 
 #define IS_FPATH(path, path_len) ((path)[(path_len) - 1] != '/')
 #define IS_DPATH(path, path_len) ((path)[(path_len) - 1] == '/')
@@ -60,6 +67,7 @@ void pfs_init() {
     r = pfs_deny_path("/", 1);
     assert(r == 0);
     is_pfs_init = 1;
+    pfs_log_info(("file system init done"));
 }
 
 static int _pfs_ctrl_path(const char * path, size_t path_len, int allow) {
@@ -73,14 +81,18 @@ static int _pfs_ctrl_path(const char * path, size_t path_len, int allow) {
 
     // insert
     node = rdx_tree_ensure(&hier_ctrl, path, path_len, &err);
-    if (err)
+    if (err) {
+        pfs_log_err(("not enough memory (radix tree)"));
         return -1;      // not enough memory
+    }
 
     pctl = (path_ctrl_t *)node->val;
     if (!pctl) {
         pctl = (path_ctrl_t *)malloc(sizeof(path_ctrl_t));
-        if (!pctl)
+        if (!pctl) {
+            pfs_log_err(("not enough memory (path control)"));
             return -1;
+        }
     }
 
     // fill
@@ -93,6 +105,9 @@ static int _pfs_ctrl_path(const char * path, size_t path_len, int allow) {
     }
     pctl->allow = allow ? 1 : 0;
     node->val = (void *)pctl;
+    pfs_log_info(("%s '%.*s' (%s, %d)", allow ? "allow" : "deny",
+            path_len, path, pctl->is_fpath ? "file path" : "dir path",
+            pctl->path_level));
     return 0;
 }
 
@@ -128,10 +143,13 @@ static rdx_node_t * _path_prefix_iter_begin(const char * path,
 
     rdx_node_t * pfx;
 
+    pfs_log_debug(("find prefix for: %.*s", path_len, path));
     pfx = rdx_prefix_iter_begin(&hier_ctrl, path, path_len, iter);
     while (pfx) {
-        if (_prefix_is_path_prefix(pfx, path))
+        if (_prefix_is_path_prefix(pfx, path)) {
+            pfs_log_debug(("found prefix: %s", pfx->key));
             return pfx;
+        }
         pfx = rdx_prefix_iter_next(iter);
     }
     return NULL;
@@ -147,8 +165,10 @@ static rdx_node_t * _path_prefix_iter_next(rdx_prefix_iter_t * iter) {
         pfx = rdx_prefix_iter_next(iter);
         if (!pfx)
             break;
-        if (_prefix_is_path_prefix(pfx, path))
+        if (_prefix_is_path_prefix(pfx, path)) {
+            pfs_log_debug(("found prefix: %s", pfx->key));
             return pfx;
+        }
     }
     return NULL;
 }
