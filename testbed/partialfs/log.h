@@ -15,14 +15,39 @@
 
 extern void pfs_log_init(void);
 
-extern void pfs_log_debug(const char * format, ...);
+#if PFS_LOG_LEVEL <= PFS_LOG_LVL_DEBUG
+extern void _pfs_log_debug(const char * format, ...);
+#define pfs_log_debug(args) _pfs_log_debug args
+#else
+#define pfs_log_debug(args)
+#endif
 
-extern void pfs_log_info(const char * format, ...);
+#if PFS_LOG_LEVEL <= PFS_LOG_LVL_INFO
+extern void _pfs_log_info(const char * format, ...);
+#define pfs_log_info(args) _pfs_log_info args
+#else
+#define pfs_log_info(args)
+#endif
 
-extern void pfs_log_warning(const char * format, ...);
+#if PFS_LOG_LEVEL <= PFS_LOG_LVL_WARNING
+extern void _pfs_log_warning(const char * format, ...);
+#define pfs_log_warning(args) _pfs_log_warning args
+#else
+#define pfs_log_warning(args)
+#endif
 
-extern void pfs_log_err(const char * format, ...);
+#if PFS_LOG_LEVEL <= PFS_LOG_LVL_ERR
+extern void _pfs_log_err(const char * format, ...);
+#define pfs_log_err(args) _pfs_log_err args
+#else
+#define pfs_log_err(args)
+#endif
 
-extern void pfs_log_crit(const char * format, ...);
+#if PFS_LOG_LEVEL <= PFS_LOG_LVL_CRIT
+extern void _pfs_log_crit(const char * format, ...);
+#define pfs_log_crit(args) _pfs_log_crit args
+#else
+#define pfs_log_crit(args)
+#endif
 
 #endif
