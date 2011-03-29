@@ -17,6 +17,19 @@
 #define IS_FPATH(path, path_len) ((path)[(path_len) - 1] != '/')
 #define IS_DPATH(path, path_len) ((path)[(path_len) - 1] == '/')
 
+#define FH_STORE_INT(fh, _i) ((fh_t *)(&(fh)))->i= (int)(_i)
+#define FH_STORE_PTR(fh, _ptr) ((fh_t *)(&(fh)))->ptr = (void *)(_ptr)
+#define FH_AS_INT(fh) (((fh_t *)(&(fh)))->i)
+#define FH_AS_PTR(fh) (((fh_t *)(&(fh)))->ptr)
+
+/* helper structure to manuplate fh field in file info
+ */
+typedef union {
+    int i;
+    void * ptr;
+    uint64_t u64;
+} fh_t;
+
 /* path control 
  */
 typedef struct path_ctrl_t {
@@ -35,6 +48,19 @@ typedef struct path_ctrl_t {
 } path_ctrl_t;
 
 static rdx_tree_t hier_ctrl;
+
+static int is_pfs_init = 0;
+
+void pfs_init() {
+    int r;
+
+    if (is_pfs_init)
+        return;
+    rdx_tree_init(&hier_ctrl);
+    r = pfs_deny_path("/", 1);
+    assert(r == 0);
+    is_pfs_init = 1;
+}
 
 static int _pfs_ctrl_path(const char * path, size_t path_len, int allow) {
 
@@ -195,17 +221,6 @@ int pfs_get_path_visibility(const char * path,
 static inline int pfs_err() {
     return -errno;
 }
-
-typedef union {
-    int i;
-    void * ptr;
-    uint64_t u64;
-} fh_t;
-
-#define FH_STORE_INT(fh, _i) ((fh_t *)(&(fh)))->i= (int)(_i)
-#define FH_STORE_PTR(fh, _ptr) ((fh_t *)(&(fh)))->ptr = (void *)(_ptr)
-#define FH_AS_INT(fh) (((fh_t *)(&(fh)))->i)
-#define FH_AS_PTR(fh) (((fh_t *)(&(fh)))->ptr)
 
 /* fuse ops 
  */
@@ -411,9 +426,8 @@ int partialfs_fsyncdir(const char * path, int datasync, struct fuse_file_info * 
 }
 
 void * partialfs_init(struct fuse_conn_info * conn) {
-    rdx_tree_init(&hier_ctrl);
-    pfs_deny_path("/", 1);
-
+    if (!is_pfs_init)
+        pfs_init();
     return NULL;
 }
 

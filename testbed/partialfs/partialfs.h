@@ -5,6 +5,10 @@
 
 #include <fuse.h>
 
+/* init pfs
+ */
+extern void pfs_init(void);
+
 /* a path is a 'file path' if it doesn't ends with '/', such:
  *      /usr/local
  *      /home
