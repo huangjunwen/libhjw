@@ -1,11 +1,12 @@
 #ifndef _LOG_H_
 #define _LOG_H_
 
-#define PFS_LOG_LVL_CRIT (4)
-#define PFS_LOG_LVL_ERR (3)
-#define PFS_LOG_LVL_WARNING (2)
-#define PFS_LOG_LVL_INFO (1)
-#define PFS_LOG_LVL_DEBUG (0)
+#define PFS_LOG_LVL_CRIT (5)
+#define PFS_LOG_LVL_ERR (4)
+#define PFS_LOG_LVL_WARNING (3)
+#define PFS_LOG_LVL_INFO (2)
+#define PFS_LOG_LVL_DEBUG (1)
+#define PFS_LOG_LVL_VERBOSE (0)
 
 // define global log level
 // only log greater or equal LOG_LEVEL will be log down
@@ -14,6 +15,13 @@
 #endif
 
 extern void pfs_log_init(void);
+
+#if PFS_LOG_LEVEL <= PFS_LOG_LVL_VERBOSE
+extern void _pfs_log_verbose(const char * format, ...);
+#define pfs_log_verbose(args) _pfs_log_verbose args
+#else
+#define pfs_log_verbose(args)
+#endif
 
 #if PFS_LOG_LEVEL <= PFS_LOG_LVL_DEBUG
 extern void _pfs_log_debug(const char * format, ...);

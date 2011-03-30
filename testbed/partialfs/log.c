@@ -21,6 +21,15 @@ static inline void _pfs_vlog(int log_lvl, const char * prefix,
             sz >= LOG_MAX_LEN ? " (...truncated)" : "");
 }
 
+#if PFS_LOG_LEVEL <= PFS_LOG_LVL_VERBOSE
+void _pfs_log_verbose(const char * format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    _pfs_vlog(LOG_DEBUG, "[verbose]", format, ap);
+    va_end(ap);
+}
+#endif
+
 #if PFS_LOG_LEVEL <= PFS_LOG_LVL_DEBUG
 void _pfs_log_debug(const char * format, ...) {
     va_list ap;

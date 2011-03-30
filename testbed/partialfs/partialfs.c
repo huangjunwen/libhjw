@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <limits.h>
 #include "log.h"
 #include "radix.h"
 #include "partialfs.h"
@@ -143,11 +144,11 @@ static rdx_node_t * _path_prefix_iter_begin(const char * path,
 
     rdx_node_t * pfx;
 
-    pfs_log_debug(("find prefix for: %.*s", path_len, path));
     pfx = rdx_prefix_iter_begin(&hier_ctrl, path, path_len, iter);
     while (pfx) {
         if (_prefix_is_path_prefix(pfx, path)) {
-            pfs_log_debug(("found prefix: %s", pfx->key));
+            pfs_log_verbose((" %c%s", 
+                    ((path_ctrl_t *)pfx->val)->allow ? '+' : '-', pfx->key));
             return pfx;
         }
         pfx = rdx_prefix_iter_next(iter);
@@ -166,7 +167,8 @@ static rdx_node_t * _path_prefix_iter_next(rdx_prefix_iter_t * iter) {
         if (!pfx)
             break;
         if (_prefix_is_path_prefix(pfx, path)) {
-            pfs_log_debug(("found prefix: %s", pfx->key));
+            pfs_log_verbose((" %c%s", 
+                    ((path_ctrl_t *)pfx->val)->allow ? '+' : '-', pfx->key));
             return pfx;
         }
     }
@@ -192,6 +194,8 @@ int pfs_get_path_visibility(const char * path,
             return 1;
     }
 
+    pfs_log_verbose(("get path visibility: '%.*s'", path_len, path));
+
     // '/' should always here
     pfx = _path_prefix_iter_begin(path, path_len, &iter);
     assert(pfx && pfx->key[0] == '/' && pfx->keylen == 1);
@@ -212,14 +216,18 @@ int pfs_get_path_visibility(const char * path,
         // we are under an invisible dir
         // and at least one intermediate path is not in 
         // hier_ctrl so by default its invisible
-        if (!default_allow && pctl->path_level != expect_level)
+        if (!default_allow && pctl->path_level != expect_level) {
+            pfs_log_verbose(("path invisible since in invisible dir"));
             return 0;
+        }
 
         // file path
         if (pctl->is_fpath) {
             // explicit deny
-            if (!pctl->allow)
+            if (!pctl->allow) {
+                pfs_log_verbose(("path invisible since explicit declare"));
                 return 0;
+            }
             ++expect_level;
             continue;
         }
@@ -231,14 +239,18 @@ int pfs_get_path_visibility(const char * path,
 
     // in a visible dir
     // or no remain
-    if (default_allow|| !remain)
+    if (default_allow|| !remain) {
+        pfs_log_verbose(("path visible"));
         return 1;
+    }
 
+    pfs_log_verbose(("path invisible"));
     return 0;
 
 }
 
-static inline int pfs_err() {
+static inline int pfs_err(const char * fname) {
+    pfs_log_debug(("%s <== %s", strerror(errno), fname));
     return -errno;
 }
 
@@ -249,27 +261,38 @@ static inline int pfs_err() {
 int partialfs_getattr(const char * path, struct stat * stbuf) {
     int r;
 
-    if (!pfs_get_path_visibility(path, 0))
+    pfs_log_debug(("==> getattr('%s', %p)", path, stbuf));
+
+    if (!pfs_get_path_visibility(path, 0)) {
+        pfs_log_debug(("%s <== getattr", strerror(ENOENT)));
         return -ENOENT;
+    }
 
     r = lstat(path, stbuf);
     if (r < 0)
-        r = pfs_err();
+        r = pfs_err("getattr");
+
     return r;
 }
 
 int partialfs_readlink(const char * path, char * buf, size_t sz) {
     int r;
 
-    if (!pfs_get_path_visibility(path, 0))
+    pfs_log_debug(("==> readlink('%s', %p, %d)", path, buf, sz));
+
+    if (!pfs_get_path_visibility(path, 0)) {
+        pfs_log_debug(("%s <== readlink", strerror(ENOENT)));
         return -ENOENT;
+    }
+
     r = readlink(path, buf, sz - 1);
     if (r < 0)
-        r = pfs_err();
+        r = pfs_err("readlink");
     else {
         buf[r] = '\0';
         r = 0;
     }
+
     return r;
 }
 
@@ -329,13 +352,21 @@ int partialfs_open(const char * path, struct fuse_file_info * fi) {
         );
     int fd;
 
-    if (fi->flags & allow_mask)
+    pfs_log_debug(("==> open('%s', %p)", path, fi));
+
+    if (fi->flags & allow_mask) {
+        pfs_log_debug(("%s <== open", strerror(EROFS)));
         return -EROFS;
-    if (!pfs_get_path_visibility(path, 0))
+    }
+
+    if (!pfs_get_path_visibility(path, 0)) {
+        pfs_log_debug(("%s <== open", strerror(ENOENT)));
         return -ENOENT;
+    }
+
     fd = open(path, fi->flags);
     if (fd < 0)
-        fd = pfs_err();
+        fd = pfs_err("open");
     else
         FH_STORE_INT(fi->fh, fd);
     return fd;
@@ -345,9 +376,12 @@ int partialfs_read(const char * path, char * buf, size_t size, off_t off,
          struct fuse_file_info * fi) {
     int r;
 
+    pfs_log_debug(("==> read('%s', %d, %d, %d, %p)", path, buf, size,
+                off, fi));
+
     r = pread(FH_AS_INT(fi->fh), buf, size, off);
     if (r < 0)
-        r = pfs_err();
+        r = pfs_err("read");
     return r;
 }
 
@@ -375,11 +409,16 @@ int partialfs_fsync(const char * path, int datasync, struct fuse_file_info * fi)
 int partialfs_opendir(const char * path, struct fuse_file_info * fi) {
     DIR * dp;
 
-    if (!pfs_get_path_visibility(path, 0))
+    pfs_log_debug(("==> opendir('%s', %p)", path, fi));
+
+    if (!pfs_get_path_visibility(path, 0)) {
+        pfs_log_debug(("%s <== opendir", strerror(ENOENT)));
         return -ENOENT;
+    }
+
     dp = opendir(path);
     if (dp == NULL)
-        return pfs_err();
+        return pfs_err("opendir");
     FH_STORE_PTR(fi->fh, dp);
     
     return 0;
@@ -390,8 +429,12 @@ int partialfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler,
         struct fuse_file_info * fi) {
     DIR * dp;
     struct dirent * de;
-    const char * dname;
-    size_t path_len, dname_len, sub_path_len;
+    const char * d_name;
+    size_t path_len, sub_path_len;
+    char sub_path[PATH_MAX + 1];
+
+    pfs_log_debug(("==> readdir('%s', %p, %p, %d, %p)", path, buf,
+                filler, off, fi));
 
     // make it a file path
     path_len = strlen(path);
@@ -399,34 +442,39 @@ int partialfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler,
         --path_len;
 
     dp = (DIR *)FH_AS_PTR(fi->fh);
-
     errno = 0;
+    sub_path[PATH_MAX] = '\0';
 
+    seekdir(dp, off);
     while ((de = readdir(dp)) != NULL) {
-        if (strcmp(dname, ".") != 0 && strcmp(dname, "..") != 0) {
-            dname = de->d_name;
-            dname_len = strlen(dname);
+        d_name = de->d_name;
 
-            // sub_path: "path/dname"
-            sub_path_len = path_len + dname_len + 1;
-            char sub_path[sub_path_len + 1];
+        // don't check '..' and '.'
+        if (d_name[0] == '.' && (d_name[1] == '\0' || (d_name[1] == '.' 
+                        && d_name[2] == '\0')))
+            goto FILL_DIR_ENTRY;
 
-            strncpy(sub_path, path, path_len);
-            sub_path[path_len] = '/';
-            strncpy(sub_path + path_len + 1, dname, dname_len);
-            sub_path[sub_path_len - 1] = '\0';
+        // make the full path of a dir entry
+        sub_path_len = snprintf(sub_path, PATH_MAX, "%.*s/%s", 
+                path_len, path, d_name);
+        // this should not happen since the origin file system
+        // will guarantee that no path can exceed PATH_MAX
+        assert(sub_path_len < PATH_MAX);
 
-            // check visibility
-            if (!pfs_get_path_visibility(sub_path, sub_path_len))
-                continue;
-        }
-        if (filler(buf, dname, NULL, 0) != 0)
-            return -ENOMEM;
+        // check visibility
+        if (!pfs_get_path_visibility(sub_path, sub_path_len))
+            continue;
+        
+FILL_DIR_ENTRY:
+        // get the offset of the next entry
+        off = telldir(dp);
+        if (filler(buf, d_name, NULL, off))
+            break;
     }
 
     // err
     if (errno > 0)
-        return pfs_err();
+        return pfs_err("readdir");
 
     return 0;
 
@@ -435,9 +483,11 @@ int partialfs_readdir(const char * path, void * buf, fuse_fill_dir_t filler,
 int partialfs_releasedir(const char * path, struct fuse_file_info * fi) {
     int r;
 
+    pfs_log_debug(("==> releasedir('%s', %p)", path, fi));
+
     r = closedir((DIR *)FH_AS_PTR(fi->fh));
     if (r < 0)
-        return pfs_err();
+        return pfs_err("releasedir");
     return r;
 }
 
@@ -452,17 +502,33 @@ void * partialfs_init(struct fuse_conn_info * conn) {
 }
 
 void partialfs_destroy(void * userdata) {
+    rdx_iter_t iter;
+    rdx_node_t * node;
+
+    node = rdx_iter_begin(&hier_ctrl, &iter);
+    while (node) {
+        free(node->val);
+        node = rdx_iter_next(&iter);
+    }
+    
     rdx_tree_fini(&hier_ctrl);
+
+    pfs_log_info(("file system fini done"));
 }
 
 int partialfs_access(const char * path, int mask) {
     int r;
 
-    if (!pfs_get_path_visibility(path, 0))
+    pfs_log_debug(("==> access('%s', %d)", path, mask));
+
+    if (!pfs_get_path_visibility(path, 0)) {
+        pfs_log_debug(("%s <== access", strerror(ENOENT)));
         return -ENOENT;
+    }
+
     r = access(path, mask);
     if (r < 0)
-        return pfs_err();
+        return pfs_err("access");
     return r;
 }
 
@@ -477,9 +543,11 @@ int partialfs_ftruncate(const char * path, off_t off, struct fuse_file_info * fi
 int partialfs_fgetattr(const char * path, struct stat * statbuf, struct fuse_file_info * fi) {
     int r;
 
-    r = fstat(fi->fh, statbuf);
+    pfs_log_debug(("==> fgetattr('%s', %p, %p)", path, statbuf, fi));
+
+    r = fstat(FH_AS_INT(fi->fh), statbuf);
     if (r < 0)
-        return pfs_err();
+        return pfs_err("fgetattr");
     return r;
 }
 
