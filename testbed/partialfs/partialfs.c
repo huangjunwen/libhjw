@@ -250,7 +250,7 @@ int pfs_get_path_visibility(const char * path,
 }
 
 static inline int pfs_err(const char * fname) {
-    pfs_log_debug(("%s <== %s", strerror(errno), fname));
+    pfs_log_debug((" %s err: %s", fname, strerror(errno)));
     return -errno;
 }
 
@@ -264,7 +264,7 @@ int partialfs_getattr(const char * path, struct stat * stbuf) {
     pfs_log_debug(("==> getattr('%s', %p)", path, stbuf));
 
     if (!pfs_get_path_visibility(path, 0)) {
-        pfs_log_debug(("%s <== getattr", strerror(ENOENT)));
+        pfs_log_debug((" getattr err: %s", strerror(ENOENT)));
         return -ENOENT;
     }
 
@@ -281,7 +281,7 @@ int partialfs_readlink(const char * path, char * buf, size_t sz) {
     pfs_log_debug(("==> readlink('%s', %p, %d)", path, buf, sz));
 
     if (!pfs_get_path_visibility(path, 0)) {
-        pfs_log_debug(("%s <== readlink", strerror(ENOENT)));
+        pfs_log_debug((" readlink err: %s", strerror(ENOENT)));
         return -ENOENT;
     }
 
@@ -338,6 +338,7 @@ int partialfs_truncate(const char * path, off_t off) {
 
 int partialfs_open(const char * path, struct fuse_file_info * fi) {
 
+#if 0
     static int allow_mask = ~(O_RDONLY | O_EXCL 
         | O_NOCTTY
         | O_NONBLOCK
@@ -350,34 +351,42 @@ int partialfs_open(const char * path, struct fuse_file_info * fi) {
         | O_CLOEXEC
 #endif
         );
-    int fd;
+#endif
+    int r, fd;
 
-    pfs_log_debug(("==> open('%s', %p)", path, fi));
+    pfs_log_debug(("==> open('%s', flags=%d, direct_io=%u, keep_cache=%u, "
+                "flush=%u)", path, fi->flags, fi->direct_io,
+                fi->keep_cache, fi->flush));
 
+#if 0
     if (fi->flags & allow_mask) {
-        pfs_log_debug(("%s <== open", strerror(EROFS)));
+        pfs_log_debug((" %s <== open", strerror(EROFS)));
         return -EROFS;
     }
+#endif
 
     if (!pfs_get_path_visibility(path, 0)) {
-        pfs_log_debug(("%s <== open", strerror(ENOENT)));
+        pfs_log_debug((" open err: %s", strerror(ENOENT)));
         return -ENOENT;
     }
 
     fd = open(path, fi->flags);
     if (fd < 0)
-        fd = pfs_err("open");
-    else
+        r = pfs_err("open");
+    else {
         FH_STORE_INT(fi->fh, fd);
-    return fd;
+        r = 0;
+        pfs_log_debug((" %d <== open", fd));
+    }
+    return r;
 }
 
 int partialfs_read(const char * path, char * buf, size_t size, off_t off,
          struct fuse_file_info * fi) {
     int r;
 
-    pfs_log_debug(("==> read('%s', %d, %d, %d, %p)", path, buf, size,
-                off, fi));
+    pfs_log_debug(("==> read('%s', fd=%d, size=%d, off=%d)", path, 
+                FH_AS_INT(fi->fh), size, off));
 
     r = pread(FH_AS_INT(fi->fh), buf, size, off);
     if (r < 0)
@@ -412,7 +421,7 @@ int partialfs_opendir(const char * path, struct fuse_file_info * fi) {
     pfs_log_debug(("==> opendir('%s', %p)", path, fi));
 
     if (!pfs_get_path_visibility(path, 0)) {
-        pfs_log_debug(("%s <== opendir", strerror(ENOENT)));
+        pfs_log_debug((" opendir err: %s", strerror(ENOENT)));
         return -ENOENT;
     }
 
@@ -522,7 +531,7 @@ int partialfs_access(const char * path, int mask) {
     pfs_log_debug(("==> access('%s', %d)", path, mask));
 
     if (!pfs_get_path_visibility(path, 0)) {
-        pfs_log_debug(("%s <== access", strerror(ENOENT)));
+        pfs_log_debug((" access err: %s", strerror(ENOENT)));
         return -ENOENT;
     }
 
