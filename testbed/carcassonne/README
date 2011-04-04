@@ -1,26 +1,32 @@
-# ==== 简介 ====
-# 这是一个 HTML5 websocket 的 demo, 桌游 Carcassonne [http://en.wikipedia.org/wiki/Carcassonne_(board_game)]
-# 
-# ==== 安装 ====
+==== 简介 ====
+这是一个 HTML5 websocket 的 demo, 桌游 Carcassonne [http://en.wikipedia.org/wiki/Carcassonne_(board_game)]
+
+==== 安装 ====
 # 安装 twisted 的 websocket 分支
 # svn://svn.twistedmatrix.com/svn/Twisted/branches/websocket-4173
 # 
 # 且一定要用 setuptools 安装， 否则认不出
+
+easy_install virtualenv
+$ virtualenv --no-site-packages --distribute <path-to-virt-py>
+$ <path-to-virt-py>/bin/pip install simplejson
+$ <path-to-virt-py>/bin/pip install -e svn+svn://svn.twistedmatrix.com/svn/Twisted/branches/websocket-4173-2
+
+
+==== 运行 ====
+$ <path-to-virt-py>/bin/twistd -ny game.tac
+
+==== 操作 ====
+鼠标可以拖动小块，按 space 旋转
+
+
+
+# ### 上述已经过时, 使用以下新方法 (使用 evenlet 代替 twisted, eventlet 已有 websocket 支持)
 # 
-# ==== 运行 ====
-# twistd -ny game.tac
-# 
-# ==== 操作 ====
-# 鼠标可以拖动小块，按 space 旋转
-
-
-
-### 上述已经过时, 使用以下新方法 (使用 evenlet 代替 twisted, eventlet 已有 websocket 支持)
-
-==== 安装 ====
-python >= 2.6:
-    python -m easy_install eventlet
-python >= 2.4 < 2.6:
-    apt-get install libssl-dev
-    python -m easy_install pyOpenSSL
-    python -m easy_install eventlet
+# ==== 安装 ====
+# python >= 2.6:
+#     python -m easy_install eventlet
+# python >= 2.4 < 2.6:
+#     apt-get install libssl-dev
+#     python -m easy_install pyOpenSSL
+#     python -m easy_install eventlet
