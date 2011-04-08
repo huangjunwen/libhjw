@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <ctype.h>
 #include <string.h>
-#include <stdio.h>
 #include "scgi_parser.h"
 
 
@@ -73,10 +72,8 @@ reenter:
         case HEADER_NAME:
 
             while (p < end) {
-                if (--header_remain < 0) {
-printf("1\n");
+                if (--header_remain < 0)
                     return E_NS_STR;
-                }
 
                 if (*p++)
                     continue;
@@ -108,10 +105,8 @@ printf("1\n");
         case HEADER_VAL:
 
             while (p < end) {
-                if (--header_remain < 0) {
-printf("3\n");
+                if (--header_remain < 0)
                     return E_NS_STR;
-                }
 
                 if (*p++)
                     continue;
@@ -131,10 +126,9 @@ printf("3\n");
             if (p < end) {
                 // net string end
                 if (header_remain == 0) {
-                    if (*p != ',') {
-printf("2\n");
+                    if (*p != ',')
                         return E_NS_STR;
-                    }
+
                     if (cb->on_headers_end(p, parser->user_data) < 0)
                         return E_CB_ERR;
                     parser->status = HEADERS_END;
