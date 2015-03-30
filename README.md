@@ -1,5 +1,7 @@
 ### 关于wiki ###
 
+这些都是很久以前的笔记了。
+
 笔记
 
   * [Twisted 笔记](notes_on_twisted.md)
