@@ -88,7 +88,7 @@ The running greenlet's stack_start is undefined but not NULL.
 
 ```
 
-stack\_start/stop/copy/saved 这几个字段在 [上边](#explanation-in-code.md) 有说明
+stack\_start/stop/copy/saved 这几个字段在 [上边](#explanation-in-code) 有说明
 
 stack\_prev 指的是在 c stack 上的先后关系
 
