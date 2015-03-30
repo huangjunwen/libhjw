@@ -1,4 +1,4 @@
-﻿#summary dynsql 文档
+﻿#dynsql 文档
 
 # 介绍 #
 
@@ -24,9 +24,7 @@ dynsql 尝试使用另外一种方法, 它完全不理解交给它处理的实�
 
 ## 代码 ##
 
-browse: _http://code.google.com/p/libhjw/source/browse/#svn/trunk/testbed/dynsql_
-
-checkout: _https://libhjw.googlecode.com/svn/trunk/testbed/dynsql_
+browse: _https://github.com/huangjunwen/libhjw/tree/master/testbed/dynsql_
 
 # 标记符 #
 

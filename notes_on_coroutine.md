@@ -1,13 +1,13 @@
 ﻿彻底的 CPS , 函数调用不是所谓的 subroutine , 而是控制流的转移, 如:
 
-```
+```python
     def f(x, y):
         return x**2 + y
 ```
 
 在 CPS 中的形式
 
-```
+```python
     def power(v, e, c):
         c(v**e)
     
@@ -26,7 +26,9 @@ learned keywords: continuation CPS
   * http://en.wikipedia.org/wiki/Continuation-passing_style CPS 比之 subroutine 是更为 general 的方式
   * http://en.wikipedia.org/wiki/Coroutine
   * http://en.wikipedia.org/wiki/Setcontext  POSIX 的系统调用哈~~* http://www.chiark.greenend.org.uk/~sgtatham/coroutines.html 这个没有用到那些 stack unwind 的操作, 不过这代码真学习了...
-```
+
+```c
+
 switch (count % 8) {
     case 0:        do {  *to = *from++;
     case 7:              *to = *from++;

@@ -10,7 +10,8 @@
 
 首先应该看一下它代码里的解释
 
-```
+```c
+
 /*
 A PyGreenlet is a range of C stack addresses that must be
 saved and restored in such a way that the full range of the
@@ -63,11 +64,14 @@ States:
 
 The running greenlet's stack_start is undefined but not NULL.
 */
+
 ```
 
 
 #### greenlet definition ####
-```
+
+```c
+
     typedef struct _greenlet {
         PyObject_HEAD
         char* stack_start;
@@ -81,6 +85,7 @@ The running greenlet's stack_start is undefined but not NULL.
         int recursion_depth;
         PyObject* weakreflist;
     } PyGreenlet;
+
 ```
 
 stack\_start/stop/copy/saved 这几个字段在 [上边](#explanation_in_code.md) 有说明
@@ -103,12 +108,14 @@ run\_info 运行对象
 _注: 下文以 **target** 表示将要跳转去的 greenlet, **current** 表示当前 greenlet_
 
 当在某个 greenlet 中 调用 target.switch(xxx) 的时候, 控制流就会去到 target 中, 分几种情况:
-  1. target [尚未执行过](#greenlet_not_stated.md)
-  1. target [曾经执行过但已暂停](#greenlet_resume.md)
-  1. target [已经执行完](#greenlet_dead.md)
+  1. target [尚未执行过](#greenlet_not_stated)
+  1. target [曾经执行过但已暂停](#greenlet_resume)
+  1. target [已经执行完](#greenlet_dead)
 
 见函数 **g\_switch**
-```
+
+```c
+
     // ...
     while (1) {
         if (PyGreen_ACTIVE(target)) {
@@ -125,12 +132,14 @@ _注: 下文以 **target** 表示将要跳转去的 greenlet, **current** 表示
         target = target->parent;                    // dead
     }
     // ...
+
 ```
 
 ##### greenlet not stated #####
 
 实际调用的函数是 `_PyGreen_initialstub`
-```
+```c
+
     //...
     /* start the greenlet */
     ts_target->stack_start = NULL;          
@@ -156,10 +165,13 @@ _注: 下文以 **target** 表示将要跳转去的 greenlet, **current** 表示
         // 不应该来到这里
     }
     // 返回到 caller
+
 ```
 
 `_PyGreen_initialstub` 示意图如下, 新的 greenlet(target) 的堆栈肯定在 dummymarker 之下, 所以可以用这个作为 target->stack\_stop (包含这部分以下的堆栈即可正确运行 target)
-```
+
+```c
+
         /*
 
         |     older functions     |   
@@ -182,11 +194,14 @@ _注: 下文以 **target** 表示将要跳转去的 greenlet, **current** 表示
         |        not used         |                                                     
 
         */
+
 ```
 
 第一次对某个 greenlet 运行 `_PyGreen_slp_switch` 并不会有 stack switch 的操作, 而是直接返回 1 (见下面代码), 所以第一次 `_PyGreen_switchstack` 也就返回1而直接进入 target greenlet 执行.
 返回1之前还有一个操作: `slp_save_state` 将 ESP ~ target->stack\_stop 之间的内容作为 current 的部分 stack 移到堆上(见上图右方那一块), 这也是为什么 `_PyGreen_switchstack` 会返回两次的原因, 因为当控制重新返回 current 的时候, 这部分属于它的 heap 上的 stack 会重新拷贝回 c stack 继续执行, 于 current 而言, 效果同样也是从 `_PyGreen_switchstack` 返回, 只是返回值不一样.
-```
+
+```c
+
     // _PyGreen_slp_switch 部分代码(实际上是在 SLP_SAVE_STATE 这个宏中)
     
     // ...
@@ -195,12 +210,15 @@ _注: 下文以 **target** 表示将要跳转去的 greenlet, **current** 表示
     if (!PyGreen_ACTIVE(ts_target)) return 1;
 
     // stack switch here
+
 ```
 
 ##### greenlet resume #####
 
 `_PyGreen_slp_switch` 可以这样表示
-```
+
+```c
+
     // asm 代码用于将需要保存的寄存器放到 stack 上, 并将 ESP 赋给 stackref
     
     if (slp_save_state((char*)stackref)) return -1;     // cp c stack 上的内容(可能包含多个 greenlet)一直到 target->stack_stop 为止

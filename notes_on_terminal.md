@@ -18,7 +18,9 @@ _注: 下文是在 linux 下实践所得, 不过其他 nix 应该差不多_
     * 原始模式, 不以行为单位, 不对特殊字符进行处理 (raw mode)
     * cbreak 模式, 类似原始模式, 但某些特殊字符也进行处理
     * 以下使用 curses 库进行演示, 修改 enter 的参数可看出两种模式下对待特殊字符的不同处理(例如按下 Ctrl+C )
-```
+    
+```python
+
     import sys, curses, atexit
 
     def enter(cbreak=True):
@@ -47,9 +49,13 @@ _注: 下文是在 linux 下实践所得, 不过其他 nix 应该差不多_
 
     if __name__ == "__main__":
         main()
+
 ```
+
   * tcgetattr/tcsetattr 函数需要一个 fd 的参数, 在下面的程序中无论使用标准输入还是标准输出作为这个参数, 行为都是一样的. 这暗示了标准输入/输出其实是同一个文件(结构).
-```
+
+```python
+
     import sys, tty, termios
 
     oldtty = termios.tcgetattr(sys.stdin)   # stdin/stdout 都一样
@@ -61,24 +67,32 @@ _注: 下文是在 linux 下实践所得, 不过其他 nix 应该差不多_
             i -= 1
     finally:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, oldtty)     # stdin/stdout 都一样
+
 ```
 
 #### 终端能力 ####
 
   * 历史上有众多的 terminal 类型, host compuer 发送到 terminal 不单只有需要显示出来的字, 也包括有控制字符. 早期的只有很少一些, 但后期却有数百个之多; 后来有些终端还有其他各种能力(例如向上滚动, 可以移动光标等), 而定义这些动作的控制字符在不同的终端下也不一样, 因此需要有一个标准: 最终一统江湖的是 termcap (terminal capabilities) 以及其后继者 terminfo 数据库.
   * 终端类型在 host computer 的 TERM 环境变量中 (我们的客户端也需要设置相同的终端类型, 否则两者无法正常沟通)
-```
+
+```bash
+
     $ echo $TERM
     linux
+
 ```
+
   * 可用 infocmp 命令查询指定终端类型数据库, man terminfo 可知 terminfo 数据库在什么位置, 如下面是 /lib/terminfo/**/**
-```
+
+```bash
+
     $ infocmp linux
     #       Reconstructed via infocmp from file: /lib/terminfo/l/linux
     linux|linux console,
             am, bce, ccc, eo, mir, msgr, xenl, xon,
             colors#8, it#8, ncv#18, pairs#64,
     ...
+
 ```
 
 #### 终端IO总结 ####
@@ -94,7 +108,8 @@ _注: 下文是在 linux 下实践所得, 不过其他 nix 应该差不多_
   * BSD 伪终端: /dev/ptyXY /dev/ttyXY 前者为主设备, 后者为从设备, 它们之间用管道相连接, 共同模拟一个终端的行为. 主设备主要是用在 rlogin/ssh 这些程序上, 从设备则主要提供给用户程序, 例如应用想要往某个伪终端里写东西, 则可以往从设备里写.
   * Unix 98 伪终端: /dev/pts/x 在文件系统里面只有一个, 这个相当于上边所说的从设备, 主设备实际上是打开文件 /dev/ptmx 获得, 详细看参看手册.
   * 试验
-```
+```bash
+
    jayven@debian:~$ ps ajx
     PPID   PID  PGID   SID TTY      TPGID STAT   UID   TIME COMMAND
        ......
@@ -148,9 +163,13 @@ _注: 下文是在 linux 下实践所得, 不过其他 nix 应该差不多_
    vim     3317 jayven    2u   CHR  136,0              2 /dev/pts/0
    vim     3317 jayven    4u   REG    8,1   12288 408855 /home/jayven/.io.py.swp
        ......
+
 ```
+
   * 可看出其流程大致如下:
-```
+
+```c
+
    /*       bash                     sshd
      __________________      ___________________                  ______________
     |                  |    |                   |    network     |              |
@@ -158,18 +177,22 @@ _注: 下文是在 linux 下实践所得, 不过其他 nix 应该差不多_
     |                  |    |                   |                |              |
      ------------------      -------------------                  --------------
    */
+
 ```
+
   * 还可以这样
-```
+
+```bash
+
    jayven@debian:~$ w -h
    jayven   pts/0    192.168.23.70    23:09    0.00s  0.44s  0.00s w -h
    jayven@debian:~$ echo "something" > /dev/pts/0 
    something
+
 ```
 
 ### 未完待续 ###
 ...
-
 
 ### 参考 ###
 

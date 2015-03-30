@@ -7,27 +7,37 @@
 ## defer ##
 
 就其构造而言, 如果简化掉 errback, defered 其实就是一串 callback 链, callback 之间有一个上下文在传递
-```
+
+```c
+
     /*
                 res            res            res
     +---------+      +-------+      +-------+     +-------+
     | defered | -->  |  cb1  | -->  |  cb2  | --> |  cb3  |
     +---------+      +-------+      +-------+     +-------+ 
     */
+
 ```
 
 例如
-```
+
+```python
+
     # ...
     d = LongOpSoRetDefer()
     d.addCallback(cb)
+
 ```
+
 似乎相当于声明了一个独立的控制流(非抢占的, 在需要长时间等待时交出cpu)
-```
+
+```python
+
     def f():
         res = LongOpSoRetDefer()
         cb(res)
         ...
+
 ```
 所不同之处在于, 前者的调度似乎更**显式**一些, 但后者的可读性更强. 下面的 inlineCallbacks 即使用标准 python 的语法来近似地实现这一想法.
 
@@ -36,7 +46,9 @@
 
 想像一个例子, 在一个连接中需要循环地处理多个请求(如http 1.1的长连接), 如下写法要自然多了: 我们创建一个会运行"很久"的
 函数, 期间会有很多次的停顿(例如IO操作)和循环, 因此使用 Generator 的特性把控制交出来, 并且在运行结束之后触发某个函数执行.
-```
+
+```python
+
     @inlineCallbacks
     def rwLoop(src):
         while True:
@@ -50,12 +62,15 @@
     # ... got a src (maybe a socket)
     d = rwLoop(src)                                # d is also a defer
     d.addCallback(someWorkAfterLoop)
+
 ```
 
 这是个好东西, 所以整个地分析一下 (location: _internet.defer_)
 
 inlineCallbacks 最终实际上调用的是 _inlineCallbacks
-```
+
+```python
+
     def _inlineCallbacks(result, g, deferred):                                          
         """  
         See L{inlineCallbacks}.
@@ -115,6 +130,7 @@ inlineCallbacks 最终实际上调用的是 _inlineCallbacks
 
 
         return deferred
+
 ```_
 
 一开始第一次调用时, result 为 None; g 为刚刚构造好的 generator; deferred 也是刚刚构造好的 defer.

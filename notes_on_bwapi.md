@@ -15,7 +15,7 @@ BWAPI 2.4 的版本号是 1689, 以下均基于此, 现在 trunk 上的代码似
   * BWAPI 同时也维护多一个数组 `unitArrayCopyLocal`, 这个数组是 `BWDATA_UnitNodeTable` 的拷贝(每次调用 update 都会 memcpy 一次), 而 BWAPI::Unit 的实现 BWAPI::UnitImpl 则是再在这个之上的一层封装 (拷贝 `unitArrayCopyLocal` 出来应该是为了防止 starcraft 更新了状态而 BWAPI 没有同步, UnitImpl 内部指向的地址出现不一致的情况).
 
   * 关心的一点: BWAPI 返回的 Unit 指针是否一直有效, 还是指向一个 slot? 答案是前者, 即使一个单位被干掉之后, 指针还是一直有效的, 只是其上的标志位改变了, 直到游戏结束才会回收这些内存.
-```
+```c++
     GameImpl::onUnitDeath
     // ...
     this->units.erase(unit);
