@@ -1,0 +1,151 @@
+=== overview ===
+
+gc module 只在单纯 refcount 不能完成任务时起作用：也就是存在循环引用；同时它采取的是分代（三代）方式，每一代到达某个阀值时触发 collect。
+
+=== function collect ===
+modules/gcmodule.c
+
+{{{
+#!text/x-csrc
+
+static Py_ssize_t
+collect(int generation)
+{
+//...
+	PyGC_Head *young; /* the generation we are examining */
+	PyGC_Head *old; /* next older generation */
+	PyGC_Head unreachable; /* non-problematic unreachable trash */
+	PyGC_Head finalizers;  /* objects with, & reachable from, __del__ */
+	PyGC_Head *gc;
+//...
+	/* Using ob_refcnt and gc_refs, calculate which objects in the
+	 * container set are reachable from outside the set (i.e., have a
+	 * refcount greater than 0 when all the references within the
+	 * set are taken into account).
+	 */
+	update_refs(young);
+	subtract_refs(young);
+	/* Leave everything reachable from outside young in young, and move
+	 * everything else (in young) to unreachable.
+	 * NOTE:  This used to move the reachable objects into a reachable
+	 * set instead.  But most things usually turn out to be reachable,
+	 * so it's more efficient to move the unreachable things.
+	 */
+	gc_list_init(&unreachable);
+	move_unreachable(young, &unreachable);
+
+	/* Move reachable objects to next generation. */
+	if (young != old)
+		gc_list_merge(young, old);
+
+//...
+}
+
+}}}
+
+* 首先，gc 对象的头部都有一个字段 gc_refs，这个是相当于一个临时的 ref count 的作用，update_refs 的作用即是将 young 中的每一个对象的 ob_refcnt （实际的引用计数）拷贝到 gc_refs 中。
+
+{{{ 
+#!text/x-csrc
+
+static void
+update_refs(PyGC_Head *containers)
+{
+	PyGC_Head *gc = containers->gc.gc_next;
+	for (; gc != containers; gc = gc->gc.gc_next) {
+		assert(gc->gc.gc_refs == GC_REACHABLE);
+		gc->gc.gc_refs = FROM_GC(gc)->ob_refcnt;
+		assert(gc->gc.gc_refs != 0);
+	}
+}
+}}}
+
+* subtract_refs 的作用是：young 中的每一个对象的 gc_refs 减去 young 中其他对象对它的引用数, 假如 gc_refs == 0，则表明此对象只被 young 中的其他对象引用；>0 的话则表明它还被外部的对象引用，在后者这种情况中，这个对象是一定不能被 gc 的。要实现这个功能，是使用这个对象的 tp_visit 来做的。
+
+{{{
+#!text/x-csrc
+
+static int
+visit_decref(PyObject *op, void *data)
+{
+        assert(op != NULL);
+	if (PyObject_IS_GC(op)) {
+		PyGC_Head *gc = AS_GC(op);
+		assert(gc->gc.gc_refs != 0); /* else refcount was too small */
+		if (gc->gc.gc_refs > 0)
+			gc->gc.gc_refs--;
+	}
+	return 0;
+}
+static void
+subtract_refs(PyGC_Head *containers)
+{
+	traverseproc traverse;
+	PyGC_Head *gc = containers->gc.gc_next;
+	for (; gc != containers; gc=gc->gc.gc_next) {
+		traverse = FROM_GC(gc)->ob_type->tp_traverse;
+		(void) traverse(FROM_GC(gc),
+			       (visitproc)visit_decref,
+			       NULL);
+	}
+}
+
+}}}
+
+* 再然后，再扫描一次上述的列表，对于 >0 的对象，它所引用的对象必须得到“恢复”，即是它的 gc_refs == 0；如此一来，没有得到“恢复”的，即是只被 young 中对象引用且这些都想都没有被外部对象引用。这一函数依然是要使用 tp_visit。
+
+{{{
+#!text/x-csrc
+
+static int
+visit_reachable(PyObject *op, PyGC_Head *reachable)
+{
+	if (PyObject_IS_GC(op)) {
+		PyGC_Head *gc = AS_GC(op);
+		const Py_ssize_t gc_refs = gc->gc.gc_refs;
+
+                // 恢复其引用 >0
+		if (gc_refs == 0) {
+			gc->gc.gc_refs = 1;
+		}
+		else if (gc_refs == GC_TENTATIVELY_UNREACHABLE) {
+			gc_list_move(gc, reachable);
+			gc->gc.gc_refs = 1;
+		}
+         	 else {
+		 	assert(gc_refs > 0
+		 	       || gc_refs == GC_REACHABLE
+		 	       || gc_refs == GC_UNTRACKED);
+		 }
+	}
+	return 0;
+}
+
+static void
+move_unreachable(PyGC_Head *young, PyGC_Head *unreachable)
+{
+	PyGC_Head *gc = young->gc.gc_next;
+
+	while (gc != young) {
+		PyGC_Head *next;
+
+		if (gc->gc.gc_refs) {
+                        PyObject *op = FROM_GC(gc);
+                        traverseproc traverse = op->ob_type->tp_traverse;
+                        assert(gc->gc.gc_refs > 0);
+                        gc->gc.gc_refs = GC_REACHABLE;
+                        (void) traverse(op,
+                                        (visitproc)visit_reachable,
+                                        (void *)young);
+                        next = gc->gc.gc_next;
+		}
+		else {
+			next = gc->gc.gc_next;
+			gc_list_move(gc, unreachable);
+			gc->gc.gc_refs = GC_TENTATIVELY_UNREACHABLE;
+		}
+		gc = next;
+	}
+}
+
+}}}

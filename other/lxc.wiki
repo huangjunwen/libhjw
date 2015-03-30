@@ -1,0 +1,115 @@
+=== linux container ===
+
+==== network config ====
+
+* ifconfig 以及 route 查看一下当前的网卡跟路由配置，例如：
+
+{{{
+#!application/x-shell-session
+
+# ifconfig
+eth0      Link encap:Ethernet  HWaddr 00:0c:29:eb:00:5b
+          inet addr:192.168.230.128  Bcast:192.168.230.255  Mask:255.255.255.0
+          inet6 addr: fe80::20c:29ff:feeb:5b/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:292074 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:242500 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:120847361 (115.2 MiB)  TX bytes:89091919 (84.9 MiB)
+          Interrupt:18 Base address:0x1400
+
+lo        Link encap:Local Loopback
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:16436  Metric:1
+          RX packets:785 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:785 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:70338 (68.6 KiB)  TX bytes:70338 (68.6 KiB)
+ 
+# route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+192.168.230.0   *               255.255.255.0   U     0      0        0 eth0
+default         192.168.230.2   0.0.0.0         UG    0      0        0 eth0
+}}}
+
+
+可以看到有一个物理网卡 eth0 ，它的 ip 是 192.168.230.128，route 的输出表示本地网络是 192.168.230.0/24，在本地网络中包是直接发送的，所以 Gateway 是 *，至于外部网络则需要通过网关 192.168.230.2 发送。
+
+
+* 创建 bridge 用来连接将要创建的 container 里面的虚拟网卡设备。（是不是只能通过这种方式呢？）
+
+{{{
+#!application/x-shell-session
+
+# brctl addbr br0               # 创建出一个叫 br0 的 bridge 设备
+# brctl setfd br0 0             # bridge forward delay
+# brctl addif br0 eth0          # 这里将原有的 eth0 设备加入到这个 bridge 中
+# ifconfig eth0 down            # 要释放 eth0 占用的 ip，这个 ip 转而会分配给 br0
+                                # !!! 注意，如果你是远程连接来做这个操作的话会悲剧的，最好让 sa 同学们搞定。
+# ifconfig br0 192.168.230.128 promisc up
+                                # 绑定 br0 的 ip，promisc 的意思参看手册。
+# ifconfig eth0 0.0.0.0 up      # up eth0
+}}}
+
+
+* 完成这一步之后，再次 ifconfig 跟 route
+
+{{{
+#!application/x-shell-session
+
+# ifconfig
+br0       Link encap:Ethernet  HWaddr 00:0c:29:eb:00:5b
+          inet addr:192.168.230.128  Bcast:192.168.230.255  Mask:255.255.255.0
+          inet6 addr: fe80::20c:29ff:feeb:5b/64 Scope:Link
+          UP BROADCAST RUNNING PROMISC MULTICAST  MTU:1500  Metric:1
+          RX packets:401 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:288 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:30395 (29.6 KiB)  TX bytes:43197 (42.1 KiB)
+
+eth0      Link encap:Ethernet  HWaddr 00:0c:29:eb:00:5b
+          inet6 addr: fe80::20c:29ff:feeb:5b/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:296066 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:245301 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:121215367 (115.5 MiB)  TX bytes:89610791 (85.4 MiB)
+          Interrupt:18 Base address:0x1400
+
+lo        Link encap:Local Loopback
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:16436  Metric:1
+          RX packets:785 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:785 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:70338 (68.6 KiB)  TX bytes:70338 (68.6 KiB)
+
+# route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+192.168.230.0   *               255.255.255.0   U     0      0        0 br0
+}}}
+
+
+* 这个时候应该已经可以 ping 局域网了（192.168.230.0/24），再加上跟外部网络的 gateway，就可以像以前一样访问外部网络了。
+
+{{{
+#!application/x-shell-session
+
+# route add default gw 192.168.230.2 && route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+192.168.230.0   *               255.255.255.0   U     0      0        0 br0
+default         192.168.230.2   0.0.0.0         UG    0      0        0 br0
+}}}
+
+* 让下一次机器重启的时候也做同样的事情。
+
+* 这段的参考有：
+ * http://linux-ip.net/html/linux-ip.html
+ * http://tldp.org/HOWTO/Ethernet-Bridge-netfilter-HOWTO.html
+
+* 另外一种做法，直接修改 /etc/network/interface （当然，debian 上）请参考 http://blog.foaa.de/2010/05/lxc-on-debian-squeeze/
