@@ -1,0 +1,44 @@
+﻿Message-oriented middleware
+Huang jun wen
+Last update: %%mtime(%c)
+
+%!encoding: utf-8
+
+**It's all about Queues**
+
+== Links ==
+ - wiki: http://en.wikipedia.org/wiki/Message-oriented_middleware
+ - In which domains are message oriented middleware like AMQP useful: http://stackoverflow.com/questions/2388539/in-which-domains-are-message-oriented-middleware-like-amqp-useful
+ - AMQP spec(pdf): http://www.amqp.org/confluence/download/attachments/720900/amqp.0-10.pdf?version=1&modificationDate=1203467591000
+ - MQs 列表, **good place to start with** : http://wiki.secondlife.com/wiki/Message_Queue_Evaluation_Notes
+ - RabbitMQ: http://www.rabbitmq.com/index.html
+  - Introduction to RabbitMQ, by Alexis Richardson(pdf): http://skillsmatter.com/custom/presentations/talk3.rabbitmqintroduction.pdf
+  - RabbitMQ’s Internal Architecture(pdf): http://skillsmatter.com/custom/presentations/talk4.rabbitmq_internals.pdf
+  - Introduction to AMQP Messaging with RabbitMQ: http://www.slideshare.net/somic/introduction-to-amqp-messaging-with-rabbitmq
+ - QPID: http://qpid.apache.org/download.html
+ - ZMQ: http://www.zeromq.org/
+  - ZMQ 的这些 whitepapers 很好: http://www.zeromq.org/area:whitepapers
+   - AMQP 协议的设计考量: http://www.zeromq.org/whitepapers:amqp-analysis
+   - ZMQ kernel (v0.1), 这个文章介绍了很多如何提高收发 message 的吞吐量的方法, 相当有启发性: http://www.zeromq.org/whitepapers:design-v01
+  - 介绍:
+   - http://lwn.net/Articles/370307/
+ - 未分类:
+  - Spread: http://www.spread.org/
+  - Gearman: http://www.danga.com/gearman/
+  - RestMS: http://www.restms.org/
+   - http://www.zyre.com/
+  - PGM (Pragmatic General Multicast)
+   - 一个挺好的介绍 (ppt): http://www.cis.udel.edu/~kamboj/presentations/cisc856.pgm.ppt
+ - 讨论:
+  - http://lists.zeromq.org/pipermail/zeromq-dev/2010-April/002958.html
+
+
+== Notes ==
+ - 根据应用的要求, 队列需要有不同的特性
+  - 基本要求:
+   - 保序
+  - 高速队列, 但允许信息的丢失
+  - 可靠队列
+   - 信息不可以丢失, 而且消息接收方能且只能接收一份 (重复的扔掉?)
+   - 如果是 fanout 的方式发送的话, 慢的接收方不应该阻碍快的接收方
+   - 极端情况例如磁盘满了该如何处理呢?

@@ -1,0 +1,14 @@
+﻿Sandbox notes
+Huang jun wen
+Last update: %%mtime(%c)
+
+%!encoding: utf-8
+
+== ref ==
+
+- Intercepting system calls:
+ - http://www.win.tue.nl/~aeb/linux/lk/lk-4.html
+ - http://plash.beasts.org/wiki/InterceptingSystemCalls
+ - http://articles.manugarg.com/aboutelfauxiliaryvectors.html
+ - http://www.trilithium.com/johan/2005/08/linux-gate/
+ - http://lkml.org/lkml/2002/12/18/218

@@ -1,0 +1,81 @@
+﻿Gearman notes
+Huang jun wen
+Last update: %%mtime(%c)
+
+%!encoding: utf-8
+
+== 基本结构 ==
+
+```
+    ----------     ----------     ----------     ----------
+    | Client |     | Client |     | Client |     | Client |
+    ----------     ----------     ----------     ----------
+         \             /              \             /
+          \           /                \           /
+          --------------               --------------
+          | Job Server |               | Job Server |
+          --------------               --------------
+                |                            |
+        ----------------------------------------------
+        |              |              |              |
+    ----------     ----------     ----------     ----------
+    | Worker |     | Worker |     | Worker |     | Worker |
+    ----------     ----------     ----------     ----------
+```
+
+job server 是这个结构的中心; worker 可以注册到一个到多个 job server; job server 凭 worker 注册的时候给的注册名字 (function name) 知道
+
+这个 worker 可以做哪样工作; 当 client 请求要处理这样一个 function 的时候, job server 把注册了这个名字的并且空闲的 worker 叫起来, 让它们来 grab job;
+
+头一个获得工作, 其余的继续休息.
+
+
+== 黑盒特性 ==
+
+- job 一定要 worker 显式表明处理结果后, job server 才会把这个 job 删掉(处理完); 所以
+    一个 job 在处理过程中(返回处理结果前), 如果 worker 挂掉了, job server 里的 job 会 queue 起来或者交由其它的 worker 处理. 
+
+ - 如何验证? 写一个处理时间很长的 worker 试下就可以了, 例如
+
+```
+#!/usr/bin/env python
+# file: echo.py
+
+import time, sys
+
+# get job
+job = sys.stdin.read(100)
+
+# process
+print >> sys.stderr, "Got job: ", job
+time.sleep(10)
+
+# return
+print job
+```
+
+ - 然后运行两个 worker
+
+```
+$ /usr/local/gearmand/bin/gearman -w -f echo ./echo.py
+```
+
+ - 然后运行 client
+
+```
+$ /usr/local/gearmand/bin/gearman -f echo hahaha
+```
+
+ - 这时可以看到其中一个 worker 有输出, 马上 ctrl+c 掉, 然后另外一个 worker 也有输出了.
+
+- job 并不是一个处理完了才处理下一个, 只要有合适的 worker, job 就会被分配出去.
+
+ - 仍然可以用上边的 echo.py 来验证 (两个 worker 两个 client)
+ 
+- job server 即使挂了, 重启后 worker 仍然有效. 估计是 worker 会不断重试连接.
+
+== 代码细节 ==
+
+ - to be continued.
+
+

@@ -1,0 +1,42 @@
+How to sandbox python (like GAE)
+Huang jun wen
+Last update: %%mtime(%c)
+
+%!encoding: utf-8
+
+== 目标 ==
+
+- 不能写入文件系统
+- 只能进行受限制的 IPC
+- 只能使用受限制的一小部分系统调用，例如已经打开了的文件（stdout）的 write 等
+- 二进制文件不能被外界接触到
+- 运行的进程信息例如用户、组、当前目录等不可知
+
+
+== 方法 ==
+
+python 里的所有实际功能最终都来自于 c 模块（无论是编译到解析器里或者以 dso 的形式提供）故而限制 c 模块的功能即能
+起到沙盒的作用。
+
+
+== 模块 ==
+
+//使用 python 2.5.2 （同 GAE）//
+
+修改:
+- ``__builtin__`` 必须存在, 解析器第一个加载, 包含所有内建对象以及函数, 因此其中的修改实际上都是别的模块的修改
+ - ``file`` 可读可写, 须改为只读
+  - detail: ``_PyFile_SanitizeMode`` (Objects/fileobject.c) 作出限制
+ - ``open`` 同上
+ - ``__import__``: 是否需要禁止 dso 模块呢? 见 imp
+ - ``reload``: reload 过程会把已经销毁的东西重现. 处理同见 imp
+  - GAE 有些比较特别的处理: reload(sys) 会导致直接终止运行, 估计是 sys 有特殊的东西不希望重现
+    因为 import.c 里头的 extensions 会对每一个 c/dso 模块作一个备份以防止多次初始化, reload 的时候会重新
+    将备份的对象 update 到模块字典中.
+- ``sys`` 必须存在, 解析器第二个加载, 内含与解析器密切相关的函数及对象
+ - ``argv`` 泄露路径及参数, 例如可改为 ['']
+ - ``executable`` 泄露解析器路径及参数, 例如可改为 ''
+- ``imp`` 通指 import.c 中的功能, imp 是向外提供的接口
+ - extensions 字典需要增加外部直接可访问的接口, 因为 _PyImport_FixupExtension 保留的 c 模块备份有可能包含有不希
+   望外界知道的信息, reload 的时候会重新出现
+   

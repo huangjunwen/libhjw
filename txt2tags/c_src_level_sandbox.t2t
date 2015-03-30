@@ -1,0 +1,19 @@
+C source level sandbox ideas
+Huang jun wen
+Last update: %%mtime(%c)
+
+%!encoding: utf-8
+
+== Ideas ==
+ - 基本思想：基于 c 函数的控制，在沙盒中某些函数准入而某些函数不准入来实现安全控制，要实现此，首先需要两个先决条件：
+  - 有确切的函数调用关系图
+  - 假令目标函数集合为 A，另外库函数（例如 libc 等）集合为 B，需要保证 A 中的函数所调用的函数（无论是直接还是间接）都必须是 A + B 中, 例如：
+   - 函数指针必须指向有效的函数入口
+   - 类型（参数、返回值）要一致
+   - 不能允许 shell code
+   - 不允许 asm code
+   - 代码段的保护
+   - ...
+ - 工具可以使用 libclang？过程如同 clang 的 static analyze 工具一样，编译过程即是检查过程
+ - 实现算法：abstract interpretaion
+ - 思路参考：google chrome 的 sandbox，不过它那个是基于 native code 一层的沙盒，也是要保证函数跳转（特别是 indirect 跳转）均落在有效范围内
