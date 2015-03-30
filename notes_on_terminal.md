@@ -21,34 +21,34 @@ _注: 下文是在 linux 下实践所得, 不过其他 nix 应该差不多_
     
 ```python
 
-    import sys, curses, atexit
+import sys, curses, atexit
 
-    def enter(cbreak=True):
-        scr = curses.initscr()                # 初始化 curses
-        curses.raw()                        # 先进入 raw 模式
-        if cbreak:                            # 是否进入 cbreak 模式
-            curses.cbreak()
-        scr.clear()                            # 清屏
-        scr.refresh()                        # 使清屏生效
-        atexit.register(leave, cbreak)        # 注册 atexit handler
-        return scr 
+def enter(cbreak=True):
+    scr = curses.initscr()                # 初始化 curses
+    curses.raw()                        # 先进入 raw 模式
+    if cbreak:                            # 是否进入 cbreak 模式
+        curses.cbreak()
+    scr.clear()                            # 清屏
+    scr.refresh()                        # 使清屏生效
+    atexit.register(leave, cbreak)        # 注册 atexit handler
+    return scr 
 
-    def leave(cbreak):
-        if cbreak:
-            curses.nocbreak()
-        curses.noraw()
-        curses.endwin()
+def leave(cbreak):
+    if cbreak:
+        curses.nocbreak()
+    curses.noraw()
+    curses.endwin()
 
-    def main():
-        enter(False)                        # True 时 cbreak 模式, False 时 raw  模式
-        i = 10
-        while i > 0:
-            print ord(sys.stdin.read(1))
-            sys.stdout.flush()
-            i -= 1
+def main():
+    enter(False)                        # True 时 cbreak 模式, False 时 raw  模式
+    i = 10
+    while i > 0:
+        print ord(sys.stdin.read(1))
+        sys.stdout.flush()
+        i -= 1
 
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()
 
 ```
 
@@ -56,17 +56,17 @@ _注: 下文是在 linux 下实践所得, 不过其他 nix 应该差不多_
 
 ```python
 
-    import sys, tty, termios
+import sys, tty, termios
 
-    oldtty = termios.tcgetattr(sys.stdin)   # stdin/stdout 都一样
-    try:
-        tty.setraw(sys.stdout)              # stdin/stdout 都一样
-        i = 10
-        while i > 0:
-            print ord(sys.stdin.read(1))
-            i -= 1
-    finally:
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, oldtty)     # stdin/stdout 都一样
+oldtty = termios.tcgetattr(sys.stdin)   # stdin/stdout 都一样
+try:
+    tty.setraw(sys.stdout)              # stdin/stdout 都一样
+    i = 10
+    while i > 0:
+        print ord(sys.stdin.read(1))
+        i -= 1
+finally:
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, oldtty)     # stdin/stdout 都一样
 
 ```
 

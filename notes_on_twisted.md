@@ -1,6 +1,4 @@
-﻿#summary twisted 笔记
-
-
+﻿#twisted 笔记
 
 # defer #
 
@@ -131,7 +129,7 @@ inlineCallbacks 最终实际上调用的是 _inlineCallbacks
 
         return deferred
 
-```_
+```
 
 一开始第一次调用时, result 为 None; g 为刚刚构造好的 generator; deferred 也是刚刚构造好的 defer.
 

@@ -1,4 +1,4 @@
-﻿#summary greenlet 实现原理
+﻿#greenlet 实现原理
 
 颇花了一段时间终于大致看明白了 greenlet 的代码, 还好有注释帮助
 
@@ -88,7 +88,7 @@ The running greenlet's stack_start is undefined but not NULL.
 
 ```
 
-stack\_start/stop/copy/saved 这几个字段在 [上边](#explanation_in_code.md) 有说明
+stack\_start/stop/copy/saved 这几个字段在 [上边](#explanation-in-code.md) 有说明
 
 stack\_prev 指的是在 c stack 上的先后关系
 
@@ -108,9 +108,9 @@ run\_info 运行对象
 _注: 下文以 **target** 表示将要跳转去的 greenlet, **current** 表示当前 greenlet_
 
 当在某个 greenlet 中 调用 target.switch(xxx) 的时候, 控制流就会去到 target 中, 分几种情况:
-  1. target [尚未执行过](#greenlet_not_stated)
-  1. target [曾经执行过但已暂停](#greenlet_resume)
-  1. target [已经执行完](#greenlet_dead)
+  1. target [尚未执行过](#greenlet-not-stated)
+  2. target [曾经执行过但已暂停](#greenlet-resume)
+  3. target [已经执行完](#greenlet-dead)
 
 见函数 **g\_switch**
 

@@ -1,4 +1,4 @@
-﻿#summary BWAPI 笔记
+﻿#BWAPI 笔记
 
 BWAPI 2.4 的版本号是 1689, 以下均基于此, 现在 trunk 上的代码似乎在大改...
 
