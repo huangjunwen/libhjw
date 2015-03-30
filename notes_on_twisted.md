@@ -137,12 +137,16 @@ inlineCallbacks 最终实际上调用的是 _inlineCallbacks
 
 **C0** 循环
 > 意义: 每一个循环执行一次 g 中一部分代码, 此函数本身的意义也是每次执行 g 中的一部分代码, 由于下面将会讲到的原因而增加了这个 while 循环
+
 **C1** 执行 generator 中的一段程序, 然后切换出来, 扔出来的 result 一般是个 defer
 > 意义: 将 g 等待到的结果交给 g, 同时得到 g 将要等待的下一个目标 (another defer)
+
 **C2** 如果 result 不是 defer, 继续循环(又扔回去, 此时 ` x = yield some_expr ` 相当于 ` x = some_expr `), 否则进入 **C2**
 > 意义: 现在就能得到的值就不要抛出来啦
+
 **C3** result(defer) 增加一个回调 gotResult, 此回调实际有用功又是 `_inlineCallbacks` 自己
 > 意义: 见 C1
+
 **C4** 返回 deferred , 此 deferred 将会在此 generator 运行完之后被回调, 见 **C51 ~ C53**
 
 之所以有 **C6** 这个的存在, 缘由在一开始的注释中有, 这里具体讲就是: 首先在 **C3** 处 addBoth 的时候, 假如返回的 result 是'假'defer(即其实已经有结果了),
