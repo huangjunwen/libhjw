@@ -164,62 +164,70 @@
 
       * 逐条解释：
 
-        > 0: offset(0) type(E) range([0 0], [0 0]) spelling([0 0])
-        
-        * 0号记录表示 invalid，初始化时即插入，其size为1（见`SourceManager::clearIDTables`) 其offset为0。
+        0.
+            > 0: offset(0) type(E) range([0 0], [0 0]) spelling([0 0])
+            
+            表示 invalid，初始化时即插入，其size为1（见`SourceManager::clearIDTables`) 其offset为0。
 
-        > 1: offset(2) type(F) orig(name(nest_expansion.c) size(126)) ...
+        1.
 
-        * 1号记录明显就是主文件 nest_expansion.c，长度是126个字节，其offset为2，原来每一条记录它都会在
+          > 1: offset(2) type(F) orig(name(nest_expansion.c) size(126)) ...
+
+          1号记录明显就是主文件 nest_expansion.c，长度是126个字节，其offset为2，原来每一条记录它都会在
           它的长度上加上1，原因见`SourceManager::createFileID`中最后的注释：
 
-          ```c++
-          // We do a +1 here because we want a SourceLocation that means "the end of the
-          // file", e.g. for the "no newline at the end of the file" diagnostic.
-          NextLocalOffset += FileSize + 1;
-          ```
+            ```c++
+            // We do a +1 here because we want a SourceLocation that means "the end of the
+            // file", e.g. for the "no newline at the end of the file" diagnostic.
+            NextLocalOffset += FileSize + 1;
+            ```
 
-          * 即加多一个字节，使得 eof 也是一个有效的 `SourceLocation`，所以实际每条记录的offset是这样算出来的：
+          即加多一个字节，使得 eof 也是一个有效的 `SourceLocation`，所以实际每条记录的offset是这样算出来的：
 
-            * offset = prev_offset + prev_file_size + 1
+            > offset = prev_offset + prev_file_size + 1
 
-          * 故这条记录的 offset = 0 + 1 + 1 = 2，而第三条记录的 offset = 2 + 126 + 1 = 129
+          故这条记录的 offset = 0 + 1 + 1 = 2，而第三条记录的 offset = 2 + 126 + 1 = 129
 
-        > 2: offset(129) type(F) 
+        2.
+          > 2: offset(129) type(F) 
 
-        * *2号记录没有文件名，是什么我还没弄清楚，但offset一下子增加了很多，好像是创建了一个挺大的虚拟文件*。
+          *2号记录没有文件名，是什么我还没弄清楚，但offset一下子增加了很多，好像是创建了一个挺大的虚拟文件*。
 
-        > 3: offset(10245) type(Ebf) range([1 97], [1 113]) spelling([1 88])
+        3.
 
-        * 3号记录是一个**Function-like macro body expansion** (_Ebf_)，它的range指向1号记录的offset[97,113]
+          > 3: offset(10245) type(Ebf) range([1 97], [1 113]) spelling([1 88])
+
+          3号记录是一个**Function-like macro body expansion** (_Ebf_)，它的range指向1号记录的offset[97,113]
           1号记录就是nest_expansion.c，用python跑一下：
 
-          ```
-          >>> s = open('nest_expansion.c').read()
-          >>> s[97:113+1]       # expansion range 指向宏展开的地方
-          'concat_with_in(m)'
-          >>> s[88:88+7]        # spelling 指向宏定义的地方
-          'x ## in'
-          ```
+            ```
+            >>> s = open('nest_expansion.c').read()
+            >>> s[97:113+1]       # expansion range 指向宏展开的地方
+            'concat_with_in(m)'
+            >>> s[88:88+7]        # spelling 指向宏定义的地方
+            'x ## in'
+            ```
 
-          * 这里的7是用上述算法倒推而出：size = next_offset - offset - 1 = 10253 - 10245 - 1 = 7
-            实际上 `SourceManager::getFileIDSize` 也做同样的事情：
+          这里的7是用上述算法倒推而出：size = next_offset - offset - 1 = 10253 - 10245 - 1 = 7
+          实际上 `SourceManager::getFileIDSize` 也做同样的事情：
 
             ```
             return NextOffset - Entry.getOffset() - 1;
             ```
 
-        > 4: offset(10253) type(Ea) range([3 0], [3 0]) spelling([1 112])
+        4.
 
-        * 4号记录是一个**Macro arg expansion** (_Ea_)，它是3号记录的offset为0的地方的展开, 3号记录的
+          > 4: offset(10253) type(Ea) range([3 0], [3 0]) spelling([1 112])
+
+          4号记录是一个**Macro arg expansion** (_Ea_)，它是3号记录的offset为0的地方的展开, 3号记录的
           字面内容为 `x ## in`，故offset为0即是`x`；而其字面位置为[1 112]指向主文件：
 
-          ```
-          >>> s[112:112+(10255-10253-1)]
-          'm'
-          ```
+            ```
+            >>> s[112:112+(10255-10253-1)]
+            'm'
+            ```
 
-          * 所以其字面内容为`m`
+          所以其字面内容为`m`
 
 
         
