@@ -24,22 +24,22 @@
 
     * 另外`SourceLocaction.h`中`class SourceLocaction`前的[注释](https://github.com/llvm-mirror/clang/blob/release_36/include/clang/Basic/SourceLocation.h#L72)也很有意义，摘抄如下：
 
-      > ```
-      > /// \brief Encodes a location in the source. The SourceManager can decode this
-      > /// to get at the full include stack, line and column information.
-      > ///
-      > /// Technically, a source location is simply an offset into the manager's view
-      > /// of the input source, which is all input buffers (including macro
-      > /// expansions) concatenated in an effectively arbitrary order. The manager
-      > /// actually maintains two blocks of input buffers. One, starting at offset
-      > /// 0 and growing upwards, contains all buffers from this module. The other,
-      > /// starting at the highest possible offset and growing downwards, contains > /// buffers of loaded modules.
-      > ///
-      > /// In addition, one bit of SourceLocation is used for quick access to the
-      > /// information whether the location is in a file or a macro expansion.
-      > ///
-      > /// It is important that this type remains small. It is currently 32 bits wide.
-      > ```
+      ```c++
+      /// \brief Encodes a location in the source. The SourceManager can decode this
+      /// to get at the full include stack, line and column information.
+      ///
+      /// Technically, a source location is simply an offset into the manager's view
+      /// of the input source, which is all input buffers (including macro
+      /// expansions) concatenated in an effectively arbitrary order. The manager
+      /// actually maintains two blocks of input buffers. One, starting at offset
+      /// 0 and growing upwards, contains all buffers from this module. The other,
+      /// starting at the highest possible offset and growing downwards, contains > /// buffers of loaded modules.
+      ///
+      /// In addition, one bit of SourceLocation is used for quick access to the
+      /// information whether the location is in a file or a macro expansion.
+      ///
+      /// It is important that this type remains small. It is currently 32 bits wide.
+      ```
   
   * `SourceManager`
     
@@ -133,19 +133,21 @@
 
       * 以下是用自己的方法打印出`LocalSLocEntryTable` 中的每一条记录，
 
-        > Number of LocalSLocEntryTable: 12
-        > 0: offset(0) type(E) range([0 0], [0 0]) spelling([0 0])
-        > 1: offset(2) type(F) orig(name(nest_expansion.c) size(126)) contents(name(nest_expansion.c) size(126)) 
-        > 2: offset(129) type(F) 
-        > 3: offset(10245) type(Ebf) range([1 97], [1 113]) spelling([1 88])
-        > 4: offset(10253) type(Ea) range([3 0], [3 0]) spelling([1 112])
-        > 5: offset(10255) type(F) 
-        > 6: offset(14316) type(Ebf) range([3 0], [3 5]) spelling([5 2])
-        > 7: offset(14320) type(Ebf) range([6 0], [1 123]) spelling([1 38])
-        > 8: offset(14344) type(Ea) range([7 2], [7 2]) spelling([1 115])
-        > 9: offset(14348) type(Ea) range([7 8], [7 8]) spelling([1 120])
-        > 10: offset(14352) type(Ea) range([7 14], [7 14]) spelling([1 120])
-        > 11: offset(14356) type(Ea) range([7 20], [7 20]) spelling([1 115])
+        ```
+        Number of LocalSLocEntryTable: 12
+        0: offset(0) type(E) range([0 0], [0 0]) spelling([0 0])
+        1: offset(2) type(F) orig(name(nest_expansion.c) size(126)) contents(name(nest_expansion.c) size(126)) 
+        2: offset(129) type(F) 
+        3: offset(10245) type(Ebf) range([1 97], [1 113]) spelling([1 88])
+        4: offset(10253) type(Ea) range([3 0], [3 0]) spelling([1 112])
+        5: offset(10255) type(F) 
+        6: offset(14316) type(Ebf) range([3 0], [3 5]) spelling([5 2])
+        7: offset(14320) type(Ebf) range([6 0], [1 123]) spelling([1 38])
+        8: offset(14344) type(Ea) range([7 2], [7 2]) spelling([1 115])
+        9: offset(14348) type(Ea) range([7 8], [7 8]) spelling([1 120])
+        10: offset(14352) type(Ea) range([7 14], [7 14]) spelling([1 120])
+        11: offset(14356) type(Ea) range([7 20], [7 20]) spelling([1 115])
+        ```
 
         * 第一个数字是第几条记录，offset是`SLocEntry::Offset`，type(F)表示是一个`FileInfo`，type(Exx)表示是一个`ExpansionInfo`；
           
@@ -169,16 +171,17 @@
         * 1号记录明显就是主文件 nest_expansion.c，长度是126个字节，其offset为2，原来每一条记录它都会在
           它的长度上加上1，原因见`SourceManager::createFileID`中最后的注释：
 
-          > // We do a +1 here because we want a SourceLocation that means "the end of the
-          > // file", e.g. for the "no newline at the end of the file" diagnostic.
-          > NextLocalOffset += FileSize + 1;
+          ```c++
+          // We do a +1 here because we want a SourceLocation that means "the end of the
+          // file", e.g. for the "no newline at the end of the file" diagnostic.
+          NextLocalOffset += FileSize + 1;
+          ```
 
           * 即加多一个字节，使得 eof 也是一个有效的 `SourceLocation`，所以实际每条记录的offset是这样算出来的：
 
-            > offset = prev_offset + prev_file_size + 1
-            
-            * 故这条记录的 offset = 0 + 1 + 1 = 2
-            * 而第三条记录的 offset = 2 + 126 + 1 = 129
+            * offset = prev_offset + prev_file_size + 1
+
+          * 故这条记录的 offset = 0 + 1 + 1 = 2，而第三条记录的 offset = 2 + 126 + 1 = 129
 
         * *2号记录没有文件名，是什么我还没弄清楚，但offset一下子增加了很多，好像是创建了一个挺大的虚拟文件*。
 
