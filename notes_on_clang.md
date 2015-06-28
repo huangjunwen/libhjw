@@ -164,16 +164,17 @@
 
       * 逐条解释：
 
-        0.
+        * 0号记录
+
             > 0: offset(0) type(E) range([0 0], [0 0]) spelling([0 0])
             
             表示 invalid，初始化时即插入，其size为1（见`SourceManager::clearIDTables`) 其offset为0。
 
-        1.
+        * 1号记录
 
           > 1: offset(2) type(F) orig(name(nest_expansion.c) size(126)) ...
 
-          1号记录明显就是主文件 nest_expansion.c，长度是126个字节，其offset为2，原来每一条记录它都会在
+          明显就是主文件 nest_expansion.c，长度是126个字节，其offset为2，原来每一条记录它都会在
           它的长度上加上1，原因见`SourceManager::createFileID`中最后的注释：
 
             ```c++
@@ -188,16 +189,16 @@
 
           故这条记录的 offset = 0 + 1 + 1 = 2，而第三条记录的 offset = 2 + 126 + 1 = 129
 
-        2.
+        * 2号记录
           > 2: offset(129) type(F) 
 
-          *2号记录没有文件名，是什么我还没弄清楚，但offset一下子增加了很多，好像是创建了一个挺大的虚拟文件*。
+          *没有文件名，是什么我还没弄清楚，但offset一下子增加了很多，好像是创建了一个挺大的虚拟文件*。
 
-        3.
+        * 3号记录
 
           > 3: offset(10245) type(Ebf) range([1 97], [1 113]) spelling([1 88])
 
-          3号记录是一个**Function-like macro body expansion** (_Ebf_)，它的range指向1号记录的offset[97,113]
+          此记录是一个**Function-like macro body expansion** (_Ebf_)，它的range指向1号记录的offset[97,113]
           1号记录就是nest_expansion.c，用python跑一下：
 
             ```
@@ -215,11 +216,11 @@
             return NextOffset - Entry.getOffset() - 1;
             ```
 
-        4.
+        * 4号记录
 
           > 4: offset(10253) type(Ea) range([3 0], [3 0]) spelling([1 112])
 
-          4号记录是一个**Macro arg expansion** (_Ea_)，它是3号记录的offset为0的地方的展开, 3号记录的
+          此记录是一个**Macro arg expansion** (_Ea_)，它是3号记录的offset为0的地方的展开, 3号记录的
           字面内容为 `x ## in`，故offset为0即是`x`；而其字面位置为[1 112]指向主文件：
 
             ```
