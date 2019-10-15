@@ -1,4 +1,4 @@
-### 关于###
+### 关于
 
 此仓库是从 https://code.google.com/p/libhjw/ 迁移过来。
 
